@@ -24,180 +24,526 @@ ui <- shiny::fluidPage(
            document.execCommand('copy');
          }
        }"
-    ))
+    )),
+    shiny::tags$style(shiny::HTML("
+      :root {
+        --sb-bg: #F8FAFC;
+        --sb-panel: #FFFFFF;
+        --sb-border: #E2E8F0;
+        --sb-teal: #0F766E;
+        --sb-teal-hover: #115E59;
+        --sb-text: #0F172A;
+        --sb-muted: #334155;
+        --sb-amber-bg: #FFFBEB;
+        --sb-amber-border: #F59E0B;
+        --sb-amber-text: #92400E;
+        --sb-radius: 10px;
+      }
+      body, .container-fluid {
+        background: var(--sb-bg) !important;
+        color: var(--sb-text);
+      }
+      .sb-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 14px 18px;
+        margin: 0 0 12px 0;
+        background: var(--sb-panel);
+        border: 1px solid var(--sb-border);
+        border-radius: var(--sb-radius);
+      }
+      .sb-brand-title {
+        margin: 0;
+        font-size: 1.55rem;
+        font-weight: 700;
+        color: var(--sb-text);
+        letter-spacing: -0.02em;
+      }
+      .sb-brand-sub {
+        margin: 4px 0 0 0;
+        font-size: 0.92rem;
+        color: var(--sb-muted);
+      }
+      .sb-header-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        justify-content: flex-end;
+      }
+      .sb-badge {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        border: 1px solid var(--sb-border);
+        background: #F1F5F9;
+        color: var(--sb-muted);
+        white-space: nowrap;
+      }
+      .sb-badge-warn {
+        background: #FEF3C7;
+        border-color: #FCD34D;
+        color: #92400E;
+      }
+      .sb-stale {
+        margin: 0 0 12px 0;
+        padding: 10px 14px;
+        background: var(--sb-amber-bg);
+        border: 1px solid var(--sb-amber-border);
+        border-radius: var(--sb-radius);
+        color: var(--sb-amber-text);
+        font-size: 0.92rem;
+      }
+      .sb-kpi-row {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        margin: 0 0 14px 0;
+      }
+      @media (max-width: 992px) {
+        .sb-kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      }
+      @media (max-width: 600px) {
+        .sb-kpi-row { grid-template-columns: 1fr; }
+        .sb-header { flex-direction: column; }
+      }
+      .sb-kpi {
+        background: var(--sb-panel);
+        border: 1px solid var(--sb-border);
+        border-radius: var(--sb-radius);
+        padding: 12px 14px;
+      }
+      .sb-kpi-label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--sb-muted);
+        margin: 0 0 6px 0;
+      }
+      .sb-kpi-value {
+        font-size: 1.05rem;
+        font-weight: 650;
+        color: var(--sb-text);
+        margin: 0;
+        word-break: break-word;
+      }
+      .sb-welcome {
+        background: var(--sb-panel);
+        border: 1px solid var(--sb-border);
+        border-radius: var(--sb-radius);
+        padding: 16px 18px;
+        margin: 0 0 14px 0;
+      }
+      .sb-welcome h4 { margin-top: 0; color: var(--sb-teal); }
+      .sb-welcome ol { margin-bottom: 0; color: var(--sb-muted); }
+      .well, .sidebarPanel, .mainPanel > .tabbable {
+        background: var(--sb-panel) !important;
+        border: 1px solid var(--sb-border) !important;
+        border-radius: var(--sb-radius) !important;
+        box-shadow: none !important;
+      }
+      .sidebarPanel {
+        padding: 14px !important;
+      }
+      .sb-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 12px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid var(--sb-border);
+      }
+      .sb-actions .btn-primary,
+      .sb-actions .btn-primary:focus {
+        background-color: var(--sb-teal) !important;
+        border-color: var(--sb-teal) !important;
+      }
+      .sb-actions .btn-primary:hover {
+        background-color: var(--sb-teal-hover) !important;
+        border-color: var(--sb-teal-hover) !important;
+      }
+      .sb-actions .shiny-download-link {
+        text-align: center;
+      }
+      details.sb-acc {
+        background: #F8FAFC;
+        border: 1px solid var(--sb-border);
+        border-radius: 8px;
+        padding: 8px 10px;
+        margin-bottom: 10px;
+      }
+      details.sb-acc > summary {
+        cursor: pointer;
+        font-weight: 650;
+        color: var(--sb-text);
+        outline: none;
+        padding: 4px 2px;
+      }
+      details.sb-acc[open] > summary {
+        margin-bottom: 8px;
+        border-bottom: 1px solid var(--sb-border);
+        padding-bottom: 8px;
+      }
+      .sb-hint {
+        font-size: 0.82rem;
+        color: var(--sb-muted);
+        margin: 0 0 8px 0;
+      }
+      .sb-note {
+        font-size: 0.84rem;
+        color: var(--sb-muted);
+        margin: 6px 0 0 0;
+      }
+      .sb-panel-block {
+        background: var(--sb-panel);
+        border: 1px solid var(--sb-border);
+        border-radius: var(--sb-radius);
+        padding: 12px 14px;
+        margin-bottom: 12px;
+      }
+      .sb-inline-controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: flex-end;
+        margin-bottom: 10px;
+      }
+      .sb-inline-controls .form-group {
+        margin-bottom: 0 !important;
+        min-width: 160px;
+      }
+      .nav-tabs > li > a { color: var(--sb-muted); }
+      .nav-tabs > li.active > a,
+      .nav-tabs > li.active > a:hover,
+      .nav-tabs > li.active > a:focus {
+        color: var(--sb-teal) !important;
+        border-top-color: var(--sb-teal) !important;
+        font-weight: 600;
+      }
+      h4.sb-section {
+        margin-top: 4px;
+        margin-bottom: 10px;
+        font-size: 1.05rem;
+        color: var(--sb-text);
+      }
+    "))
   ),
-  shiny::titlePanel("SigBenchR — Gen İmzası Doğrulama"),
-  shiny::tags$p(
-    shiny::em(
-      "Dahili halka açık melanoma ICI kohortları üzerinde keşifsel kıyaslama aracı — yalnızca gen sembolleri girin. ",
-      "Araştırma amaçlıdır; klinik karar aracı değildir."
+  shiny::div(
+    class = "sb-header",
+    shiny::div(
+      shiny::tags$h1(class = "sb-brand-title", "SigBenchR"),
+      shiny::tags$p(
+        class = "sb-brand-sub",
+        "İmmünoterapi Gen İmzası Doğrulama Aracı"
+      )
+    ),
+    shiny::div(
+      class = "sb-header-meta",
+      shiny::span(class = "sb-badge", "v0.3.1"),
+      shiny::span(
+        class = "sb-badge sb-badge-warn",
+        "Araştırma Amaçlıdır — Klinik Karar Aracı Değildir"
+      )
     )
   ),
+  shiny::uiOutput("stale_note"),
   shiny::sidebarLayout(
     shiny::sidebarPanel(
-      shiny::checkboxGroupInput(
-        "sig_choice", "Hazır imzalar",
-        choices = c("Cytokine-5", "IFNG6", "Random3"),
-        selected = c("Cytokine-5", "IFNG6", "Random3")
-      ),
-      shiny::textAreaInput(
-        "custom_genes",
-        "Özel imza ekle — opsiyonel",
-        rows = 3,
-        placeholder = "Genleri virgül, boşluk veya satırla ayırın"
-      ),
-      shiny::checkboxGroupInput(
-        "methods", "Skorlama yöntemleri",
-        choices = c("mean", "zscore", "median", "rank", "ss_rank"),
-        selected = c("mean", "zscore")
-      ),
-      shiny::radioButtons(
-        "heatmap_method", "Aktif Görünüm / Özet Yöntemi",
-        choices = c("mean", "zscore"), selected = "mean"
-      ),
-      shiny::radioButtons(
-        "direction", "İmza yönü",
-        choices = c("Yüksek=yanıtlı (<)" = "<", "Düşük=yanıtlı (>)" = ">"),
-        selected = "<"
-      ),
-      shiny::radioButtons(
-        "sd_handling", "SD politikası",
-        choices = c(
-          "SD dışla [CR/PR vs PD]" = "exclude",
-          "ORR [CR/PR vs SD/PD]" = "as_0",
-          "DCR [CR/PR/SD vs PD]" = "as_1"
+      width = 3,
+      shiny::div(
+        class = "sb-actions",
+        shiny::actionButton(
+          "run", "Analizi Çalıştır",
+          class = "btn-primary btn-block",
+          width = "100%"
         ),
-        selected = "exclude"
-      ),
-      shiny::checkboxInput(
-        "match_expression",
-        "Null: ifade düzeyine eşleştirilmiş örnekleme",
-        FALSE
-      ),
-      shiny::sliderInput("coverage_threshold", "Kapsama eşiği", 0.5, 1, 0.70, 0.05),
-      shiny::sliderInput("sensitivity_threshold", "Dayanıklılık eşiği (keyfi)", 0.05, 0.3, 0.10, 0.01),
-      shiny::checkboxInput("compute_pr", "PR-AUC + bootstrap GA", TRUE),
-      shiny::numericInput("n_boot", "PR bootstrap (n_boot)", value = 200, min = 0, max = 2000, step = 50),
-      shiny::checkboxInput("compute_null", "Null permütasyon", FALSE),
-      shiny::numericInput("n_perm", "Null B", value = 1000, min = 10, max = 2000, step = 50),
-      shiny::numericInput("seed", "Seed", value = 42, min = 1, step = 1),
-      shiny::checkboxGroupInput(
-        "datasets", "Veri setleri (ICI kohortları)",
-        choices = c(
-          "van_allen_2015", "hugo_2016", "riaz_2017", "gide_2019"
-        ),
-        selected = c("van_allen_2015", "hugo_2016", "riaz_2017", "gide_2019")
-      ),
-      if (isTRUE(.sigbenchr_allow_upload)) {
-        shiny::tagList(
-          shiny::hr(),
-          shiny::h5("Yerel Kohort Ekle (CSV/TSV)"),
-          shiny::fileInput("upload_expr", "Ifade matrisi (CSV/TSV)", accept = c(".csv", ".tsv", ".txt")),
-          shiny::fileInput("upload_meta", "Klinik metadata (CSV/TSV)", accept = c(".csv", ".tsv", ".txt")),
-          shiny::checkboxInput("upload_genes_in_rows", "Genler satırlarda", TRUE),
-          shiny::selectInput(
-            "upload_gene_id_type", "Gen ID tipi",
-            choices = c("HGNC", "Ensembl", "other"), selected = "HGNC"
-          ),
-          shiny::selectInput(
-            "upload_normalization", "Normalizasyon",
-            choices = c("TPM", "FPKM", "normalized_counts", "log_normalized", "other"),
-            selected = "TPM"
-          ),
-          shiny::selectInput(
-            "upload_scale", "Ölçek",
-            choices = c("linear", "log2"), selected = "log2"
-          ),
-          shiny::textInput("upload_sample_id_col", "sample_id sütunu", value = "sample_id"),
-          shiny::textInput("upload_response_col", "response sütunu", value = "response_label"),
-          shiny::textInput("upload_dataset_name", "Kohort adı", value = "user_cohort"),
-          shiny::actionButton("upload_add", "Kohortu Doğrula ve Ekle", class = "btn-info"),
-          shiny::verbatimTextOutput("upload_status")
+        shiny::downloadButton(
+          "download_report", "HTML Rapor İndir",
+          class = "btn-default btn-block"
         )
-      } else {
+      ),
+      shiny::tags$details(
+        class = "sb-acc",
+        open = NA,
+        shiny::tags$summary("1. İmzalar ve Kohortlar"),
+        shiny::checkboxGroupInput(
+          "sig_choice", "Hazır imzalar",
+          choices = c("Cytokine-5", "IFNG6", "Random3"),
+          selected = c("Cytokine-5", "IFNG6", "Random3")
+        ),
+        shiny::textAreaInput(
+          "custom_genes",
+          "Özel imza (opsiyonel)",
+          rows = 3,
+          placeholder = "Genleri virgül, boşluk veya satırla ayırın"
+        ),
         shiny::tags$p(
-          shiny::em(
-            "Özel kohort yükleme hasta gizliliği için yalnızca yerel R oturumunda (`SigBenchR::run_app(allow_upload = TRUE)`) aktiftir."
+          class = "sb-hint",
+          "Özel imza Jaccard ve DeLong seçicilerinde \"Custom\" olarak görünür; derived_from belirtilmez (independent = NA)."
+        ),
+        shiny::checkboxGroupInput(
+          "datasets", "Kohortlar (ICI)",
+          choices = c(
+            "van_allen_2015", "hugo_2016", "riaz_2017", "gide_2019"
+          ),
+          selected = c("van_allen_2015", "hugo_2016", "riaz_2017", "gide_2019")
+        ),
+        if (isTRUE(.sigbenchr_allow_upload)) {
+          shiny::tags$details(
+            class = "sb-acc",
+            shiny::tags$summary("Yerel Kohort Yükle (CSV/TSV)"),
+            shiny::fileInput("upload_expr", "Ifade matrisi (CSV/TSV)", accept = c(".csv", ".tsv", ".txt")),
+            shiny::fileInput("upload_meta", "Klinik metadata (CSV/TSV)", accept = c(".csv", ".tsv", ".txt")),
+            shiny::checkboxInput("upload_genes_in_rows", "Genler satırlarda", TRUE),
+            shiny::selectInput(
+              "upload_gene_id_type", "Gen ID tipi",
+              choices = c("HGNC", "Ensembl", "other"), selected = "HGNC"
+            ),
+            shiny::selectInput(
+              "upload_normalization", "Normalizasyon",
+              choices = c("TPM", "FPKM", "normalized_counts", "log_normalized", "other"),
+              selected = "TPM"
+            ),
+            shiny::selectInput(
+              "upload_scale", "Ölçek",
+              choices = c("linear", "log2"), selected = "log2"
+            ),
+            shiny::textInput("upload_sample_id_col", "sample_id sütunu", value = "sample_id"),
+            shiny::textInput("upload_response_col", "response sütunu", value = "response_label"),
+            shiny::textInput("upload_dataset_name", "Kohort adı", value = "user_cohort"),
+            shiny::actionButton("upload_add", "Kohortu Doğrula ve Ekle", class = "btn-info"),
+            shiny::verbatimTextOutput("upload_status")
           )
-        )
-      },
-      shiny::actionButton("run", "Analizi çalıştır", class = "btn-primary"),
-      shiny::downloadButton("download_report", "Tüm sonuçları HTML rapor olarak indir"),
-      shiny::hr(),
-      shiny::h5("DeLong: iki imza (aynı veri seti)"),
-      shiny::selectInput(
-        "cmp_dataset", "Veri seti",
-        choices = c("van_allen_2015", "hugo_2016", "riaz_2017", "gide_2019")
+        } else {
+          shiny::tags$p(
+            class = "sb-note",
+            "Yerel kohort yükleme yalnızca SigBenchR::run_app(allow_upload = TRUE) ile açılır."
+          )
+        }
       ),
-      shiny::selectInput("cmp_sig1", "İmza 1", choices = c("Cytokine-5", "IFNG6", "Random3")),
-      shiny::selectInput("cmp_sig2", "İmza 2", choices = c("IFNG6", "Cytokine-5", "Random3")),
-      shiny::actionButton("run_cmp", "DeLong karşılaştır")
+      shiny::tags$details(
+        class = "sb-acc",
+        open = NA,
+        shiny::tags$summary("2. Yöntem ve Klinik Politika"),
+        shiny::checkboxGroupInput(
+          "methods", "Skorlama yöntemleri",
+          choices = c("mean", "zscore", "median", "rank", "ss_rank"),
+          selected = c("mean", "zscore")
+        ),
+        shiny::radioButtons(
+          "direction", "İmza yönü",
+          choices = c("Yüksek=yanıtlı (<)" = "<", "Düşük=yanıtlı (>)" = ">"),
+          selected = "<"
+        ),
+        shiny::radioButtons(
+          "sd_handling", "SD politikası",
+          choices = c(
+            "SD dışla [CR/PR vs PD]" = "exclude",
+            "ORR [CR/PR vs SD/PD]" = "as_0",
+            "DCR [CR/PR/SD vs PD]" = "as_1"
+          ),
+          selected = "exclude"
+        )
+      ),
+      shiny::tags$details(
+        class = "sb-acc",
+        shiny::tags$summary("3. İleri İstatistiksel Ayarlar"),
+        shiny::sliderInput("coverage_threshold", "Kapsama eşiği", 0.5, 1, 0.70, 0.05),
+        shiny::sliderInput("sensitivity_threshold", "Dayanıklılık eşiği (keyfi)", 0.05, 0.3, 0.10, 0.01),
+        shiny::checkboxInput("compute_pr", "PR-AUC + bootstrap GA", TRUE),
+        shiny::numericInput("n_boot", "PR bootstrap (n_boot)", value = 200, min = 0, max = 2000, step = 50),
+        shiny::checkboxInput("compute_null", "Null permütasyon", FALSE),
+        shiny::numericInput("n_perm", "Null B", value = 1000, min = 10, max = 2000, step = 50),
+        shiny::checkboxInput(
+          "match_expression",
+          "Null: ifade düzeyine eşleştirilmiş örnekleme",
+          FALSE
+        ),
+        shiny::numericInput("seed", "Seed", value = 42, min = 1, step = 1)
+      )
     ),
     shiny::mainPanel(
+      width = 9,
+      shiny::uiOutput("kpi_strip"),
       shiny::tabsetPanel(
+        id = "main_tabs",
         shiny::tabPanel(
-          "Sonuçlar",
-          shiny::verbatimTextOutput("status"),
-          shiny::uiOutput("stale_note"),
-          shiny::h4("Sonuç tablosu"),
-          if (requireNamespace("DT", quietly = TRUE)) DT::DTOutput("table") else shiny::tableOutput("table_fallback"),
-          shiny::h4("AUC ısı haritası"),
-          shiny::plotOutput("heatmap", height = "320px"),
-          shiny::h4("Dayanıklılık (Sensitivity)"),
-          if (requireNamespace("DT", quietly = TRUE)) DT::DTOutput("sensitivity_table") else shiny::tableOutput("sensitivity_fallback")
+          "Genel Bakış",
+          shiny::div(
+            class = "sb-panel-block",
+            shiny::radioButtons(
+              "heatmap_method", "Aktif Görünüm Yöntemi",
+              choices = c("mean", "zscore"), selected = "mean",
+              inline = TRUE
+            ),
+            shiny::tags$h4(class = "sb-section", "AUC ısı haritası"),
+            shiny::plotOutput("heatmap", height = "320px"),
+            shiny::tags$h4(class = "sb-section", "Sonuç tablosu"),
+            if (requireNamespace("DT", quietly = TRUE)) {
+              DT::DTOutput("table")
+            } else {
+              shiny::tableOutput("table_fallback")
+            }
+          )
         ),
         shiny::tabPanel(
-          "Gen Kapsama",
-          shiny::h4("Gen kapsama ve eksik gen detayı"),
-          shiny::tags$p(shiny::em("Her imza × kohort için bulunan/toplam gen, % kapsama ve missing_genes.")),
-          if (requireNamespace("DT", quietly = TRUE)) DT::DTOutput("coverage_table") else shiny::tableOutput("coverage_fallback")
-        ),
-        shiny::tabPanel(
-          "ROC eğrileri",
-          shiny::selectInput(
-            "roc_dataset", "Veri seti",
-            choices = c("van_allen_2015", "hugo_2016", "riaz_2017", "gide_2019")
+          "ROC ve Forest",
+          shiny::div(
+            class = "sb-panel-block",
+            shiny::div(
+              class = "sb-inline-controls",
+              shiny::selectInput(
+                "roc_dataset", "Kohort",
+                choices = c("van_allen_2015", "hugo_2016", "riaz_2017", "gide_2019")
+              )
+            ),
+            shiny::tags$h4(class = "sb-section", "ROC eğrileri"),
+            shiny::plotOutput("roc_plot", height = "420px")
           ),
-          shiny::plotOutput("roc_plot", height = "420px")
+          shiny::div(
+            class = "sb-panel-block",
+            shiny::div(
+              class = "sb-inline-controls",
+              shiny::selectInput(
+                "forest_sig", "Forest imzası",
+                choices = c("Cytokine-5", "IFNG6", "Random3")
+              )
+            ),
+            shiny::tags$h4(class = "sb-section", "AUC forest"),
+            shiny::plotOutput("forest_plot", height = "320px")
+          )
         ),
         shiny::tabPanel(
-          "DeLong",
-          shiny::verbatimTextOutput("cmp_status"),
-          shiny::tags$p(shiny::em("Tek karşılaştırmada p_adj_bh ham p değerine eşittir.")),
-          if (requireNamespace("DT", quietly = TRUE)) DT::DTOutput("cmp_table") else shiny::tableOutput("cmp_fallback")
-        ),
-        shiny::tabPanel(
-          "Özet",
-          shiny::selectInput(
-            "forest_sig", "Forest imzası",
-            choices = c("Cytokine-5", "IFNG6", "Random3")
+          "Özet ve Alt Gruplar",
+          shiny::div(
+            class = "sb-panel-block",
+            shiny::checkboxInput(
+              "stratify_by",
+              "Tedavi / Sonlanım Alt Grubuna Göre Ayır (stratify_by)",
+              FALSE
+            ),
+            shiny::tags$p(
+              class = "sb-hint",
+              "İşaretliyken özet stratify_by = c(\"treatment\", \"endpoint_type\") ile ayrılır (ör. anti-CTLA4 klinik yarar vs anti-PD1 RECIST)."
+            ),
+            shiny::tags$h4(class = "sb-section", "Ağırlıklı özet (n + ters-varyans, Q, I²)"),
+            if (requireNamespace("DT", quietly = TRUE)) {
+              DT::DTOutput("summary_table")
+            } else {
+              shiny::tableOutput("summary_fallback")
+            }
           ),
-          shiny::h4("Ağırlıklı Özet (n + ters-varyans, Q, I2)"),
-          if (requireNamespace("DT", quietly = TRUE)) DT::DTOutput("summary_table") else shiny::tableOutput("summary_fallback"),
-          shiny::h4("AUC forest"),
-          shiny::plotOutput("forest_plot", height = "320px"),
-          shiny::h4("Jaccard (aktif imzalar)"),
-          if (requireNamespace("DT", quietly = TRUE)) DT::DTOutput("jaccard_table") else shiny::tableOutput("jaccard_fallback"),
-          shiny::h4("AUC korelasyonu (veri setleri boyunca)"),
-          if (requireNamespace("DT", quietly = TRUE)) DT::DTOutput("corr_table") else shiny::tableOutput("corr_fallback")
+          shiny::div(
+            class = "sb-panel-block",
+            shiny::tags$h4(class = "sb-section", "Skorlama dayanıklılığı (check_sensitivity)"),
+            if (requireNamespace("DT", quietly = TRUE)) {
+              DT::DTOutput("sensitivity_table")
+            } else {
+              shiny::tableOutput("sensitivity_fallback")
+            }
+          )
         ),
         shiny::tabPanel(
-          "R kodu",
-          shiny::h4("Bu analizin R kodunu kopyala"),
-          shiny::tags$p("Son çalıştırılan snapshot parametrelerinden üretilen kod:"),
-          shiny::textAreaInput(
-            "r_code_text",
-            label = NULL,
-            value = "",
-            rows = 18,
-            width = "100%"
+          "Karşılaştırma",
+          shiny::div(
+            class = "sb-panel-block",
+            shiny::tags$h4(class = "sb-section", "Eşleştirilmiş DeLong"),
+            shiny::div(
+              class = "sb-inline-controls",
+              shiny::selectInput(
+                "cmp_dataset", "Veri seti",
+                choices = c("van_allen_2015", "hugo_2016", "riaz_2017", "gide_2019")
+              ),
+              shiny::selectInput(
+                "cmp_sig1", "İmza 1",
+                choices = c("Cytokine-5", "IFNG6", "Random3")
+              ),
+              shiny::selectInput(
+                "cmp_sig2", "İmza 2",
+                choices = c("IFNG6", "Cytokine-5", "Random3")
+              ),
+              shiny::actionButton("run_cmp", "Karşılaştır", class = "btn-primary")
+            ),
+            shiny::verbatimTextOutput("cmp_status"),
+            shiny::tags$p(
+              class = "sb-hint",
+              "Tek karşılaştırmada p_adj_bh ham p değerine eşittir (p_adj_bh == p_value)."
+            ),
+            if (requireNamespace("DT", quietly = TRUE)) {
+              DT::DTOutput("cmp_table")
+            } else {
+              shiny::tableOutput("cmp_fallback")
+            }
           ),
-          shiny::tags$button(
-            "Kodu kopyala",
-            id = "copy_r_code",
-            class = "btn btn-default",
-            type = "button",
-            onclick = "sigbenchrCopyRcode();"
+          shiny::div(
+            class = "sb-panel-block",
+            shiny::tags$h4(class = "sb-section", "Jaccard örtüşme (Custom dahil)"),
+            if (requireNamespace("DT", quietly = TRUE)) {
+              DT::DTOutput("jaccard_table")
+            } else {
+              shiny::tableOutput("jaccard_fallback")
+            }
+          ),
+          shiny::div(
+            class = "sb-panel-block",
+            shiny::tags$h4(class = "sb-section", "AUC korelasyonu (veri setleri boyunca)"),
+            if (requireNamespace("DT", quietly = TRUE)) {
+              DT::DTOutput("corr_table")
+            } else {
+              shiny::tableOutput("corr_fallback")
+            }
+          )
+        ),
+        shiny::tabPanel(
+          "Kapsama ve Tekrarlanabilirlik",
+          shiny::div(
+            class = "sb-panel-block",
+            shiny::tags$h4(class = "sb-section", "Gen kapsama ve eksik gen detayı"),
+            shiny::tags$p(
+              class = "sb-hint",
+              "Her imza × kohort için bulunan/toplam gen, % kapsama ve missing_genes."
+            ),
+            if (requireNamespace("DT", quietly = TRUE)) {
+              DT::DTOutput("coverage_table")
+            } else {
+              shiny::tableOutput("coverage_fallback")
+            }
+          ),
+          shiny::div(
+            class = "sb-panel-block",
+            shiny::tags$h4(class = "sb-section", "Kopyalanabilir R kodu"),
+            shiny::tags$p(
+              class = "sb-hint",
+              "Son çalıştırılan snapshot parametrelerinden üretilir; canlı input ile çelişmez."
+            ),
+            shiny::textAreaInput(
+              "r_code_text",
+              label = NULL,
+              value = "",
+              rows = 16,
+              width = "100%"
+            ),
+            shiny::tags$button(
+              "Kodu kopyala",
+              id = "copy_r_code",
+              class = "btn btn-default",
+              type = "button",
+              onclick = "sigbenchrCopyRcode();"
+            )
+          ),
+          shiny::div(
+            class = "sb-panel-block",
+            shiny::tags$h4(class = "sb-section", "Bilimsel sınır ve provenans"),
+            shiny::tags$ul(
+              shiny::tags$li("Araştırma amaçlı keşif aracıdır; klinik karar için tasarlanmamıştır."),
+              shiny::tags$li("Dahili halka açık melanoma ICI kohortları (datasets_ici) ve demo imzaları kullanılır."),
+              shiny::tags$li("Grafikler, R kodu ve HTML rapor yalnızca results() snapshot nesnesinden (res, sigs, params) beslenir."),
+              shiny::tags$li("Cytokine-5 derived_from içerir (independent = FALSE); IFNG6 / Random3 bağımsızdır; Custom için independent = NA.")
+            )
           )
         )
       )
@@ -434,13 +780,90 @@ server <- function(input, output, session) {
 
   output$stale_note <- shiny::renderUI({
     if (isTRUE(stale_inputs())) {
-      shiny::tags$p(
-        shiny::em("Ayarlar değişti; güncel sonuç için 'Analizi Çalıştır'a basın."),
-        style = "color:#8a6d3b;"
+      shiny::div(
+        class = "sb-stale",
+        "Parametreler değişti — güncel sonuçları görmek için 'Analizi Çalıştır'a basın."
       )
     } else {
       NULL
     }
+  })
+
+  output$kpi_strip <- shiny::renderUI({
+    snap <- results()
+    if (is.null(snap) || is.null(input$run) || identical(as.integer(input$run), 0L)) {
+      return(shiny::div(
+        class = "sb-welcome",
+        shiny::tags$h4("Başlangıç rehberi"),
+        shiny::tags$ol(
+          shiny::tags$li("Soldan imza ve kohortları seçin (gerekirse özel gen listesi ekleyin)."),
+          shiny::tags$li("Yöntem, imza yönü ve SD politikasını ayarlayın."),
+          shiny::tags$li("\"Analizi Çalıştır\"a basın; özet metrikler ve sekmeler snapshot sonuçlarıyla dolar."),
+          shiny::tags$li("ROC / Forest, özet alt grupları ve DeLong karşılaştırmasını ilgili sekmelerde inceleyin.")
+        )
+      ))
+    }
+
+    df <- snap$res
+    p <- snap$params
+    n_ds <- length(unique(as.character(p$datasets)))
+    n_sig <- length(snap$sigs)
+    hm <- if (!is.null(input$heatmap_method) && nzchar(input$heatmap_method)) {
+      input$heatmap_method
+    } else {
+      p$heatmap_method
+    }
+    sd_lab <- switch(
+      as.character(p$sd_handling),
+      exclude = "exclude",
+      as_0 = "as_0 (ORR)",
+      as_1 = "as_1 (DCR)",
+      as.character(p$sd_handling)
+    )
+
+    indep_flag <- as.logical(df$independent)
+    indep <- df[
+      df$method == hm &
+        !(df$skipped %in% TRUE) &
+        !is.na(indep_flag) & indep_flag &
+        !(df$low_coverage %in% TRUE) &
+        is.finite(df$auc),
+      ,
+      drop = FALSE
+    ]
+    best_auc <- if (nrow(indep) > 0L) {
+      i <- which.max(indep$auc)
+      sprintf("%.3f (%s · %s)", indep$auc[i], indep$signature[i], indep$dataset[i])
+    } else {
+      "Bağımsız sonuç yok"
+    }
+
+    n_low <- sum(df$low_coverage %in% TRUE, na.rm = TRUE)
+    thr_pct <- round(100 * as.numeric(p$coverage_threshold))
+
+    shiny::div(
+      class = "sb-kpi-row",
+      shiny::div(
+        class = "sb-kpi",
+        shiny::tags$p(class = "sb-kpi-label", "Kohort / İmza"),
+        shiny::tags$p(class = "sb-kpi-value", sprintf("%d kohort · %d imza", n_ds, n_sig))
+      ),
+      shiny::div(
+        class = "sb-kpi",
+        shiny::tags$p(class = "sb-kpi-label", "Yöntem & SD"),
+        shiny::tags$p(class = "sb-kpi-value", sprintf("%s · %s", hm, sd_lab))
+      ),
+      shiny::div(
+        class = "sb-kpi",
+        shiny::tags$p(class = "sb-kpi-label", "En yüksek bağımsız AUC"),
+        shiny::tags$p(class = "sb-kpi-value", best_auc)
+      ),
+      shiny::div(
+        class = "sb-kpi",
+        shiny::tags$p(class = "sb-kpi-label", sprintf("Düşük kapsama (< %%%d)", thr_pct)),
+        shiny::tags$p(class = "sb-kpi-value", sprintf("%d hücre", as.integer(n_low)))
+      )
+    )
   })
 
   sens <- shiny::reactive({
@@ -460,8 +883,27 @@ server <- function(input, output, session) {
     } else {
       snap$params$heatmap_method
     }
+    strat <- if (isTRUE(input$stratify_by)) {
+      c("treatment", "endpoint_type")
+    } else {
+      NULL
+    }
     suppressWarnings(
-      SigBenchR::summarize_auc(snap$res, method = hm)
+      SigBenchR::summarize_auc(snap$res, method = hm, stratify_by = strat)
+    )
+  })
+
+  # Forest referans çizgisi için tabakasız özet (çok satırlı stratify_by ile çelişmez)
+  summary_res_forest <- shiny::reactive({
+    shiny::req(results())
+    snap <- results()
+    hm <- if (!is.null(input$heatmap_method) && nzchar(input$heatmap_method)) {
+      input$heatmap_method
+    } else {
+      snap$params$heatmap_method
+    }
+    suppressWarnings(
+      SigBenchR::summarize_auc(snap$res, method = hm, stratify_by = NULL)
     )
   })
 
@@ -534,22 +976,6 @@ server <- function(input, output, session) {
       )
     }
   )
-
-  output$status <- shiny::renderText({
-    if (is.null(input$run) || identical(as.integer(input$run), 0L)) {
-      return("Analizi çalıştırmak için düğmeye basın.")
-    }
-    if (is.null(results())) {
-      return("Analizi çalıştırmak için düğmeye basın.")
-    }
-    df <- results()$res
-    paste0(
-      "Satır: ", nrow(df),
-      " | Düşük kapsama: ", sum(df$low_coverage, na.rm = TRUE),
-      " | Küçük kohort: ", sum(df$small_cohort, na.rm = TRUE),
-      " | var_zero: ", sum(df$var_zero, na.rm = TRUE)
-    )
-  })
 
   .dt_round <- function(df) {
     if (!requireNamespace("DT", quietly = TRUE)) {
@@ -770,7 +1196,7 @@ server <- function(input, output, session) {
       snap$res,
       signature = input$forest_sig,
       method = input$heatmap_method,
-      summary = summary_res()
+      summary = summary_res_forest()
     )
   })
 
