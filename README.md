@@ -1,8 +1,18 @@
 # SigBenchR
 
+[![R-CMD-check](https://github.com/F1perS-Efe/Benchmark/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/F1perS-Efe/Benchmark/actions/workflows/R-CMD-check.yaml)
+
 Bir gen imzasının (gen listesi) immünoterapi yanıt sınıfları arasında **ayırt edici** (discrimination) olup olmadığını birden fazla veri setinde istatistiksel olarak sınayan, tekrarlanabilir doğrulama aracı. AUC klinik tahmin / kalibrasyon modeli değildir.
 
 > **Önemli:** Bu araç klinik karar desteği değildir. Sonuçlar araştırma amaçlıdır; küçük örneklemlerde belirsizdir. “Kanıt yok” sonucu da netçe raporlanır. Eşikler ve varsayılanlar sonuçlara bakıldıktan sonra değiştirilmemelidir.
+
+## Overview (English)
+
+SigBenchR is a pure CRAN / zero-Bioconductor R package for reproducible gene-signature benchmarking in immuno-oncology. Datasets follow a lightweight `list(expr, sample_meta, info)` contract, with optional GMT and `SummarizedExperiment` adapters for interoperability. Five scoring methods are supported (`mean`, `zscore`, `median`, `rank`, `ss_rank`), including signed `+`/`-` signatures; 53 immuno-oncology gene aliases are rescued automatically; and gene coverage is reported as `coverage_status` (`ok` / `low_power` / `invalid`). Evaluation is leakage-free (`enc$kept` filtering before scoring and permutation), with an 8-signature literature ICI panel plus 3 negative controls, biological-context correlations (`correlate_reference_axes()`), Hanley–McNeil power (`estimate_auc_power()`), REML + truncated HKSJ meta-analysis, and optional Cox PH / Kaplan–Meier survival via `evaluate_survival()`.
+
+## Methods (Publication-Ready Summary)
+
+For each cohort, linear-scale expression (`scale == "linear"`) is transformed with `log2(x + 1)`; SD/NA response samples are removed via `enc$kept` before scoring and null permutation. Signature scores are oriented with `orient_score()` and evaluated with unidirectional ROC-AUC (`direction = "<"`) under DeLong 95% confidence intervals, alongside stratified bootstrap PR-AUC. Empirical nulls use a vectorized Mann–Whitney U statistic with p = (k + 1) / (B + 1) (`B = 1000` by default) and Benjamini–Hochberg adjustment across the signature × cohort family. Independent, adequately covered cohorts are summarized on the logit-AUC scale with REML random-effects meta-analysis and truncated HKSJ intervals; small-n discrimination power for a target AUC of 0.70 is reported with the Hanley–McNeil (1982) approximation. Optional clinical-benefit endpoints are assessed with 1-SD continuous Cox proportional hazards models and median-split Kaplan–Meier log-rank tests. Known limits are stated transparently: the bundled demo expression pool contains ~2,800 genes, meta-analysis with `k <= 4` cohorts is exploratory, and normalization schemes remain heterogeneous across cohorts.
 
 ## Kurulum
 
