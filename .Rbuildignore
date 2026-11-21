@@ -1,0 +1,14 @@
+^.*\.Rproj$
+^\.Rproj\.user$
+^\.git$
+^\.gitignore$
+^\.cursor$
+^renv$
+^renv\.lock$
+^data-raw$
+^README\.Rmd$
+^\.github$
+^.*\.tar\.gz$
+^\.DS_Store$
+^\.socraticodeignore$
+^LICENSE\.md$

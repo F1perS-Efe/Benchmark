@@ -1,0 +1,28 @@
+Package: SigBenchR
+Title: Gene Signature Benchmarking for Immunotherapy Response
+Version: 0.1.0
+Authors@R: 
+    person(given = "Kaan", family = "Developer",
+           role = c("aut", "cre"),
+           email = "kaan@example.com")
+Description: Statistically validates whether a gene signature predicts
+    immunotherapy response across multiple datasets in a reproducible way.
+    Core computations are independent of Shiny; an optional web UI is provided
+    via run_app().
+License: GPL (>= 3)
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+Depends: 
+    R (>= 4.2.0)
+Imports: 
+    ggplot2,
+    pROC
+Suggests: 
+    DT,
+    knitr,
+    shiny,
+    testthat (>= 3.0.0),
+    withr
+Config/testthat/edition: 3
+Config/roxygen2/version: 8.1.1

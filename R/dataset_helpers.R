@@ -1,0 +1,98 @@
+#' Veri seti listesinin zorunlu alanlarini dogrula
+#'
+#' Beklenen yapi:
+#' `list(expr = <matris>, sample_meta = <data.frame>, info = list(...))`
+#'
+#' @param dataset SigBenchR veri seti listesi.
+#' @param name Hata mesajlari icin istege bagli ad.
+#'
+#' @return Gorunmez olarak `dataset` (yan etkisiz dogrulama).
+#' @export
+validate_dataset <- function(dataset, name = NULL) {
+  label <- if (is.null(name)) "dataset" else name
+  if (!is.list(dataset)) {
+    stop("`", label, "` bir list olmalidir.", call. = FALSE)
+  }
+  required <- c("expr", "sample_meta", "info")
+  missing <- setdiff(required, names(dataset))
+  if (length(missing) > 0L) {
+    stop(
+      "`", label, "` eksik alanlar: ", paste(missing, collapse = ", "),
+      call. = FALSE
+    )
+  }
+  if (!is.matrix(dataset$expr) && !is.data.frame(dataset$expr)) {
+    stop("`", label, "$expr` matris veya data.frame olmalidir.", call. = FALSE)
+  }
+  if (is.null(rownames(dataset$expr))) {
+    stop("`", label, "$expr` satir adlari (genler) zorunludur.", call. = FALSE)
+  }
+  if (is.null(colnames(dataset$expr))) {
+    stop("`", label, "$expr` sutun adlari (ornekler) zorunludur.", call. = FALSE)
+  }
+  if (!is.data.frame(dataset$sample_meta)) {
+    stop("`", label, "$sample_meta` data.frame olmalidir.", call. = FALSE)
+  }
+  if (!"sample_id" %in% names(dataset$sample_meta)) {
+    stop("`", label, "$sample_meta` icinde `sample_id` sutunu zorunludur.", call. = FALSE)
+  }
+  if (!"response_label" %in% names(dataset$sample_meta)) {
+    stop(
+      "`", label, "$sample_meta` icinde `response_label` sutunu zorunludur.",
+      call. = FALSE
+    )
+  }
+  info_req <- c("normalization", "scale")
+  info_miss <- setdiff(info_req, names(dataset$info))
+  if (length(info_miss) > 0L) {
+    stop(
+      "`", label, "$info` eksik alanlar: ", paste(info_miss, collapse = ", "),
+      call. = FALSE
+    )
+  }
+  if (!dataset$info$scale %in% c("log2", "linear")) {
+    stop("`", label, "$info$scale` 'log2' veya 'linear' olmalidir.", call. = FALSE)
+  }
+
+  # Ornek sirasi: expr sutunlari ile sample_meta$sample_id hizali olmali.
+  if (!identical(as.character(dataset$sample_meta$sample_id), colnames(dataset$expr))) {
+    stop(
+      "`", label, "`: sample_meta$sample_id, expr sutun adlariyla ayni sirada olmalidir.",
+      call. = FALSE
+    )
+  }
+
+  invisible(dataset)
+}
+
+#' Yinelenen gen satirlarini birlestir
+#'
+#' Varsayilan: ortalama ifadesi en yuksek olan satiri tut.
+#'
+#' @param expr Gen x ornek matris.
+#' @param rule Simdilik yalniz `"max_mean"`.
+#'
+#' @return Tekillestirilmis matris.
+#' @export
+collapse_duplicate_genes <- function(expr, rule = c("max_mean")) {
+  rule <- match.arg(rule)
+  if (is.null(rownames(expr))) {
+    stop("`expr` satir adlari zorunludur.", call. = FALSE)
+  }
+  expr <- as.matrix(expr)
+  keys <- toupper(rownames(expr))
+  if (!anyDuplicated(keys)) {
+    return(expr)
+  }
+
+  split_idx <- split(seq_len(nrow(expr)), keys)
+  keep <- vapply(split_idx, function(idx) {
+    if (length(idx) == 1L) {
+      return(idx)
+    }
+    means <- rowMeans(expr[idx, , drop = FALSE], na.rm = TRUE)
+    idx[which.max(means)]
+  }, integer(1))
+
+  expr[sort(unname(keep)), , drop = FALSE]
+}

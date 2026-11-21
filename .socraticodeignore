@@ -1,0 +1,12 @@
+# SigBenchR: token dostu indeks kapsamı
+renv/
+data/
+data-raw/
+.Rproj.user/
+*.rds
+*.rda
+*.csv
+*.tsv
+man/
+*.Rcheck/
+renv.lock
