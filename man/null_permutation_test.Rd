@@ -17,7 +17,8 @@ null_permutation_test(
   signature_genes = NULL,
   observed_scores = NULL,
   min_genes = 3L,
-  n_genes_down = 0L
+  n_genes_down = 0L,
+  signature_genes_down = NULL
 )
 }
 \arguments{
@@ -25,7 +26,8 @@ null_permutation_test(
 
 \item{response}{0/1 yanit (ornek sirasi \code{colnames(mat)} ile hizali veya isimli).}
 
-\item{n_genes}{Cekilecek rastgele up / tek yonlu gen sayisi (kapsama sonrasi).}
+\item{n_genes}{Cekilecek rastgele up / tek yonlu gen sayisi (kapsama sonrasi).
+Down-only isaretli null icin \code{0L} olabilir.}
 
 \item{exclude_genes}{Havuzdan cikarilacak genler (imza genleri).}
 
@@ -40,8 +42,9 @@ null_permutation_test(
 \item{match_expression}{TRUE ise imza genlerinin ortalama ifadesine yakin
 quantile-bin eslestirilmis ornekleme yapar.}
 
-\item{signature_genes}{\code{match_expression = TRUE} icin imza genleri
-(ifade ortalamasi eslestirme referansi). \code{NULL} ise \code{exclude_genes}.}
+\item{signature_genes}{\code{match_expression = TRUE} icin up / tek yonlu imza
+genleri (ifade ortalamasi eslestirme referansi). \code{NULL} ise \code{exclude_genes}
+(up kolu yoksa eslestirme atlanir).}
 
 \item{observed_scores}{Opsiyonel: gozlenen imza skorlari (isimli).
 Verilmezse \code{signature_genes} ile skorlanir.}
@@ -49,6 +52,10 @@ Verilmezse \code{signature_genes} ile skorlanir.}
 \item{min_genes}{\code{score_signature} esigi.}
 
 \item{n_genes_down}{Isaretli null icin down kolu gen sayisi. Varsayilan 0.}
+
+\item{signature_genes_down}{\code{match_expression = TRUE} ve \code{n_genes_down > 0}
+iken down kolu ifade-bin referansi. \code{NULL} ise down kolu guvenli rastgele
+fallback kullanir.}
 }
 \value{
 Liste: \code{obs_auc}, \code{null_aucs}, \code{null_p}, \code{n_perm}, \code{n_genes},
@@ -74,4 +81,6 @@ z-skorudur (\code{sqrt(k)} olcekli GSVA degil).
 Isaretli imzalar icin \code{n_genes_down > 0L} iken her permutasyonda birbirinden
 ayrik \code{n_genes} (up) + \code{n_genes_down} (down) rastgele gen cekilir;
 skor \code{up - down} (\code{ss_rank} icin \code{s_up + s_down}) olur.
+Yalnizca down kolu (\code{n_genes = 0}, \code{n_genes_down >= 1}) icin skor \code{-down}
+(\code{ss_rank} icin azalan sira \code{s_down}) uretilir.
 }

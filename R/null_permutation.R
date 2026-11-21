@@ -18,10 +18,13 @@
 #' Isaretli imzalar icin `n_genes_down > 0L` iken her permutasyonda birbirinden
 #' ayrik `n_genes` (up) + `n_genes_down` (down) rastgele gen cekilir;
 #' skor `up - down` (`ss_rank` icin `s_up + s_down`) olur.
+#' Yalnizca down kolu (`n_genes = 0`, `n_genes_down >= 1`) icin skor `-down`
+#' (`ss_rank` icin azalan sira `s_down`) uretilir.
 #'
 #' @param mat Gen x ornek ifade matrisi (hazirlanmis).
 #' @param response 0/1 yanit (ornek sirasi `colnames(mat)` ile hizali veya isimli).
 #' @param n_genes Cekilecek rastgele up / tek yonlu gen sayisi (kapsama sonrasi).
+#'   Down-only isaretli null icin `0L` olabilir.
 #' @param exclude_genes Havuzdan cikarilacak genler (imza genleri).
 #' @param method Skorlama yontemi (`score_signature`).
 #' @param direction Imza yonu.
@@ -29,8 +32,12 @@
 #' @param seed RNG tohumu.
 #' @param match_expression TRUE ise imza genlerinin ortalama ifadesine yakin
 #'   quantile-bin eslestirilmis ornekleme yapar.
-#' @param signature_genes `match_expression = TRUE` icin imza genleri
-#'   (ifade ortalamasi eslestirme referansi). `NULL` ise `exclude_genes`.
+#' @param signature_genes `match_expression = TRUE` icin up / tek yonlu imza
+#'   genleri (ifade ortalamasi eslestirme referansi). `NULL` ise `exclude_genes`
+#'   (up kolu yoksa eslestirme atlanir).
+#' @param signature_genes_down `match_expression = TRUE` ve `n_genes_down > 0`
+#'   iken down kolu ifade-bin referansi. `NULL` ise down kolu guvenli rastgele
+#'   fallback kullanir.
 #' @param observed_scores Opsiyonel: gozlenen imza skorlari (isimli).
 #'   Verilmezse `signature_genes` ile skorlanir.
 #' @param min_genes `score_signature` esigi.
@@ -51,17 +58,21 @@ null_permutation_test <- function(mat,
                                   signature_genes = NULL,
                                   observed_scores = NULL,
                                   min_genes = 3L,
-                                  n_genes_down = 0L) {
+                                  n_genes_down = 0L,
+                                  signature_genes_down = NULL) {
   method <- match.arg(method)
   direction <- match.arg(direction)
   mat <- as.matrix(mat)
   n_genes <- as.integer(n_genes)
   n_genes_down <- as.integer(n_genes_down)
-  if (length(n_genes) != 1L || is.na(n_genes) || n_genes < 1L) {
-    stop("`n_genes` must be a positive integer.", call. = FALSE)
+  if (length(n_genes) != 1L || is.na(n_genes) || n_genes < 0L) {
+    stop("`n_genes` must be a non-negative integer.", call. = FALSE)
   }
   if (length(n_genes_down) != 1L || is.na(n_genes_down) || n_genes_down < 0L) {
     stop("`n_genes_down` must be a non-negative integer.", call. = FALSE)
+  }
+  if (n_genes < 1L && n_genes_down < 1L) {
+    stop("At least one of `n_genes` and `n_genes_down` must be positive.", call. = FALSE)
   }
   if (is.null(rownames(mat)) || is.null(colnames(mat))) {
     stop("`mat` satir/sutun adlari zorunludur.", call. = FALSE)
@@ -141,45 +152,78 @@ null_permutation_test <- function(mat,
   obs_oriented <- orient_score(obs_scores, direction = direction)
   obs_auc <- auc_mw(obs_oriented, resp_use)
 
-  # Eslestirme: imza gen ortalama ifadeleri -> quantile bin
-  sig_ref <- if (is.null(signature_genes)) exclude_genes else signature_genes
-  sig_ref_up <- unique(toupper(as.character(sig_ref)))
-  sig_means <- NULL
-  if (isTRUE(match_expression)) {
-    hit <- match(sig_ref_up, rows_up)
-    hit <- hit[!is.na(hit)]
-    if (length(hit) == 0L) {
-      warning("match_expression: imza geni bulunamadi; rastgele orneklemeye dusuldu.", call. = FALSE)
-      match_expression <- FALSE
-    } else {
-      sig_means <- rowMeans(mat[hit, , drop = FALSE], na.rm = TRUE)
-      sig_means <- sig_means[is.finite(sig_means)]
-      if (length(sig_means) == 0L) {
-        warning("match_expression: imza ortalama ifadesi NA; rastgele orneklemeye dusuldu.", call. = FALSE)
-        match_expression <- FALSE
-      }
-    }
-  }
-
+  # Eslestirme: imza gen ortalama ifadeleri -> quantile bin (up ve down ayri)
   pool_means <- rowMeans(mat[pool_idx, , drop = FALSE], na.rm = TRUE)
-  # Tum genlerin quantile binleri (havuz + referans olcegi icin)
   all_means <- rowMeans(mat, na.rm = TRUE)
   brks <- unique(stats::quantile(all_means[is.finite(all_means)],
                                  probs = seq(0, 1, length.out = 6),
                                  na.rm = TRUE, names = FALSE))
   pool_bins <- NULL
   sig_bins <- NULL
+  sig_bins_down <- NULL
+  match_up <- isTRUE(match_expression) && n_genes > 0L
+  match_down <- isTRUE(match_expression) &&
+    n_genes_down > 0L &&
+    !is.null(signature_genes_down) &&
+    length(signature_genes_down) > 0L
+
   if (length(brks) < 2L) {
-    match_expression <- FALSE
-  } else if (isTRUE(match_expression)) {
+    match_up <- FALSE
+    match_down <- FALSE
+  } else {
     pool_bins <- as.integer(cut(pool_means, breaks = brks, include.lowest = TRUE, labels = FALSE))
-    sig_bins <- as.integer(cut(sig_means, breaks = brks, include.lowest = TRUE, labels = FALSE))
-    sig_bins <- sig_bins[!is.na(sig_bins)]
-    if (length(sig_bins) == 0L) {
-      warning("match_expression: sig_bins NA; rastgele orneklemeye dusuldu.", call. = FALSE)
-      match_expression <- FALSE
-      pool_bins <- NULL
-      sig_bins <- NULL
+  }
+
+  if (isTRUE(match_up)) {
+    sig_ref <- if (is.null(signature_genes)) exclude_genes else signature_genes
+    sig_ref_up <- unique(toupper(as.character(sig_ref)))
+    hit <- match(sig_ref_up, rows_up)
+    hit <- hit[!is.na(hit)]
+    if (length(hit) == 0L) {
+      warning("match_expression: up imza geni bulunamadi; up rastgele orneklemeye dusuldu.", call. = FALSE)
+      match_up <- FALSE
+    } else {
+      sig_means <- rowMeans(mat[hit, , drop = FALSE], na.rm = TRUE)
+      sig_means <- sig_means[is.finite(sig_means)]
+      if (length(sig_means) == 0L) {
+        warning("match_expression: up ortalama ifadesi NA; up rastgele orneklemeye dusuldu.", call. = FALSE)
+        match_up <- FALSE
+      } else {
+        sig_bins <- as.integer(cut(sig_means, breaks = brks, include.lowest = TRUE, labels = FALSE))
+        sig_bins <- sig_bins[!is.na(sig_bins)]
+        if (length(sig_bins) == 0L) {
+          warning("match_expression: sig_bins NA; up rastgele orneklemeye dusuldu.", call. = FALSE)
+          match_up <- FALSE
+          sig_bins <- NULL
+        }
+      }
+    }
+  }
+
+  if (isTRUE(match_down)) {
+    sig_ref_dn <- unique(toupper(as.character(signature_genes_down)))
+    hit_dn <- match(sig_ref_dn, rows_up)
+    hit_dn <- hit_dn[!is.na(hit_dn)]
+    if (length(hit_dn) == 0L) {
+      warning("match_expression: down imza geni bulunamadi; down rastgele orneklemeye dusuldu.", call. = FALSE)
+      match_down <- FALSE
+    } else {
+      sig_means_dn <- rowMeans(mat[hit_dn, , drop = FALSE], na.rm = TRUE)
+      sig_means_dn <- sig_means_dn[is.finite(sig_means_dn)]
+      if (length(sig_means_dn) == 0L) {
+        warning("match_expression: down ortalama ifadesi NA; down rastgele orneklemeye dusuldu.", call. = FALSE)
+        match_down <- FALSE
+      } else {
+        sig_bins_down <- as.integer(
+          cut(sig_means_dn, breaks = brks, include.lowest = TRUE, labels = FALSE)
+        )
+        sig_bins_down <- sig_bins_down[!is.na(sig_bins_down)]
+        if (length(sig_bins_down) == 0L) {
+          warning("match_expression: sig_bins_down NA; down rastgele orneklemeye dusuldu.", call. = FALSE)
+          match_down <- FALSE
+          sig_bins_down <- NULL
+        }
+      }
     }
   }
 
@@ -222,89 +266,135 @@ null_permutation_test <- function(mat,
     score_mat <- pool_mat
   }
 
+  .sample_matched_arm <- function(n_need, bins, already_picked) {
+    if (n_need < 1L) {
+      return(character(0))
+    }
+    avail <- setdiff(pool_genes, already_picked)
+    if (length(avail) < n_need) {
+      return(NULL)
+    }
+    picked <- character(0)
+    for (bn in bins) {
+      if (length(picked) >= n_need) {
+        break
+      }
+      cand_idx <- which(
+        !is.na(pool_bins) &
+          pool_bins == bn &
+          pool_genes %in% avail &
+          !(pool_genes %in% picked)
+      )
+      cand <- pool_genes[cand_idx]
+      if (length(cand) == 0L) {
+        cand <- setdiff(avail, picked)
+      }
+      if (length(cand) == 0L) {
+        return(NULL)
+      }
+      picked <- c(picked, sample(cand, size = 1L))
+    }
+    if (length(picked) < n_need) {
+      extra <- setdiff(avail, picked)
+      need <- n_need - length(picked)
+      if (length(extra) < need) {
+        return(NULL)
+      }
+      picked <- c(picked, sample(extra, size = need))
+    }
+    picked[seq_len(n_need)]
+  }
+
   .pick_null_genes <- function() {
-    if (isTRUE(match_expression) && !is.null(sig_bins)) {
-      picked <- character(0)
-      for (bn in sig_bins) {
-        cand_idx <- which(!is.na(pool_bins) & pool_bins == bn & !(pool_genes %in% picked))
-        cand <- pool_genes[cand_idx]
-        if (length(cand) == 0L) {
-          cand <- setdiff(pool_genes, picked)
-        }
-        if (length(cand) == 0L) {
+    if (n_genes > 0L) {
+      if (isTRUE(match_up) && !is.null(sig_bins)) {
+        picked_up <- .sample_matched_arm(n_genes, sig_bins, character(0))
+        if (is.null(picked_up)) {
           return(NULL)
         }
-        picked <- c(picked, sample(cand, size = 1L))
+      } else {
+        picked_up <- sample(pool_genes, size = n_genes, replace = FALSE)
       }
-      if (length(picked) < n_genes) {
-        extra <- setdiff(pool_genes, picked)
-        need <- n_genes - length(picked)
-        if (length(extra) < need) {
-          return(NULL)
-        }
-        picked <- c(picked, sample(extra, size = need))
-      }
-      picked_up <- picked[seq_len(n_genes)]
     } else {
-      picked_up <- sample(pool_genes, size = n_genes, replace = FALSE)
+      picked_up <- character(0)
     }
 
     if (n_genes_down > 0L) {
-      rem <- setdiff(pool_genes, picked_up)
-      if (length(rem) < n_genes_down) {
-        return(NULL)
+      if (isTRUE(match_down) && !is.null(sig_bins_down)) {
+        picked_down <- .sample_matched_arm(n_genes_down, sig_bins_down, picked_up)
+        if (is.null(picked_down)) {
+          return(NULL)
+        }
+      } else {
+        rem <- setdiff(pool_genes, picked_up)
+        if (length(rem) < n_genes_down) {
+          return(NULL)
+        }
+        picked_down <- sample(rem, size = n_genes_down, replace = FALSE)
       }
-      picked_down <- sample(rem, size = n_genes_down, replace = FALSE)
     } else {
       picked_down <- character(0)
     }
     list(up = picked_up, down = picked_down)
   }
 
+  .arm_scores <- function(gene_names) {
+    if (length(gene_names) == 0L) {
+      return(NULL)
+    }
+    row_idx <- match(gene_names, rownames(score_mat))
+    if (anyNA(row_idx)) {
+      return(NULL)
+    }
+    sub <- score_mat[row_idx, , drop = FALSE]
+    if (method == "median") {
+      out <- apply(sub, 2L, function(x) {
+        if (all(is.na(x))) NA_real_ else stats::median(x, na.rm = TRUE)
+      })
+    } else {
+      out <- colMeans(sub, na.rm = TRUE)
+      out[colSums(!is.na(sub)) == 0L] <- NA_real_
+    }
+    out
+  }
+
   .scores_from_pick <- function(picked) {
     if (method == "ss_rank") {
-      s_up <- .ss_rank_arm(rank_mat, picked$up, N_j, reverse = FALSE)
-      if (length(picked$down) > 0L) {
-        s_down <- .ss_rank_arm(rank_mat, picked$down, N_j, reverse = TRUE)
-        scores <- s_up + s_down
+      has_up <- length(picked$up) > 0L
+      has_down <- length(picked$down) > 0L
+      s_up <- if (has_up) {
+        .ss_rank_arm(rank_mat, picked$up, N_j, reverse = FALSE)
       } else {
-        scores <- s_up
+        rep(0, ncol(mat))
+      }
+      s_down <- if (has_down) {
+        .ss_rank_arm(rank_mat, picked$down, N_j, reverse = TRUE)
+      } else {
+        rep(0, ncol(mat))
+      }
+      scores <- if (has_up && has_down) {
+        s_up + s_down
+      } else if (has_up) {
+        s_up
+      } else if (has_down) {
+        s_down
+      } else {
+        return(NULL)
       }
       names(scores) <- colnames(mat)
       return(scores)
     }
 
-    row_idx_up <- match(picked$up, rownames(score_mat))
-    if (anyNA(row_idx_up)) {
-      return(NULL)
-    }
-    sub_up <- score_mat[row_idx_up, , drop = FALSE]
-    if (method == "median") {
-      scores_up <- apply(sub_up, 2L, function(x) {
-        if (all(is.na(x))) NA_real_ else stats::median(x, na.rm = TRUE)
-      })
-    } else {
-      scores_up <- colMeans(sub_up, na.rm = TRUE)
-      scores_up[colSums(!is.na(sub_up)) == 0L] <- NA_real_
-    }
-
-    if (length(picked$down) == 0L) {
-      scores <- scores_up
-    } else {
-      row_idx_dn <- match(picked$down, rownames(score_mat))
-      if (anyNA(row_idx_dn)) {
-        return(NULL)
-      }
-      sub_dn <- score_mat[row_idx_dn, , drop = FALSE]
-      if (method == "median") {
-        scores_dn <- apply(sub_dn, 2L, function(x) {
-          if (all(is.na(x))) NA_real_ else stats::median(x, na.rm = TRUE)
-        })
-      } else {
-        scores_dn <- colMeans(sub_dn, na.rm = TRUE)
-        scores_dn[colSums(!is.na(sub_dn)) == 0L] <- NA_real_
-      }
+    scores_up <- .arm_scores(picked$up)
+    scores_dn <- .arm_scores(picked$down)
+    if (!is.null(scores_up) && !is.null(scores_dn)) {
       scores <- scores_up - scores_dn
+    } else if (!is.null(scores_up)) {
+      scores <- scores_up
+    } else if (!is.null(scores_dn)) {
+      scores <- -scores_dn
+    } else {
+      return(NULL)
     }
     names(scores) <- colnames(score_mat)
     scores

@@ -256,12 +256,19 @@ ok_fr <- is.data.frame(results) &&
   nzchar(fsig) &&
   any(results$signature == fsig & results$method == hm & !(results$skipped %in% TRUE))
 if (ok_fr) {
+  # Forest her zaman tek-satirli tabakasiz ozet kullanir (stratify_by acik olsa bile)
+  forest_summary <- tryCatch(
+    suppressWarnings(
+      SigBenchR::summarize_auc(results, method = hm, stratify_by = NULL)
+    ),
+    error = function(e) summary_tbl
+  )
   print(
     SigBenchR::plot_auc_forest(
       results,
       signature = fsig,
       method = hm,
-      summary = summary_tbl
+      summary = forest_summary
     )
   )
 } else {

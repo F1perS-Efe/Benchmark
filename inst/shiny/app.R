@@ -246,7 +246,7 @@ ui <- shiny::fluidPage(
     ),
     shiny::div(
       class = "sb-header-meta",
-      shiny::span(class = "sb-badge", "v0.4.0"),
+      shiny::span(class = "sb-badge", "v0.4.1"),
       shiny::span(
         class = "sb-badge sb-badge-warn",
         "Araştırma Amaçlıdır — Klinik Karar Aracı Değildir"
@@ -287,6 +287,10 @@ ui <- shiny::fluidPage(
         shiny::tags$p(
           class = "sb-hint",
           "Özel imza Jaccard ve DeLong seçicilerinde \"Custom\" olarak görünür; derived_from belirtilmez (independent = NA)."
+        ),
+        shiny::tags$p(
+          class = "sb-hint",
+          "Not: Dahili ICI kohortları ~2.800 gen içerir (dış imzalarda ~%14–15 kapsama beklenir); tam gen kapsamı için yerelde CSV/TSV yükleyin."
         ),
         shiny::checkboxGroupInput(
           "datasets", "Kohortlar (ICI)",
@@ -768,6 +772,9 @@ server <- function(input, output, session) {
   }, ignoreInit = TRUE)
 
   stale_inputs <- shiny::reactive({
+    if (is.null(input$run) || identical(as.integer(input$run), 0L)) {
+      return(FALSE)
+    }
     snap <- results()
     if (is.null(snap)) {
       return(FALSE)
@@ -793,8 +800,20 @@ server <- function(input, output, session) {
   })
 
   output$kpi_strip <- shiny::renderUI({
+    if (is.null(input$run) || identical(as.integer(input$run), 0L)) {
+      return(shiny::div(
+        class = "sb-welcome",
+        shiny::tags$h4("Başlangıç rehberi"),
+        shiny::tags$ol(
+          shiny::tags$li("Soldan imza ve kohortları seçin (gerekirse özel gen listesi ekleyin)."),
+          shiny::tags$li("Yöntem, imza yönü ve SD politikasını ayarlayın."),
+          shiny::tags$li("\"Analizi Çalıştır\"a basın; özet metrikler ve sekmeler snapshot sonuçlarıyla dolar."),
+          shiny::tags$li("ROC / Forest, özet alt grupları ve DeLong karşılaştırmasını ilgili sekmelerde inceleyin.")
+        )
+      ))
+    }
     snap <- results()
-    if (is.null(snap) || is.null(input$run) || identical(as.integer(input$run), 0L)) {
+    if (is.null(snap)) {
       return(shiny::div(
         class = "sb-welcome",
         shiny::tags$h4("Başlangıç rehberi"),
@@ -911,6 +930,13 @@ server <- function(input, output, session) {
   })
 
   shiny::observe({
+    if (is.null(input$run) || identical(as.integer(input$run), 0L)) {
+      shiny::updateTextAreaInput(
+        session, "r_code_text",
+        value = "# Analizi çalıştırdıktan sonra tekrarlanabilir R kodu burada görünür."
+      )
+      return()
+    }
     snap <- results()
     if (is.null(snap)) {
       shiny::updateTextAreaInput(
@@ -941,7 +967,9 @@ server <- function(input, output, session) {
         seed = p$seed,
         dataset_names = p$datasets,
         compute_pr = p$compute_pr,
-        compute_null = p$compute_null
+        compute_null = p$compute_null,
+        sd_handling = p$sd_handling,
+        match_expression = p$match_expression
       ),
       error = function(e) paste0("# Kod üretilemedi: ", conditionMessage(e))
     )
@@ -958,9 +986,17 @@ server <- function(input, output, session) {
         stop("HTML rapor için 'rmarkdown' paketini kurun.", call. = FALSE)
       }
       snap <- results()
+      hm_active <- if (!is.null(input$heatmap_method) && nzchar(input$heatmap_method)) {
+        input$heatmap_method
+      } else {
+        snap$params$heatmap_method
+      }
+      summary_unstrat <- suppressWarnings(
+        SigBenchR::summarize_auc(snap$res, method = hm_active, stratify_by = NULL)
+      )
       SigBenchR::export_report(
         results = snap$res,
-        summary_tbl = summary_res(),
+        summary_tbl = summary_unstrat,
         sensitivity_tbl = sens(),
         params_list = list(
           methods = snap$params$methods,
@@ -972,7 +1008,7 @@ server <- function(input, output, session) {
           seed = snap$params$seed,
           sd_handling = snap$params$sd_handling,
           match_expression = snap$params$match_expression,
-          heatmap_method = snap$params$heatmap_method,
+          heatmap_method = hm_active,
           forest_signature = snap$params$forest_signature
         ),
         output_file = file

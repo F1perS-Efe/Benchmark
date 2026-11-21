@@ -283,29 +283,33 @@ run_benchmark <- function(signatures,
         }
 
         if (isTRUE(compute_null)) {
-          if (isTRUE(scored$signed) && as.integer(scored$n_up_found) >= 1L) {
-            n_genes_null <- as.integer(scored$n_up_found)
-            n_genes_down_null <- as.integer(scored$n_down_found)
-          } else if (isTRUE(scored$signed) && as.integer(scored$n_down_found) >= 1L) {
-            n_genes_null <- as.integer(scored$n_down_found)
-            n_genes_down_null <- 0L
+          n_up_f <- as.integer(scored$n_up_found)
+          n_dn_f <- as.integer(scored$n_down_found)
+          found_all <- scored$coverage$found
+          sig_up <- if (n_up_f > 0L) {
+            found_all[seq_len(n_up_f)]
           } else {
-            n_genes_null <- as.integer(scored$coverage$n_found)
-            n_genes_down_null <- 0L
+            character(0)
+          }
+          sig_dn <- if (n_dn_f > 0L) {
+            found_all[seq.int(n_up_f + 1L, length.out = n_dn_f)]
+          } else {
+            character(0)
           }
           null_res <- tryCatch(
             null_permutation_test(
               mat = expr_kept,
               response = y_kept,
-              n_genes = n_genes_null,
-              n_genes_down = n_genes_down_null,
-              exclude_genes = scored$coverage$found,
+              n_genes = n_up_f,
+              n_genes_down = n_dn_f,
+              exclude_genes = found_all,
               method = method,
               direction = sig_dir,
               n_perm = n_perm,
               seed = cell_seed,
               match_expression = match_expression,
-              signature_genes = scored$coverage$found,
+              signature_genes = if (length(sig_up) > 0L) sig_up else NULL,
+              signature_genes_down = if (length(sig_dn) > 0L) sig_dn else NULL,
               observed_scores = scores_use,
               min_genes = min_genes
             ),

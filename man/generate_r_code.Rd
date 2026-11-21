@@ -11,11 +11,13 @@ generate_r_code(
   direction = "<",
   coverage_threshold = 0.7,
   n_boot = 200L,
-  n_perm = 50L,
+  n_perm = 1000L,
   seed = 42L,
   dataset_names = c("demo_A", "demo_B"),
   compute_pr = TRUE,
-  compute_null = FALSE
+  compute_null = FALSE,
+  sd_handling = "exclude",
+  match_expression = FALSE
 )
 }
 \arguments{
@@ -45,6 +47,10 @@ aksi halde \code{datasets_demo}.}
 \item{compute_pr}{PR-AUC hesaplansin mi.}
 
 \item{compute_null}{Null permutasyon calissin mi.}
+
+\item{sd_handling}{SD politikasi (\code{"exclude"}, \code{"as_0"}, \code{"as_1"}).}
+
+\item{match_expression}{Null icin ifade duzeyine eslestirilmis ornekleme.}
 }
 \value{
 Tek bir karakter dizisi (R kodu; satirlar \verb{\\\\n} ile ayrilir).

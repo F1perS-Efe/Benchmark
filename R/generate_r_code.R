@@ -19,6 +19,8 @@
 #'   aksi halde `datasets_demo`.
 #' @param compute_pr PR-AUC hesaplansin mi.
 #' @param compute_null Null permutasyon calissin mi.
+#' @param sd_handling SD politikasi (`"exclude"`, `"as_0"`, `"as_1"`).
+#' @param match_expression Null icin ifade duzeyine eslestirilmis ornekleme.
 #'
 #' @return Tek bir karakter dizisi (R kodu; satirlar `\\n` ile ayrilir).
 #' @export
@@ -28,16 +30,23 @@ generate_r_code <- function(signature_name = "Cytokine-5",
                             direction = "<",
                             coverage_threshold = 0.70,
                             n_boot = 200L,
-                            n_perm = 50L,
+                            n_perm = 1000L,
                             seed = 42L,
                             dataset_names = c("demo_A", "demo_B"),
                             compute_pr = TRUE,
-                            compute_null = FALSE) {
+                            compute_null = FALSE,
+                            sd_handling = "exclude",
+                            match_expression = FALSE) {
   methods <- as.character(methods)
   if (length(methods) < 1L) {
     stop("`methods` bos olamaz.", call. = FALSE)
   }
   direction <- match.arg(as.character(direction), c("<", ">"))
+  sd_handling <- match.arg(
+    as.character(sd_handling),
+    c("exclude", "as_0", "as_1")
+  )
+  match_expression <- isTRUE(match_expression)
   dataset_names <- as.character(dataset_names)
   if (length(dataset_names) < 1L) {
     stop("`dataset_names` bos olamaz.", call. = FALSE)
@@ -158,11 +167,13 @@ generate_r_code <- function(signature_name = "Cytokine-5",
     paste0("  methods = ", fmt_chr_vec(methods), ","),
     paste0("  direction = ", fmt_chr(direction), ","),
     paste0("  coverage_threshold = ", as.numeric(coverage_threshold), ","),
+    paste0("  sd_handling = ", fmt_chr(sd_handling), ","),
     paste0("  compute_pr = ", fmt_logical(compute_pr), ","),
     paste0("  n_boot = ", as.integer(n_boot), "L,"),
     paste0("  compute_null = ", fmt_logical(compute_null), ","),
     paste0("  n_perm = ", as.integer(n_perm), "L,"),
-    paste0("  seed = ", as.integer(seed), "L"),
+    paste0("  seed = ", as.integer(seed), "L,"),
+    paste0("  match_expression = ", fmt_logical(match_expression)),
     ")",
     "print(res)",
     "print(summarize_auc(res))",

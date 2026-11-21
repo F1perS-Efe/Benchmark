@@ -71,14 +71,16 @@ Shiny varsayılanı gerçek ICI kohortlarıdır (`van_allen_2015`, `hugo_2016`, 
 - PR-AUC + prevalans + tabakalı bootstrap GA (`PRROC`)
 - Null permütasyon (`auc_mw` vektörize; p = (k+1)/(B+1); işaretli null için `n_genes_down`); `null_p_adj_bh`
 - Eşleştirilmiş DeLong iki imza karşılaştırması (`compare_signatures`, BH)
-- Ağırlıklı özet: `summarize_auc()` — n-ağırlıklı + ters-varyans, Cochran `Q`, `I²`; isteğe bağlı **`stratify_by`** (tedavi / klinik sonlanım alt grupları)
+- Ağırlıklı özet: `summarize_auc()` — n-ağırlıklı + ters-varyans, Cochran `Q`, `I²`, **logit-AUC REML + kesilmiş HKSJ**; isteğe bağlı **`stratify_by`** (tedavi / klinik sonlanım alt grupları)
+- SD politika duyarlılığı: `check_sd_sensitivity()` (`exclude` / `as_0` / `as_1`)
+- Yerel kohort: `read_user_dataset()`, `load_cohort_bundle()`
 - İmza örtüşmesi: `jaccard_signatures()`; veri setleri boyunca `auc_correlation()`
-- Forest grafik: `plot_auc_forest()`
+- Forest grafik: `plot_auc_forest()` (IVW + REML+HKSJ satırı)
 - Gen kapsama denetimi + gri düşük-kapsama ısı haritası
 - Skorlama dayanıklılığı: `check_sensitivity()` (eşik 0.10 keyfidir)
 - HTML rapor: `export_report()` (`inst/rmd/benchmark_report.Rmd`)
-- Tekrarlanabilir betik: `generate_r_code()`
-- Gerçek melanoma ICI kohortları (`datasets_ici`) + sentetik demo + Shiny
+- Tekrarlanabilir betik: `generate_r_code()` (`sd_handling`, `match_expression`, `n_perm = 1000`)
+- Gerçek melanoma ICI kohortları (`datasets_ici`) + sentetik demo + yenilenmiş Shiny UI + vinyet
 
 ## Faz 3B Paket A — gerçek kohortlar
 
@@ -103,12 +105,12 @@ Liu 2019 (cBioPortal) S3/LFS **403** verdiği için dahil edilmedi.
 **Bağımsızlık:** `Cytokine-5$derived_from` bu kohort adlarını içerir (`independent = FALSE`); `IFNG6` / `Random3` açıkça `derived_from = character(0)` taşır (`independent = TRUE`). Kökeni belirtilmemiş özel imzalar `independent = NA` alır ve varsayılan bağımsız özete girmez.  
 **Yazar:** `DESCRIPTION` içinde `Efe Kaan Şengönül <fperskaan@gmail.com>` (`aut`, `cre`); placeholder yok.
 
-## SigBenchR v1 kapsam dışı / sonraki sprintler
+## SigBenchR v0.4.1 notları / hâlâ kapsam dışı
 
+- **v0.4.1’de mevcut:** `ss_rank`, işaretli `+`/`-` imzalar, `stratify_by`, logit-AUC REML+HKSJ, `check_sd_sensitivity()`, `read_user_dataset()`, `load_cohort_bundle()`, yenilenmiş Shiny UI, vinyet
 - Takma ad (alias) eşleştirme **yok**
-- DerSimonian–Laird rastgele etkiler özeti **yok**
 - Bioconductor bağımlılığı (`singscore` / `GSVA` / `SummarizedExperiment`) **yok** (`ss_rank` saf base R)
-- Shiny UX yenilemesi sonraki sprintte
+- Klasik DerSimonian–Laird rastgele etkiler **yok** (yerine logit-AUC REML + kesilmiş HKSJ)
 
 ## Veri yapısı
 

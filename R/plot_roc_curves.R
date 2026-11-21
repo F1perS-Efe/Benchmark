@@ -27,6 +27,11 @@ plot_roc_curves <- function(datasets,
   expr <- prepare_expression(expr, scale = ds$info$scale, apply_log2 = apply_log2)
   enc <- encode_response(ds$sample_meta$response_label, sd_handling = sd_handling)
 
+  # SD / NA yanit orneklerini skorlamadan once cikar (zscore/rank sizintisi yok)
+  expr_kept <- expr[, enc$kept, drop = FALSE]
+  y_kept <- enc$response[enc$kept]
+  names(y_kept) <- colnames(expr_kept)
+
   curve_rows <- list()
   for (sig_name in names(signatures)) {
     sig <- signatures[[sig_name]]
@@ -34,7 +39,7 @@ plot_roc_curves <- function(datasets,
     sig_dir <- if (!is.null(sig$direction)) sig$direction else direction
 
     scored <- score_signature(
-      expr,
+      expr_kept,
       genes = sig$genes,
       genes_up = sig$genes_up,
       genes_down = sig$genes_down,
@@ -44,9 +49,8 @@ plot_roc_curves <- function(datasets,
     if (isTRUE(scored$skipped)) next
 
     sample_ids <- names(scored$scores)
-    meta_idx <- match(sample_ids, ds$sample_meta$sample_id)
-    resp <- enc$response[meta_idx]
-    keep <- enc$kept[meta_idx] & is.finite(scored$scores)
+    resp <- y_kept[sample_ids]
+    keep <- is.finite(scored$scores) & !is.na(resp)
     if (length(unique(resp[keep])) < 2L) next
 
     roc_res <- roc_auc(scored$scores[keep], resp[keep], direction = sig_dir)
