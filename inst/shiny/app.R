@@ -4,6 +4,11 @@
 data(datasets_ici, package = "SigBenchR", envir = environment())
 data(signatures_demo, package = "SigBenchR", envir = environment())
 
+# Fail-closed: yalniz run_app(allow_upload = TRUE) ile acilir
+.sigbenchr_allow_upload <- isTRUE(
+  shiny::getShinyOption("sigbenchr_allow_upload", default = FALSE)
+)
+
 ui <- shiny::fluidPage(
   shiny::tags$head(
     shiny::tags$script(shiny::HTML(
@@ -83,6 +88,39 @@ ui <- shiny::fluidPage(
         ),
         selected = c("van_allen_2015", "hugo_2016", "riaz_2017", "gide_2019")
       ),
+      if (isTRUE(.sigbenchr_allow_upload)) {
+        shiny::tagList(
+          shiny::hr(),
+          shiny::h5("Yerel Kohort Ekle (CSV/TSV)"),
+          shiny::fileInput("upload_expr", "Ifade matrisi (CSV/TSV)", accept = c(".csv", ".tsv", ".txt")),
+          shiny::fileInput("upload_meta", "Klinik metadata (CSV/TSV)", accept = c(".csv", ".tsv", ".txt")),
+          shiny::checkboxInput("upload_genes_in_rows", "Genler satırlarda", TRUE),
+          shiny::selectInput(
+            "upload_gene_id_type", "Gen ID tipi",
+            choices = c("HGNC", "Ensembl", "other"), selected = "HGNC"
+          ),
+          shiny::selectInput(
+            "upload_normalization", "Normalizasyon",
+            choices = c("TPM", "FPKM", "normalized_counts", "log_normalized", "other"),
+            selected = "TPM"
+          ),
+          shiny::selectInput(
+            "upload_scale", "Ölçek",
+            choices = c("linear", "log2"), selected = "log2"
+          ),
+          shiny::textInput("upload_sample_id_col", "sample_id sütunu", value = "sample_id"),
+          shiny::textInput("upload_response_col", "response sütunu", value = "response_label"),
+          shiny::textInput("upload_dataset_name", "Kohort adı", value = "user_cohort"),
+          shiny::actionButton("upload_add", "Kohortu Doğrula ve Ekle", class = "btn-info"),
+          shiny::verbatimTextOutput("upload_status")
+        )
+      } else {
+        shiny::tags$p(
+          shiny::em(
+            "Özel kohort yükleme hasta gizliliği için yalnızca yerel R oturumunda (`SigBenchR::run_app(allow_upload = TRUE)`) aktiftir."
+          )
+        )
+      },
       shiny::actionButton("run", "Analizi çalıştır", class = "btn-primary"),
       shiny::downloadButton("download_report", "Tüm sonuçları HTML rapor olarak indir"),
       shiny::hr(),
@@ -107,6 +145,12 @@ ui <- shiny::fluidPage(
           shiny::plotOutput("heatmap", height = "320px"),
           shiny::h4("Dayanıklılık (Sensitivity)"),
           if (requireNamespace("DT", quietly = TRUE)) DT::DTOutput("sensitivity_table") else shiny::tableOutput("sensitivity_fallback")
+        ),
+        shiny::tabPanel(
+          "Gen Kapsama",
+          shiny::h4("Gen kapsama ve eksik gen detayı"),
+          shiny::tags$p(shiny::em("Her imza × kohort için bulunan/toplam gen, % kapsama ve missing_genes.")),
+          if (requireNamespace("DT", quietly = TRUE)) DT::DTOutput("coverage_table") else shiny::tableOutput("coverage_fallback")
         ),
         shiny::tabPanel(
           "ROC eğrileri",
@@ -163,6 +207,71 @@ ui <- shiny::fluidPage(
 
 server <- function(input, output, session) {
   # Shiny varsayilani gercek ICI kohortlari; sentetik demo_A/demo_B testlerde kalir.
+  # Kullanici kohortlari (yalniz allow_upload = TRUE) reactiveVal ile eklenir;
+  # snapshot kilidi current_params / results ile korunur.
+  user_datasets <- shiny::reactiveVal(list())
+
+  active_dataset_pool <- shiny::reactive({
+    c(datasets_ici, user_datasets())
+  })
+
+  shiny::observeEvent(input$upload_add, {
+    shiny::req(isTRUE(.sigbenchr_allow_upload))
+    shiny::req(input$upload_expr, input$upload_meta)
+    nm <- trimws(as.character(input$upload_dataset_name))
+    if (!nzchar(nm)) nm <- "user_cohort"
+    warn_msgs <- character(0)
+    ds <- tryCatch(
+      withCallingHandlers(
+        SigBenchR::read_user_dataset(
+          expr_path = input$upload_expr$datapath,
+          meta_path = input$upload_meta$datapath,
+          genes_in_rows = isTRUE(input$upload_genes_in_rows),
+          gene_id_type = as.character(input$upload_gene_id_type),
+          normalization = as.character(input$upload_normalization),
+          scale = as.character(input$upload_scale),
+          sample_id_col = as.character(input$upload_sample_id_col),
+          response_col = as.character(input$upload_response_col),
+          dataset_name = nm
+        ),
+        warning = function(w) {
+          warn_msgs <<- c(warn_msgs, conditionMessage(w))
+          invokeRestart("muffleWarning")
+        }
+      ),
+      error = function(e) e
+    )
+    if (inherits(ds, "error")) {
+      output$upload_status <- shiny::renderText({
+        paste0("Hata: ", conditionMessage(ds))
+      })
+      return()
+    }
+    pool <- user_datasets()
+    pool[[nm]] <- ds
+    user_datasets(pool)
+    all_names <- c(names(datasets_ici), names(pool))
+    cur_sel <- as.character(input$datasets)
+    cur_sel <- cur_sel[nzchar(cur_sel)]
+    shiny::updateCheckboxGroupInput(
+      session, "datasets",
+      choices = all_names,
+      selected = unique(c(cur_sel, nm))
+    )
+    output$upload_status <- shiny::renderText({
+      msg <- paste0(
+        "Eklendi: ", nm,
+        " | gen=", ds$info$n_genes,
+        " | ornek=", ds$info$n_samples,
+        " | norm=", ds$info$normalization,
+        " | scale=", ds$info$scale
+      )
+      if (length(warn_msgs) > 0L) {
+        msg <- paste0(msg, "\nUyarilar:\n- ", paste(warn_msgs, collapse = "\n- "))
+      }
+      msg
+    })
+  })
 
   active_sig_names <- shiny::reactive({
     chosen <- as.character(input$sig_choice)
@@ -275,7 +384,13 @@ server <- function(input, output, session) {
     shiny::req(length(input$datasets) > 0, length(input$methods) > 0)
     params <- current_params()
     sigs <- build_sigs(params$direction, params$sig_choice, params$custom_genes)
-    ds <- datasets_ici[params$datasets]
+    pool <- active_dataset_pool()
+    miss_ds <- setdiff(params$datasets, names(pool))
+    shiny::validate(shiny::need(
+      length(miss_ds) == 0L,
+      paste0("Bilinmeyen veri seti: ", paste(miss_ds, collapse = ", "))
+    ))
+    ds <- pool[params$datasets]
 
     shiny::withProgress(message = "Benchmark çalışıyor...", value = 0.2, {
       shiny::incProgress(0.3, detail = "ROC / PR / null")
@@ -454,7 +569,7 @@ server <- function(input, output, session) {
       df <- results()$res
       cols <- c(
         "dataset", "signature", "method", "n", "n_pos", "n_neg",
-        "coverage_label", "missing_genes", "low_coverage",
+        "coverage_label", "found_genes", "missing_genes", "low_coverage",
         "auc", "auc_ci_low", "auc_ci_high", "auc_var", "var_zero", "small_cohort",
         "pr_auc", "pr_baseline", "pr_ci_low", "pr_ci_high",
         "null_p", "null_p_adj_bh", "independent",
@@ -467,9 +582,39 @@ server <- function(input, output, session) {
   output$table_fallback <- shiny::renderTable({
     shiny::req(results())
     results()$res[, intersect(
-      c("dataset", "signature", "method", "auc", "pr_auc", "null_p", "low_coverage"),
+      c("dataset", "signature", "method", "auc", "pr_auc", "null_p", "low_coverage", "missing_genes"),
       names(results()$res)
     ), drop = FALSE]
+  })
+
+  output$coverage_table <- if (requireNamespace("DT", quietly = TRUE)) {
+    DT::renderDT({
+      shiny::req(results())
+      df <- results()$res
+      cols <- c(
+        "dataset", "signature", "method",
+        "n_found", "n_total", "coverage_pct", "coverage_label",
+        "low_coverage", "found_genes", "missing_genes"
+      )
+      cov <- df[, intersect(cols, names(df)), drop = FALSE]
+      if (all(c("dataset", "signature") %in% names(cov))) {
+        cov <- cov[!duplicated(cov[, c("dataset", "signature"), drop = FALSE]), , drop = FALSE]
+      }
+      .dt_round(cov)
+    })
+  } else NULL
+  output$coverage_fallback <- shiny::renderTable({
+    shiny::req(results())
+    df <- results()$res
+    cols <- intersect(
+      c("dataset", "signature", "coverage_label", "low_coverage", "missing_genes"),
+      names(df)
+    )
+    cov <- df[, cols, drop = FALSE]
+    if (all(c("dataset", "signature") %in% names(cov))) {
+      cov <- cov[!duplicated(cov[, c("dataset", "signature"), drop = FALSE]), , drop = FALSE]
+    }
+    cov
   })
 
   output$heatmap <- shiny::renderPlot({
@@ -532,9 +677,14 @@ server <- function(input, output, session) {
         shiny::need(length(genes2) >= 1, "İmza 2 genleri bulunamadı.")
       )
 
+      cmp_pool <- active_dataset_pool()
+      shiny::validate(shiny::need(
+        input$cmp_dataset %in% names(cmp_pool),
+        paste0("Veri seti bulunamadı: ", input$cmp_dataset)
+      ))
       s1 <- tryCatch(
         SigBenchR::score_for_dataset(
-          datasets_ici[[input$cmp_dataset]],
+          cmp_pool[[input$cmp_dataset]],
           genes = genes1,
           method = input$heatmap_method,
           direction = input$direction,
@@ -549,7 +699,7 @@ server <- function(input, output, session) {
 
       s2 <- tryCatch(
         SigBenchR::score_for_dataset(
-          datasets_ici[[input$cmp_dataset]],
+          cmp_pool[[input$cmp_dataset]],
           genes = genes2,
           method = input$heatmap_method,
           direction = input$direction,

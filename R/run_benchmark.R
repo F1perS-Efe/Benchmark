@@ -137,7 +137,12 @@ run_benchmark <- function(signatures,
             scored$coverage$n_total,
             scored$coverage$coverage_pct
           ),
-          missing_genes = paste(scored$coverage$missing, collapse = ","),
+          found_genes = paste(scored$coverage$found, collapse = ","),
+          missing_genes = if (length(scored$coverage$missing) == 0L) {
+            ""
+          } else {
+            paste(scored$coverage$missing, collapse = ",")
+          },
           low_coverage = low_cov,
           auc = NA_real_,
           auc_ci_low = NA_real_,

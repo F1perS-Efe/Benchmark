@@ -4,9 +4,11 @@
 \alias{run_app}
 \title{SigBenchR Shiny arayuzunu baslat}
 \usage{
-run_app(...)
+run_app(allow_upload = FALSE, ...)
 }
 \arguments{
+\item{allow_upload}{Yerel CSV/TSV kohort yuklemeyi ac. Varsayilan \code{FALSE}.}
+
 \item{...}{\code{shiny::runApp()}'e iletilen ek argumanlar.}
 }
 \value{
@@ -14,4 +16,7 @@ run_app(...)
 }
 \description{
 Uygulama \verb{inst/shiny/} altindadir. Shiny paket bagimliligi Suggests'tedir.
+Yerel dosya yukleme varsayilan olarak kapali (fail-closed) kalir; acmak icin
+\code{allow_upload = TRUE} verin. Uzak sunucu / shinyapps.io giris noktasi
+(\code{app.R}) \code{allow_upload = FALSE} ile cagirir.
 }

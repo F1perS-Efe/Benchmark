@@ -135,6 +135,32 @@ if (is.data.frame(results) && nrow(results) > 0) {
 }
 ```
 
+## Gen Kapsama ve Eksik Gen Detayı
+
+Her imza × kohort için bulunan/toplam gen sayısı, kapsama yüzdesi, eşik durumu ve
+eksik gen listesi (`missing_genes`). Eksik gen yoksa alan boştur.
+
+```{r gene-coverage-detail}
+if (is.data.frame(results) && nrow(results) > 0) {
+  cov_cols <- intersect(
+    c(
+      "dataset", "signature", "method",
+      "n_found", "n_total", "coverage_pct", "coverage_label",
+      "low_coverage", "found_genes", "missing_genes"
+    ),
+    names(results)
+  )
+  # Bir method satiri yeter; method bazinda ayni kapsama tekrarlanir
+  cov_df <- results[, cov_cols, drop = FALSE]
+  if ("method" %in% names(cov_df)) {
+    cov_df <- cov_df[!duplicated(cov_df[, intersect(c("dataset", "signature"), names(cov_df)), drop = FALSE]), , drop = FALSE]
+  }
+  knitr::kable(cov_df, digits = 1)
+} else {
+  cat("Kapsama detayi icin sonuc yok.\n")
+}
+```
+
 ## Ağırlıklı Özet (n-ağırlıklı + ters-varyans, Q, I2)
 
 **Metodoloji notu:** Sabit etkiler IVW, 4 heterojen kohortta keşifseldir (rastgele etkiler / DL yok).
