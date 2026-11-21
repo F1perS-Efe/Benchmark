@@ -10,17 +10,28 @@ Paket Bioconductor `Imports` kullanmaz. Veri setleri `list(expr, sample_meta, in
 
 ## Kurulum
 
-```r
-# Paket kökünden:
-devtools::install(".")
-# veya
-# remotes::install_local(".")
+R 4.2 veya üzeri gerekir. Depo kökünde:
+
+```sh
+Rscript setup.R
 ```
 
-HTML rapor için Suggests bağımlılığı:
+Betik `renv` proje kütüphanesini açar, `renv.lock` içindeki paketleri kurar, Shiny arayüzü, HTML rapor ve testler için Suggests paketlerini (`shiny`, `DT`, `rmarkdown`, `knitr`, `survival`, `testthat`) yükler ve `SigBenchR` paketini aynı kütüphaneye kurar. Ardından aynı klasörde açılan bir R oturumunda:
 
 ```r
-install.packages("rmarkdown")
+library(SigBenchR)
+SigBenchR::run_app()
+```
+
+Aynı adımlar elle:
+
+```r
+renv::restore()
+renv::install(
+  c("shiny", "DT", "rmarkdown", "knitr", "survival", "testthat"),
+  lock = FALSE
+)
+renv::install(".", lock = FALSE)
 ```
 
 ## Hızlı başlangıç
