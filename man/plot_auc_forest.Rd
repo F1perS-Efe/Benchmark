@@ -19,6 +19,9 @@ plot_auc_forest(results, signature = NULL, method = NULL, summary = NULL)
 \code{ggplot} nesnesi.
 }
 \description{
-Her veri seti icin AUC noktasi ve DeLong \%95 GA cubugu.
-\code{summarize_auc()} ozeti verilirse IVW (yoksa n-agirlikli) referans cizgisi eklenir.
+Her veri seti icin AUC noktasi ve DeLong 95 pct GA cubugu.
+\code{summarize_auc()} ozeti verilirse IVW (yoksa n-agirlikli) referans cizgisi
+eklenir. Ozet \code{auc_re} ile sonlu HKSJ GA sutunlari iceriyorsa logit-AUC
+REML nokta tahmini ve 95 pct HKSJ yatay hata cubugu da cizilir; tek kohortta
+(\code{auc_re_ci_low} NA) yalniz mevcut ozet cizgisi korunur.
 }

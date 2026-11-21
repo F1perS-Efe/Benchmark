@@ -1,0 +1,130 @@
+---
+title: "SigBenchR Benchmark Workflow"
+author: "SigBenchR"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{SigBenchR Benchmark Workflow}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 6,
+  fig.height = 4,
+  dpi = 96
+)
+```
+
+# Scope
+
+This vignette is a short, reproducible research checklist for SigBenchR 0.4.0.
+It uses the packaged melanoma ICI cohorts (`datasets_ici`) and demo signatures.
+Results are **exploratory**: AUC measures discrimination, not calibrated clinical
+prediction. With only four heterogeneous cohorts, meta-analytic summaries
+(including logit-AUC REML + truncated HKSJ) remain exploratory.
+
+```{r libs}
+library(SigBenchR)
+data(datasets_ici, package = "SigBenchR")
+data(signatures_demo, package = "SigBenchR")
+```
+
+# Benchmark across scoring methods
+
+Run a fast discrimination screen with `mean`, `zscore`, and single-sample
+`ss_rank` (no PR bootstrap, no null permutations).
+
+```{r bench}
+res <- suppressWarnings(run_benchmark(
+  signatures = signatures_demo,
+  datasets = datasets_ici,
+  methods = c("mean", "zscore", "ss_rank"),
+  compute_pr = FALSE,
+  compute_null = FALSE,
+  seed = 42L
+))
+head(res[, c("dataset", "signature", "method", "n", "auc", "independent")])
+```
+
+# Independence: Cytokine-5 vs IFNG6
+
+`Cytokine-5` lists the packaged ICI cohorts in `derived_from`, so
+`independent = FALSE` and it is excluded from the default independent summary.
+`IFNG6` uses `derived_from = character(0)` and remains eligible.
+
+```{r indep}
+table(res$signature, res$independent, useNA = "ifany")
+sm_indep <- suppressWarnings(summarize_auc(res, method = "mean"))
+sm_indep[, c("signature", "n_cohorts", "auc_n_weighted", "auc_re", "tau2_reml")]
+```
+
+# SD spectrum bias: exclude vs ORR vs DCR
+
+Stable disease coding can shift the responder definition (ORR vs DCR).
+`check_sd_sensitivity()` re-runs the same settings under `"exclude"`, `"as_0"`,
+and `"as_1"`. The delta threshold is arbitrary.
+
+```{r sd-sens}
+sd_tab <- suppressWarnings(check_sd_sensitivity(
+  signatures = signatures_demo["IFNG6"],
+  datasets = datasets_ici[c("riaz_2017", "gide_2019")],
+  methods = "mean",
+  seed = 42L
+))
+sd_tab[, c(
+  "dataset", "n_exclude", "n_as_0", "n_as_1",
+  "auc_exclude", "auc_as_0", "auc_as_1",
+  "delta_orr", "delta_dcr", "sd_sensitive"
+)]
+```
+
+# Stratified REML + HKSJ summary
+
+Pool only within clinically comparable strata. Anti-CTLA4 clinical-benefit labels
+(`van_allen_2015`) are not interchangeable with anti-PD1 RECIST cohorts.
+
+```{r strat}
+sm_strat <- suppressWarnings(summarize_auc(
+  res,
+  method = "mean",
+  stratify_by = c("treatment", "endpoint_type")
+))
+sm_strat[, c(
+  "signature", "treatment", "endpoint_type", "n_cohorts",
+  "auc_n_weighted", "auc_ivw", "auc_re",
+  "auc_re_ci_low", "auc_re_ci_high", "tau2_reml", "i2_logit"
+)]
+```
+
+`auc_re` is the inverse-logit REML estimate; the confidence interval uses a
+truncated Hartung-Knapp-Sidik-Jonkman standard error on the logit scale.
+With few cohorts the interval is exploratory.
+
+# Load your own full-gene cohort (template)
+
+```{r user-load, eval = FALSE}
+# CSV / TSV local files
+ds <- read_user_dataset(
+  expr_path = "path/to/expression.csv",
+  meta_path = "path/to/sample_meta.csv",
+  genes_in_rows = TRUE,
+  normalization = "TPM",
+  scale = "linear"
+)
+
+# Or a local named-list RDS bundle (optional MD5 check; no network)
+bundle <- load_cohort_bundle(
+  path = "path/to/cohort_bundle.rds",
+  expected_md5 = NULL
+)
+```
+
+# Session
+
+```{r session}
+sessionInfo()
+```

@@ -161,16 +161,28 @@ if (is.data.frame(results) && nrow(results) > 0) {
 }
 ```
 
-## Ağırlıklı Özet (n-ağırlıklı + ters-varyans, Q, I2)
+## Ağırlıklı Özet (n-ağırlıklı + ters-varyans, Q, I2 + logit-AUC REML)
 
-**Metodoloji notu:** Sabit etkiler IVW, 4 heterojen kohortta keşifseldir (rastgele etkiler / DL yok).
+**Metodoloji notu:** Sabit etkiler IVW, 4 heterojen kohortta keşifseldir.
+`auc_re` ve `%95` HKSJ aralığı logit-AUC ölçeğinde REML + kesilmiş Hartung–Knapp–Sidik–Jonkman
+ile hesaplanır; küçük kohort sayısında (`k <= 4`) ve klinik olarak heterojen kohortlarda
+keşifseldir — mümkünse `stratify_by` kullanın.
 `independent = NA` (kökeni bilinmeyen) veya `FALSE` (türetilmiş) imzalar varsayılan bağımsız özete girmez.
 `rank` ve `zscore` kohort-içi göreli skorlardır (`singscore` / `sqrt(k)` GSVA değildir); kohortlar arası
 ham skor birleştirilmez. AUC ayırt edicilik ölçer; klinik yanıtı “tahmin eden” kalibre model değildir.
 
 ```{r summary-table}
 if (is.data.frame(summary_tbl) && nrow(summary_tbl) > 0) {
-  knitr::kable(summary_tbl, digits = 3)
+  show_cols <- intersect(
+    c(
+      "signature", "method", "treatment", "endpoint_type",
+      "n_cohorts", "auc_n_weighted", "auc_ivw", "Q", "I2",
+      "auc_re", "auc_re_ci_low", "auc_re_ci_high", "tau2_reml", "i2_logit",
+      "n_var_zero_excluded", "n_low_coverage_excluded", "note"
+    ),
+    names(summary_tbl)
+  )
+  knitr::kable(summary_tbl[, show_cols, drop = FALSE], digits = 3)
 } else {
   cat("Özet tablosu boş.\n")
 }

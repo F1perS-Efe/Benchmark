@@ -1,7 +1,10 @@
 #' AUC orman (forest) grafigi
 #'
-#' Her veri seti icin AUC noktasi ve DeLong %95 GA cubugu.
-#' `summarize_auc()` ozeti verilirse IVW (yoksa n-agirlikli) referans cizgisi eklenir.
+#' Her veri seti icin AUC noktasi ve DeLong 95 pct GA cubugu.
+#' `summarize_auc()` ozeti verilirse IVW (yoksa n-agirlikli) referans cizgisi
+#' eklenir. Ozet `auc_re` ile sonlu HKSJ GA sutunlari iceriyorsa logit-AUC
+#' REML nokta tahmini ve 95 pct HKSJ yatay hata cubugu da cizilir; tek kohortta
+#' (`auc_re_ci_low` NA) yalniz mevcut ozet cizgisi korunur.
 #'
 #' @param results `run_benchmark()` cikti.
 #' @param signature Tek imza adi; `NULL` ise ilk imza.
@@ -38,6 +41,37 @@ plot_auc_forest <- function(results,
     as.character(df$dataset),
     paste0(df$dataset, " (bagimsiz degil)")
   )
+
+  caption <- "Kesikli cizgi: sans duzeyi (0.5). var_zero satirlarda GA dar/eksik olabilir."
+  has_hksj <- FALSE
+  sm <- NULL
+  if (!is.null(summary) && is.data.frame(summary) && nrow(summary) > 0L) {
+    sm <- summary
+    sm <- sm[sm$signature == signature & sm$method == method, , drop = FALSE]
+    if (nrow(sm) == 1L &&
+        all(c("auc_re", "auc_re_ci_low", "auc_re_ci_high") %in% names(sm)) &&
+        is.finite(sm$auc_re[1]) &&
+        is.finite(sm$auc_re_ci_low[1]) &&
+        is.finite(sm$auc_re_ci_high[1])) {
+      has_hksj <- TRUE
+      re_row <- data.frame(
+        auc = sm$auc_re[1],
+        auc_ci_low = sm$auc_re_ci_low[1],
+        auc_ci_high = sm$auc_re_ci_high[1],
+        lab = "REML + HKSJ (95 pct)",
+        stringsAsFactors = FALSE
+      )
+      df <- rbind(
+        df[, c("auc", "auc_ci_low", "auc_ci_high", "lab"), drop = FALSE],
+        re_row
+      )
+      caption <- paste0(
+        caption,
+        " Alt satir: logit-AUC REML nokta + kesilmis HKSJ 95 pct GA."
+      )
+    }
+  }
+
   df$lab <- factor(df$lab, levels = rev(unique(df$lab)))
 
   p <- ggplot2::ggplot(
@@ -54,36 +88,45 @@ plot_auc_forest <- function(results,
     ggplot2::geom_point(size = 2.5) +
     ggplot2::labs(
       title = paste0("AUC forest: ", signature, " (", method, ")"),
-      x = "ROC-AUC (DeLong %95 GA)",
+      x = "ROC-AUC (DeLong 95 pct GA)",
       y = NULL,
-      caption = "Kesikli cizgi: sans duzeyi (0.5). var_zero satirlarda GA dar/eksik olabilir."
+      caption = caption
     ) +
     ggplot2::theme_bw()
 
-  if (!is.null(summary) && is.data.frame(summary) && nrow(summary) > 0L) {
-    sm <- summary
-    sm <- sm[sm$signature == signature & sm$method == method, , drop = FALSE]
-    if (nrow(sm) == 1L) {
-      ref_val <- sm$auc_ivw[1]
-      ref_lab <- "auc_ivw (ters-varyans)"
-      if (!is.finite(ref_val)) {
-        ref_val <- sm$auc_n_weighted[1]
-        ref_lab <- "auc_n_weighted (n-agirlikli)"
+  if (!is.null(sm) && nrow(sm) == 1L) {
+    ref_val <- if ("auc_re" %in% names(sm) && is.finite(sm$auc_re[1])) {
+      sm$auc_re[1]
+    } else {
+      sm$auc_ivw[1]
+    }
+    ref_lab <- if ("auc_re" %in% names(sm) && is.finite(sm$auc_re[1])) {
+      "auc_re (logit-AUC REML)"
+    } else {
+      "auc_ivw (ters-varyans)"
+    }
+    if (!is.finite(ref_val)) {
+      ref_val <- sm$auc_n_weighted[1]
+      ref_lab <- "auc_n_weighted (n-agirlikli)"
+    }
+    if (is.finite(ref_val)) {
+      cap_extra <- paste0(
+        "Mavi cizgi: ", ref_lab, " = ",
+        sprintf("%.3f", ref_val),
+        ". Kesikli: 0.5."
+      )
+      if (isTRUE(has_hksj)) {
+        cap_extra <- paste0(
+          cap_extra,
+          " Alt satir: logit-AUC REML + HKSJ 95 pct GA."
+        )
       }
-      if (is.finite(ref_val)) {
-        p <- p + ggplot2::geom_vline(
-          xintercept = ref_val,
-          color = "steelblue",
-          linetype = "solid"
-        ) +
-          ggplot2::labs(
-            caption = paste0(
-              "Mavi cizgi: ", ref_lab, " = ",
-              sprintf("%.3f", ref_val),
-              ". Kesikli: 0.5."
-            )
-          )
-      }
+      p <- p + ggplot2::geom_vline(
+        xintercept = ref_val,
+        color = "steelblue",
+        linetype = "solid"
+      ) +
+        ggplot2::labs(caption = cap_extra)
     }
   }
 

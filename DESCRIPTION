@@ -1,6 +1,6 @@
 Package: SigBenchR
 Title: Gene Signature Benchmarking for Immunotherapy Response
-Version: 0.3.1
+Version: 0.4.0
 Authors@R: 
     person(given = "Efe Kaan", family = "Şengönül",
            role = c("aut", "cre"),
@@ -12,6 +12,7 @@ Description: Statistically validates whether a gene signature predicts
 License: GPL (>= 3)
 Encoding: UTF-8
 LazyData: true
+VignetteBuilder: knitr
 Roxygen: list(markdown = TRUE)
 Depends: 
     R (>= 4.2.0)

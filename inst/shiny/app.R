@@ -230,6 +230,9 @@ ui <- shiny::fluidPage(
         font-size: 1.05rem;
         color: var(--sb-text);
       }
+      input[type='checkbox'], input[type='radio'] {
+        accent-color: #0F766E;
+      }
     "))
   ),
   shiny::div(
@@ -243,7 +246,7 @@ ui <- shiny::fluidPage(
     ),
     shiny::div(
       class = "sb-header-meta",
-      shiny::span(class = "sb-badge", "v0.3.1"),
+      shiny::span(class = "sb-badge", "v0.4.0"),
       shiny::span(
         class = "sb-badge sb-badge-warn",
         "Araştırma Amaçlıdır — Klinik Karar Aracı Değildir"

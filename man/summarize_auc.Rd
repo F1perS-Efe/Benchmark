@@ -2,7 +2,7 @@
 % Please edit documentation in R/summarize_auc.R
 \name{summarize_auc}
 \alias{summarize_auc}
-\title{Veri setleri uzerinde agirlikli AUC ozeti (n ve ters-varyans)}
+\title{Veri setleri uzerinde agirlikli AUC ozeti (n, IVW ve logit-AUC REML)}
 \usage{
 summarize_auc(
   results,
@@ -32,7 +32,8 @@ summarize_auc(
 verildiginde ozet her alt grup icinde ayri hesaplanir.}
 }
 \value{
-\code{data.frame} ozet satirlari.
+\code{data.frame} ozet satirlari (\code{auc_re}, \code{auc_re_ci_low}, \code{auc_re_ci_high},
+\code{tau2_reml}, \code{i2_logit} dahil).
 }
 \description{
 Her \code{signature} x \code{method} (ve istege bagli \code{stratify_by} alt gruplari) icin:
@@ -40,6 +41,11 @@ Her \code{signature} x \code{method} (ve istege bagli \code{stratify_by} alt gru
 \item \strong{n-agirlikli} ortalama: \code{sum(n * auc) / sum(n)}
 \item \strong{ters-varyans (IVW)} ortalama: \code{sum(w * auc) / sum(w)}, \code{w = 1 / auc_var}
 \item Heterojenlik: Cochran \code{Q} ve \code{I^2} (IVW agirliklariyla)
+\item \strong{Logit-AUC REML + kesilmis HKSJ 95 pct GA}: AUC acik aralikta (0, 1) ve
+pozitif varyansli kohortlarda \code{stats::qlogis} olceginde REML \code{tau2},
+Hartung-Knapp-Sidik-Jonkman \code{max(1, q_hk)} kesmeli standart hata ve
+\code{stats::qt} kritik degeri; nokta/GA \code{stats::plogis} ile geri donusur.
+Ayrica logit olcekli \code{i2_logit} raporlanir.
 }
 }
 \details{
@@ -47,7 +53,7 @@ Varsayilan kurallar:
 \itemize{
 \item \code{independent_only = TRUE}: yalniz \code{independent == TRUE} (NA / FALSE dislanir)
 \item \code{exclude_low_coverage = TRUE}: \code{low_coverage == TRUE} satirlar dislanir
-\item \code{var_zero} / \code{auc_var <= 0} yalnizca IVW'den cikarilir; n-agirlikli ortalamaya girer
+\item \code{var_zero} / \code{auc_var <= 0} yalnizca IVW / REML'den cikarilir; n-agirlikli ortalamaya girer
 \item \code{skipped} veya sonlu olmayan AUC satirlar yok sayilir
 }
 
@@ -55,5 +61,7 @@ Varsayilan kurallar:
 grubunda birden fazla farkli non-NA \code{endpoint_type} veya \code{treatment} degeri
 birlestiriliyorsa ASCII \code{warning()} uretilir ve \code{stratify_by} onerilir.
 
-DerSimonian-Laird rastgele etkili model bu fonksiyonda yoktur (opsiyonel genisleme).
+Logit-AUC REML + HKSJ ozeti kucuk kohort sayisinda (\code{k <= 4}) \strong{kesifseldir}.
+Farkli klinik sonlanimli kohortlarda \code{stratify_by} kullanin; havuzlama
+klinik olarak anlamsiz ortalamalar uretebilir.
 }

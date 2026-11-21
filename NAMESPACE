@@ -3,6 +3,7 @@
 export(adjust_null_p)
 export(auc_correlation)
 export(auc_mw)
+export(check_sd_sensitivity)
 export(check_sensitivity)
 export(collapse_duplicate_genes)
 export(compare_signatures)

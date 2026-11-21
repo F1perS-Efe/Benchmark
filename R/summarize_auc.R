@@ -1,21 +1,28 @@
-#' Veri setleri uzerinde agirlikli AUC ozeti (n ve ters-varyans)
+#' Veri setleri uzerinde agirlikli AUC ozeti (n, IVW ve logit-AUC REML)
 #'
 #' Her `signature` x `method` (ve istege bagli `stratify_by` alt gruplari) icin:
 #' - **n-agirlikli** ortalama: `sum(n * auc) / sum(n)`
 #' - **ters-varyans (IVW)** ortalama: `sum(w * auc) / sum(w)`, `w = 1 / auc_var`
 #' - Heterojenlik: Cochran `Q` ve `I^2` (IVW agirliklariyla)
+#' - **Logit-AUC REML + kesilmis HKSJ 95 pct GA**: AUC acik aralikta (0, 1) ve
+#'   pozitif varyansli kohortlarda `stats::qlogis` olceginde REML `tau2`,
+#'   Hartung-Knapp-Sidik-Jonkman `max(1, q_hk)` kesmeli standart hata ve
+#'   `stats::qt` kritik degeri; nokta/GA `stats::plogis` ile geri donusur.
+#'   Ayrica logit olcekli `i2_logit` raporlanir.
 #'
 #' Varsayilan kurallar:
 #' - `independent_only = TRUE`: yalniz `independent == TRUE` (NA / FALSE dislanir)
 #' - `exclude_low_coverage = TRUE`: `low_coverage == TRUE` satirlar dislanir
-#' - `var_zero` / `auc_var <= 0` yalnizca IVW'den cikarilir; n-agirlikli ortalamaya girer
+#' - `var_zero` / `auc_var <= 0` yalnizca IVW / REML'den cikarilir; n-agirlikli ortalamaya girer
 #' - `skipped` veya sonlu olmayan AUC satirlar yok sayilir
 #'
 #' `stratify_by = NULL` (varsayilan) iken cikti geriye donuk uyumludur. Ayni ozet
 #' grubunda birden fazla farkli non-NA `endpoint_type` veya `treatment` degeri
 #' birlestiriliyorsa ASCII `warning()` uretilir ve `stratify_by` onerilir.
 #'
-#' DerSimonian-Laird rastgele etkili model bu fonksiyonda yoktur (opsiyonel genisleme).
+#' Logit-AUC REML + HKSJ ozeti kucuk kohort sayisinda (`k <= 4`) **kesifseldir**.
+#' Farkli klinik sonlanimli kohortlarda `stratify_by` kullanin; havuzlama
+#' klinik olarak anlamsiz ortalamalar uretebilir.
 #'
 #' @param results `run_benchmark()` cikti tablosu.
 #' @param method Belirli skorlama yontemi; `NULL` ise tum yontemler ayri ozetlenir.
@@ -27,7 +34,8 @@
 #' @param stratify_by Opsiyonel karakter vektoru (orn. `c("treatment", "endpoint_type")`);
 #'   verildiginde ozet her alt grup icinde ayri hesaplanir.
 #'
-#' @return `data.frame` ozet satirlari.
+#' @return `data.frame` ozet satirlari (`auc_re`, `auc_re_ci_low`, `auc_re_ci_high`,
+#'   `tau2_reml`, `i2_logit` dahil).
 #' @export
 summarize_auc <- function(results,
                           method = NULL,
@@ -187,6 +195,11 @@ summarize_auc <- function(results,
       auc_ivw = NA_real_,
       Q = NA_real_,
       I2 = NA_real_,
+      auc_re = NA_real_,
+      auc_re_ci_low = NA_real_,
+      auc_re_ci_high = NA_real_,
+      tau2_reml = NA_real_,
+      i2_logit = NA_real_,
       n_excluded_nonindependent = as.integer(n_nonindep),
       n_excluded_var_zero = 0L,
       n_var_zero_excluded = 0L,
@@ -252,6 +265,17 @@ summarize_auc <- function(results,
     }
   }
 
+  # Logit-AUC REML + truncated HKSJ (open-interval AUC, positive variance)
+  use_re <- use_ivw[
+    use_ivw$auc > 0 & use_ivw$auc < 1,
+    ,
+    drop = FALSE
+  ]
+  re_meta <- .logit_reml_meta(
+    auc = as.numeric(use_re$auc),
+    auc_var = as.numeric(use_re$auc_var)
+  )
+
   data.frame(
     signature = g$signature[1],
     method = g$method[1],
@@ -263,6 +287,11 @@ summarize_auc <- function(results,
     auc_ivw = auc_ivw,
     Q = Q,
     I2 = I2,
+    auc_re = re_meta$auc_re,
+    auc_re_ci_low = re_meta$auc_re_ci_low,
+    auc_re_ci_high = re_meta$auc_re_ci_high,
+    tau2_reml = re_meta$tau2_reml,
+    i2_logit = re_meta$i2_logit,
     n_excluded_nonindependent = as.integer(n_nonindep),
     n_excluded_var_zero = as.integer(n_var_zero),
     n_var_zero_excluded = as.integer(n_var_zero),
@@ -270,6 +299,81 @@ summarize_auc <- function(results,
     n_small_cohort = as.integer(n_small),
     note = if (length(notes) == 0L) NA_character_ else paste(notes, collapse = "; "),
     stringsAsFactors = FALSE
+  )
+}
+
+#' Logit-AUC REML + truncated HKSJ meta-analysis (base R only)
+#'
+#' @param auc Numeric AUC vector (open interval expected by caller).
+#' @param auc_var Positive AUC variances (same length).
+#' @return Named list with auc_re, auc_re_ci_low, auc_re_ci_high, tau2_reml, i2_logit.
+#' @noRd
+.logit_reml_meta <- function(auc, auc_var) {
+  y <- stats::qlogis(auc)
+  v <- auc_var / (auc * (1 - auc))^2
+  ok <- is.finite(y) & is.finite(v) & v > 0
+  y <- y[ok]
+  v <- v[ok]
+  k <- length(y)
+
+  if (k == 0L) {
+    return(list(
+      auc_re = NA_real_,
+      auc_re_ci_low = NA_real_,
+      auc_re_ci_high = NA_real_,
+      tau2_reml = NA_real_,
+      i2_logit = NA_real_
+    ))
+  }
+
+  if (k == 1L) {
+    return(list(
+      auc_re = stats::plogis(y[1]),
+      auc_re_ci_low = NA_real_,
+      auc_re_ci_high = NA_real_,
+      tau2_reml = NA_real_,
+      i2_logit = NA_real_
+    ))
+  }
+
+  reml_ll <- function(tau2) {
+    w <- 1 / (v + tau2)
+    sw <- sum(w)
+    mu <- sum(w * y) / sw
+    -0.5 * (sum(log(v + tau2)) + log(sw) + sum(w * (y - mu)^2))
+  }
+
+  upper <- max(20, 10 * stats::var(y))
+  opt <- stats::optimize(reml_ll, interval = c(0, upper), maximum = TRUE)
+  ll0 <- reml_ll(0)
+  if (is.finite(ll0) && (!is.finite(opt$objective) || ll0 >= opt$objective)) {
+    tau2_reml <- 0
+  } else {
+    tau2_reml <- max(0, as.numeric(opt$maximum))
+  }
+
+  w_re <- 1 / (v + tau2_reml)
+  theta_re <- sum(w_re * y) / sum(w_re)
+
+  q_hk <- sum(w_re * (y - theta_re)^2) / (k - 1)
+  se_hk <- sqrt(max(1, q_hk) / sum(w_re))
+  t_crit <- stats::qt(0.975, df = k - 1)
+
+  w_fe <- 1 / v
+  theta_fe <- sum(w_fe * y) / sum(w_fe)
+  Q_logit <- sum(w_fe * (y - theta_fe)^2)
+  i2_logit <- if (is.finite(Q_logit) && Q_logit > 0) {
+    max(0, (Q_logit - (k - 1)) / Q_logit) * 100
+  } else {
+    0
+  }
+
+  list(
+    auc_re = stats::plogis(theta_re),
+    auc_re_ci_low = stats::plogis(theta_re - t_crit * se_hk),
+    auc_re_ci_high = stats::plogis(theta_re + t_crit * se_hk),
+    tau2_reml = tau2_reml,
+    i2_logit = i2_logit
   )
 }
 
@@ -312,6 +416,11 @@ summarize_auc <- function(results,
     auc_ivw = numeric(),
     Q = numeric(),
     I2 = numeric(),
+    auc_re = numeric(),
+    auc_re_ci_low = numeric(),
+    auc_re_ci_high = numeric(),
+    tau2_reml = numeric(),
+    i2_logit = numeric(),
     n_excluded_nonindependent = integer(),
     n_excluded_var_zero = integer(),
     n_var_zero_excluded = integer(),
