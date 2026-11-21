@@ -4,14 +4,19 @@
 \alias{score_signature}
 \title{Imza skorunu ornek basina hesapla}
 \usage{
-score_signature(expr, genes, method = c("mean", "zscore"), min_genes = 3L)
+score_signature(
+  expr,
+  genes,
+  method = c("mean", "zscore", "median", "rank"),
+  min_genes = 3L
+)
 }
 \arguments{
 \item{expr}{Gen x ornek matris (hazirlanmis / log olcekli).}
 
 \item{genes}{Imza genleri (karakter).}
 
-\item{method}{\code{"mean"} veya \code{"zscore"}.}
+\item{method}{\code{"mean"}, \code{"zscore"}, \code{"median"} veya \code{"rank"}.}
 
 \item{min_genes}{Kapsama sonrasi minimum gen sayisi. Varsayilan 3.}
 }
@@ -26,5 +31,8 @@ uzerinde etiketten bagimsiz hesaplanir.
 \itemize{
 \item \code{mean}: log olcekli ifadenin ornek basina ortalamasi
 \item \code{zscore}: her gen veri seti genelinde z-score'a cevrilir, sonra ortalanir
+\item \code{median}: ham (log olcekli) ifadenin ornek basina medyani
+\item \code{rank}: her gen ornekler arasi ortalama siraya cevrilir, 0-1 araligina
+olceklenir, sonra ornek basina ortalanir
 }
 }

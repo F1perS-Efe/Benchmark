@@ -17,5 +17,6 @@ plot_auc_heatmap(results, method = NULL, coverage_threshold = 0.7)
 \code{ggplot} nesnesi.
 }
 \description{
-Kapsama esigi altindaki hucreler gri cizilir.
+Kapsama esigi altindaki (\code{low_coverage}) hucreler gri cizilir; bu durum
+lejant/caption'da acikca belirtilir (sessizce gecilmez).
 }

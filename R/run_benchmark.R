@@ -6,18 +6,18 @@
 #' @param signatures Isimli liste; her eleman `list(genes = <chr>, direction = "<"|">",
 #'   derived_from = <chr>)`. `direction` ve `derived_from` istege bagli.
 #' @param datasets Isimli liste; her eleman `validate_dataset()` yapisinda.
-#' @param methods Skorlama yontemleri. Faz 1: `"mean"`, `"zscore"`.
+#' @param methods Skorlama yontemleri: `"mean"`, `"zscore"`, `"median"`, `"rank"`.
 #' @param direction Varsayilan imza yonu (imza duzeyinde yoksa).
 #' @param min_genes `score_signature()` esigi.
 #' @param coverage_threshold Kapsama uyari esigi (0-1). Varsayilan 0.70.
 #' @param apply_log2 `scale = "linear"` iken log2 uygula.
 #' @param sd_handling `encode_response()` politikasi.
 #'
-#' @return `data.frame` sonuc tablosu.
+#' @return `data.frame` sonuc tablosu (`coverage_label`, `missing_genes` dahil).
 #' @export
 run_benchmark <- function(signatures,
                           datasets,
-                          methods = c("mean", "zscore"),
+                          methods = c("mean", "zscore", "median", "rank"),
                           direction = "<",
                           min_genes = 3L,
                           coverage_threshold = 0.70,
@@ -29,7 +29,8 @@ run_benchmark <- function(signatures,
   if (is.null(names(datasets)) || any(!nzchar(names(datasets)))) {
     stop("`datasets` isimli bir liste olmalidir.", call. = FALSE)
   }
-  methods <- match.arg(methods, several.ok = TRUE)
+  method_choices <- c("mean", "zscore", "median", "rank")
+  methods <- match.arg(methods, choices = method_choices, several.ok = TRUE)
 
   # Farkli normalizasyon uyarisi (birlestirme yok; yalnizca bilgilendirme).
   norms <- vapply(datasets, function(d) as.character(d$info$normalization), character(1))
@@ -101,6 +102,12 @@ run_benchmark <- function(signatures,
           coverage_pct = scored$coverage$coverage_pct,
           n_found = scored$coverage$n_found,
           n_total = scored$coverage$n_total,
+          coverage_label = sprintf(
+            "%d/%d (%.0f%%)",
+            scored$coverage$n_found,
+            scored$coverage$n_total,
+            scored$coverage$coverage_pct
+          ),
           missing_genes = paste(scored$coverage$missing, collapse = ","),
           low_coverage = low_cov,
           auc = NA_real_,

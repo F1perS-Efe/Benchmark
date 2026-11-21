@@ -1,9 +1,9 @@
-# SigBenchR Shiny MVP (Faz 1) - tek dosya
+# SigBenchR Shiny (Faz 2A) - tek dosya
 
 options(shiny.maxRequestSize = 25 * 1024^2) # 25 MB
 
 ui <- shiny::fluidPage(
-  shiny::titlePanel("SigBenchR - Imza Dogrulama (Faz 1)"),
+  shiny::titlePanel("SigBenchR - Imza Dogrulama (Faz 2A)"),
   shiny::tags$p(
     shiny::em(
       "Arastirma amaclidir; klinik karar araci degildir. ",
@@ -33,10 +33,16 @@ ui <- shiny::fluidPage(
           placeholder = "IFNG, CXCL9, CXCL13"
         )
       ),
+      shiny::checkboxGroupInput(
+        "methods",
+        "Skorlama yontemleri",
+        choices = c("mean", "zscore", "median", "rank"),
+        selected = c("mean", "zscore", "median", "rank")
+      ),
       shiny::radioButtons(
-        "method",
-        "Skorlama yontemi",
-        choices = c("mean", "zscore"),
+        "heatmap_method",
+        "Isi haritasi yontemi",
+        choices = c("mean", "zscore", "median", "rank"),
         selected = "mean"
       ),
       shiny::radioButtons(
@@ -48,6 +54,20 @@ ui <- shiny::fluidPage(
         ),
         selected = "<"
       ),
+      shiny::sliderInput(
+        "coverage_threshold",
+        "Kapsama esigi",
+        min = 0.5, max = 1, value = 0.70, step = 0.05
+      ),
+      shiny::sliderInput(
+        "sensitivity_threshold",
+        "Dayaniklilik AUC-aralik esigi (keyfi)",
+        min = 0.05, max = 0.30, value = 0.10, step = 0.01
+      ),
+      shiny::tags$small(
+        "0.10 esigi keyfidir; bilimsel bir standart degildir. ",
+        "Sonuclara bakildiktan sonra degistirilmemelidir."
+      ),
       shiny::checkboxGroupInput(
         "datasets",
         "Veri setleri",
@@ -58,7 +78,8 @@ ui <- shiny::fluidPage(
       shiny::hr(),
       shiny::tags$small(
         "Farkli normalizasyonlu veri setlerinin ham ifadeleri birlestirilmez. ",
-        "AUC her veri seti icinde ayri hesaplanir."
+        "AUC her veri seti icinde ayri hesaplanir. ",
+        "Gri isi-haritasi hucreleri dusuk kapsama uyarisidir."
       )
     ),
     shiny::mainPanel(
@@ -70,7 +91,19 @@ ui <- shiny::fluidPage(
         shiny::tableOutput("table_fallback")
       },
       shiny::h4("AUC isi haritasi"),
-      shiny::plotOutput("heatmap", height = "360px")
+      shiny::plotOutput("heatmap", height = "360px"),
+      shiny::h4("Dayaniklilik (Sensitivity)"),
+      shiny::tags$p(
+        shiny::em(
+          "fragile = TRUE: yontemler arasi AUC araligi esigi asar. ",
+          "Esik keyfidir (varsayilan 0.10)."
+        )
+      ),
+      if (requireNamespace("DT", quietly = TRUE)) {
+        DT::DTOutput("sensitivity_table")
+      } else {
+        shiny::tableOutput("sensitivity_fallback")
+      }
     )
   )
 )
@@ -81,6 +114,7 @@ server <- function(input, output, session) {
 
   results <- shiny::eventReactive(input$run, {
     shiny::req(length(input$datasets) > 0)
+    shiny::validate(shiny::need(length(input$methods) >= 1, "En az bir skorlama yontemi secin."))
 
     if (identical(input$sig_choice, "custom")) {
       genes <- SigBenchR::parse_genes(input$custom_genes)
@@ -97,8 +131,17 @@ server <- function(input, output, session) {
     SigBenchR::run_benchmark(
       signatures = sigs,
       datasets = ds,
-      methods = input$method,
-      direction = input$direction
+      methods = input$methods,
+      direction = input$direction,
+      coverage_threshold = input$coverage_threshold
+    )
+  })
+
+  sens <- shiny::reactive({
+    shiny::req(results())
+    SigBenchR::check_sensitivity(
+      results(),
+      threshold = input$sensitivity_threshold
     )
   })
 
@@ -107,10 +150,12 @@ server <- function(input, output, session) {
       return("Analizi calistirmak icin dugmeye basin.")
     }
     df <- results()
+    s <- sens()
     paste0(
       "Satir: ", nrow(df),
       " | Atlanan: ", sum(df$skipped, na.rm = TRUE),
-      " | Dusuk kapsama: ", sum(df$low_coverage, na.rm = TRUE)
+      " | Dusuk kapsama: ", sum(df$low_coverage, na.rm = TRUE),
+      " | Kirilgan (fragile): ", sum(s$fragile, na.rm = TRUE)
     )
   })
 
@@ -120,8 +165,9 @@ server <- function(input, output, session) {
       df <- results()
       cols <- c(
         "dataset", "signature", "method", "n", "n_pos", "n_neg",
-        "coverage_pct", "auc", "normalization", "scale",
-        "cancer", "treatment", "low_coverage", "skipped", "skip_reason"
+        "coverage_label", "missing_genes", "low_coverage", "auc",
+        "normalization", "scale", "cancer", "treatment",
+        "skipped", "skip_reason"
       )
       cols <- intersect(cols, names(df))
       DT::datatable(df[, cols, drop = FALSE], options = list(pageLength = 10))
@@ -133,15 +179,39 @@ server <- function(input, output, session) {
   output$table_fallback <- shiny::renderTable({
     shiny::req(results())
     df <- results()
-    cols <- c("dataset", "signature", "method", "n", "coverage_pct", "auc", "skipped")
+    cols <- c(
+      "dataset", "signature", "method", "n", "coverage_label",
+      "missing_genes", "low_coverage", "auc", "skipped"
+    )
     df[, intersect(cols, names(df)), drop = FALSE]
   })
 
   output$heatmap <- shiny::renderPlot({
     shiny::req(results())
     df <- results()
-    shiny::validate(shiny::need(any(!df$skipped & is.finite(df$auc)), "Cizilecek AUC yok."))
-    SigBenchR::plot_auc_heatmap(df, method = input$method)
+    shiny::validate(shiny::need(
+      any(df$method == input$heatmap_method & !df$skipped & is.finite(df$auc)),
+      "Secilen isi-haritasi yontemi icin cizilecek AUC yok."
+    ))
+    SigBenchR::plot_auc_heatmap(
+      df,
+      method = input$heatmap_method,
+      coverage_threshold = input$coverage_threshold
+    )
+  })
+
+  output$sensitivity_table <- if (requireNamespace("DT", quietly = TRUE)) {
+    DT::renderDT({
+      shiny::req(sens())
+      DT::datatable(sens(), options = list(pageLength = 10))
+    })
+  } else {
+    NULL
+  }
+
+  output$sensitivity_fallback <- shiny::renderTable({
+    shiny::req(sens())
+    sens()
   })
 }
 

@@ -7,7 +7,7 @@
 run_benchmark(
   signatures,
   datasets,
-  methods = c("mean", "zscore"),
+  methods = c("mean", "zscore", "median", "rank"),
   direction = "<",
   min_genes = 3L,
   coverage_threshold = 0.7,
@@ -20,7 +20,7 @@ run_benchmark(
 
 \item{datasets}{Isimli liste; her eleman \code{validate_dataset()} yapisinda.}
 
-\item{methods}{Skorlama yontemleri. Faz 1: \code{"mean"}, \code{"zscore"}.}
+\item{methods}{Skorlama yontemleri: \code{"mean"}, \code{"zscore"}, \code{"median"}, \code{"rank"}.}
 
 \item{direction}{Varsayilan imza yonu (imza duzeyinde yoksa).}
 
@@ -33,7 +33,7 @@ run_benchmark(
 \item{sd_handling}{\code{encode_response()} politikasi.}
 }
 \value{
-\code{data.frame} sonuc tablosu.
+\code{data.frame} sonuc tablosu (\code{coverage_label}, \code{missing_genes} dahil).
 }
 \description{
 Her veri seti icinde ayri AUC hesaplar; ham ifadeleri birlestirmez.

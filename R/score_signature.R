@@ -5,17 +5,20 @@
 #'
 #' - `mean`: log olcekli ifadenin ornek basina ortalamasi
 #' - `zscore`: her gen veri seti genelinde z-score'a cevrilir, sonra ortalanir
+#' - `median`: ham (log olcekli) ifadenin ornek basina medyani
+#' - `rank`: her gen ornekler arasi ortalama siraya cevrilir, 0-1 araligina
+#'   olceklenir, sonra ornek basina ortalanir
 #'
 #' @param expr Gen x ornek matris (hazirlanmis / log olcekli).
 #' @param genes Imza genleri (karakter).
-#' @param method `"mean"` veya `"zscore"`.
+#' @param method `"mean"`, `"zscore"`, `"median"` veya `"rank"`.
 #' @param min_genes Kapsama sonrasi minimum gen sayisi. Varsayilan 3.
 #'
 #' @return Liste: `scores`, `coverage`, `n_all_na_dropped`, `skipped`, `skip_reason`.
 #' @export
 score_signature <- function(expr,
                             genes,
-                            method = c("mean", "zscore"),
+                            method = c("mean", "zscore", "median", "rank"),
                             min_genes = 3L) {
   method <- match.arg(method)
   coverage <- match_genes(expr, genes)
@@ -41,12 +44,35 @@ score_signature <- function(expr,
     # Sabit genler (sd = 0) NA uretir; skorlamada na.rm ile idare edilir.
   }
 
-  # Ornek basina ortalama; gen NA'lari ornek icinde yok sayilir.
+  if (method == "rank") {
+    # Her gen (satir): ornekler arasi average-rank, sonra [0, 1] olcek.
+    sub <- t(apply(sub, 1L, function(x) {
+      m <- sum(!is.na(x))
+      if (m <= 1L) {
+        # Tek veya sifir gecerli deger: bolme guvensiz; NA birak.
+        return(rep(NA_real_, length(x)))
+      }
+      r <- rank(x, ties.method = "average", na.last = "keep")
+      (r - 1) / (m - 1)
+    }))
+    if (!is.null(colnames(expr))) {
+      colnames(sub) <- colnames(expr)[seq_len(ncol(sub))]
+    }
+    if (!is.null(rownames(expr)) || length(coverage$found) > 0L) {
+      rownames(sub) <- coverage$found
+    }
+  }
+
+  # Ornek basina ozet; gen NA'lari ornek icinde yok sayilir.
   scores <- apply(sub, 2L, function(x) {
     if (all(is.na(x))) {
       return(NA_real_)
     }
-    mean(x, na.rm = TRUE)
+    if (method == "median") {
+      stats::median(x, na.rm = TRUE)
+    } else {
+      mean(x, na.rm = TRUE)
+    }
   })
 
   all_na <- is.na(scores)

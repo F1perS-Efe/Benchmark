@@ -1,6 +1,7 @@
 #' Imza x veri seti AUC isi haritasi
 #'
-#' Kapsama esigi altindaki hucreler gri cizilir.
+#' Kapsama esigi altindaki (`low_coverage`) hucreler gri cizilir; bu durum
+#' lejant/caption'da acikca belirtilir (sessizce gecilmez).
 #'
 #' @param results `run_benchmark()` ciktisi.
 #' @param method Belirli bir skorlama yontemi suz. `NULL` ise ilk yontem.
@@ -24,10 +25,26 @@ plot_auc_heatmap <- function(results,
     stop("Secilen yontem icin cizilecek satir yok.", call. = FALSE)
   }
 
-  # Dusuk kapsama: AUC'yi NA yap -> gri kutu
+  # Dusuk kapsama: AUC'yi NA yap -> gri kutu (na.value)
+  if (!"low_coverage" %in% names(df)) {
+    df$low_coverage <- df$coverage_pct < (100 * coverage_threshold)
+  }
+  # Esik yeniden uygulanabilir (Shiny'den gelen esik)
+  df$low_coverage <- df$low_coverage | df$coverage_pct < (100 * coverage_threshold)
+
   df$auc_plot <- df$auc
-  low <- df$low_coverage | df$coverage_pct < (100 * coverage_threshold)
-  df$auc_plot[low] <- NA_real_
+  df$auc_plot[df$low_coverage] <- NA_real_
+
+  cov_txt <- if ("coverage_label" %in% names(df)) {
+    as.character(df$coverage_label)
+  } else {
+    sprintf("%.0f%%", df$coverage_pct)
+  }
+  df$cell_label <- ifelse(
+    df$low_coverage,
+    paste0("dusuk\n", cov_txt),
+    sprintf("%.2f", df$auc)
+  )
 
   ggplot2::ggplot(
     df,
@@ -39,13 +56,7 @@ plot_auc_heatmap <- function(results,
   ) +
     ggplot2::geom_tile(color = "white", linewidth = 0.4) +
     ggplot2::geom_text(
-      ggplot2::aes(
-        label = ifelse(
-          is.na(.data$auc_plot),
-          sprintf("NA\n(%.0f%%)", .data$coverage_pct),
-          sprintf("%.2f", .data$auc)
-        )
-      ),
+      ggplot2::aes(label = .data$cell_label),
       size = 3
     ) +
     ggplot2::scale_fill_gradient(
@@ -60,8 +71,9 @@ plot_auc_heatmap <- function(results,
       x = "Veri seti",
       y = "Imza",
       caption = paste0(
-        "Gri hucreler: kapsama < %", round(100 * coverage_threshold),
-        " veya atlanan sonuc"
+        "Gri hucreler = dusuk gen kapsama (kapsama < %",
+        round(100 * coverage_threshold),
+        "). Gri, eksik kanit uyarisidir; sessizce yok sayilmamalidir."
       )
     ) +
     ggplot2::theme_minimal(base_size = 12) +

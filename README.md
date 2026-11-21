@@ -24,7 +24,7 @@ data(signatures_demo)
 res <- run_benchmark(
   signatures = signatures_demo,
   datasets = datasets_demo,
-  methods = c("mean", "zscore")
+  methods = c("mean", "zscore", "median", "rank")
 )
 
 print(res)
@@ -37,13 +37,15 @@ Shiny arayüzü:
 SigBenchR::run_app()
 ```
 
-## Faz 1 kapsamı
+## Kapsam (Faz 1 + Faz 2A)
 
-- Skorlama: `mean`, `zscore`
+- Skorlama: `mean`, `zscore`, `median`, `rank`
 - ROC-AUC (sabit yön; `orient_score` sonrası her zaman `pROC` `direction = "<"`)
+- Gen kapsama denetimi + ısı haritasında düşük kapsama gri uyarısı
+- Skorlama dayanıklılığı: `check_sensitivity()` (eşik varsayılanı 0.10, keyfidir)
 - Sentetik 2 demo veri seti + Cytokine-5 / IFNG6 / Random3
 - Gen eşleştirme: büyük harfe çevrilmiş **tam eşleşme** (alias yok)
-- Sade Shiny (`inst/shiny/app.R`)
+- Shiny (`inst/shiny/app.R`)
 
 **v1 dışı:** Aynı imzada gen bazlı `+` / `-` işaretleri; takma ad eşleştirme.
 
@@ -74,4 +76,4 @@ Cytokine-5 imzası TCGEx çalışmasında Pan-ICI verisinden türetilmiştir; ya
 
 ## Lisans
 
-`[LİSANS: benim seçimim; öneri GPL-3, TCGEx ile uyumlu]` — bkz. `LICENSE` dosyası. Kesin lisans Faz 3’te netleştirilecektir.
+GNU GPL (>= 3). Ayrıntılar için `LICENSE.md`. TCGEx ile uyumludur.
