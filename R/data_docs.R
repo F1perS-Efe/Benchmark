@@ -17,6 +17,12 @@
 #' `seed = 42` ile orneklenmis tarafsiz null havuzu (~2800 gen/kohort).
 #' Liu 2019 (cBioPortal) S3 403 nedeniyle dahil edilmedi.
 #'
+#' Klinik etiket notlari:
+#' - `van_allen_2015`: `sample_meta$treatment = "anti-CTLA4"`; IMS
+#'   `mel_van_cli_data.csv` ikili clinical-benefit yaniti (`n_pos = 19`).
+#' - `gide_2019`: `sample_meta$treatment = "anti-PD1"`; yalniz `PD1_*_PRE`
+#'   monoterapi (`n = 41`); `ipiPD1_*` kombinasyon dahil degil.
+#'
 #' @format Isimli liste: `van_allen_2015`, `hugo_2016`, `riaz_2017`, `gide_2019`.
 #' @examples
 #' data(datasets_ici)

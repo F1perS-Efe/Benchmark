@@ -15,6 +15,15 @@ Pre-treatment, hasta basina tek ornek. Genler: demo imza genleri +
 \code{seed = 42} ile orneklenmis tarafsiz null havuzu (~2800 gen/kohort).
 Liu 2019 (cBioPortal) S3 403 nedeniyle dahil edilmedi.
 }
+\details{
+Klinik etiket notlari:
+\itemize{
+\item \code{van_allen_2015}: \code{sample_meta$treatment = "anti-CTLA4"}; IMS
+\code{mel_van_cli_data.csv} ikili clinical-benefit yaniti (\code{n_pos = 19}).
+\item \code{gide_2019}: \code{sample_meta$treatment = "anti-PD1"}; yalniz \verb{PD1_*_PRE}
+monoterapi (\code{n = 41}); \verb{ipiPD1_*} kombinasyon dahil degil.
+}
+}
 \examples{
 data(datasets_ici)
 names(datasets_ici)

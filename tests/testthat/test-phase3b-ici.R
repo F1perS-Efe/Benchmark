@@ -63,3 +63,64 @@ test_that("data/ paketi 5 MB altinda", {
   bytes <- sum(file.info(list.files(data_dir, full.names = TRUE))$size, na.rm = TRUE)
   expect_lt(bytes, 5 * 1024^2)
 })
+
+test_that("generate_r_code datasets_ici ile uyumlu ve eval edilebilir", {
+  skip_if_not_installed("pROC")
+  skip_if_not_installed("ggplot2")
+  data(datasets_ici, package = "SigBenchR")
+  data(signatures_demo, package = "SigBenchR")
+
+  ici_names <- names(datasets_ici)
+  expect_true(all(c("van_allen_2015", "hugo_2016", "riaz_2017", "gide_2019") %in% ici_names))
+
+  code <- generate_r_code(
+    signature_name = "IFNG6",
+    methods = "mean",
+    direction = "<",
+    dataset_names = ici_names,
+    compute_pr = FALSE,
+    compute_null = FALSE,
+    n_boot = 10L,
+    n_perm = 10L,
+    seed = 42L
+  )
+  expect_silent(parse(text = code))
+  expect_true(grepl("data(datasets_ici)", code, fixed = TRUE))
+  expect_false(grepl("data(datasets_demo)", code, fixed = TRUE))
+  expect_true(grepl("ds <- datasets_ici[", code, fixed = TRUE))
+  for (nm in ici_names) {
+    expect_true(grepl(nm, code, fixed = TRUE))
+  }
+
+  # Shiny "R kodunu kopyala" ile ayni: secilen kohort adlari datasets_ici[...] uzerinden
+  code_run <- sub("^library\\(SigBenchR\\)\\r?\\n?", "", code)
+  grDevices::pdf(NULL)
+  on.exit(grDevices::dev.off(), add = TRUE)
+  eval_ok <- TRUE
+  tryCatch(
+    suppressWarnings(capture.output(eval(parse(text = code_run)))),
+    error = function(e) {
+      eval_ok <<- FALSE
+      attr(eval_ok, "message") <<- conditionMessage(e)
+    }
+  )
+  expect_true(eval_ok, info = paste0("eval hata: ", attr(eval_ok, "message")))
+})
+
+test_that("gide_2019 anti-PD1 monoterapi; van_allen klinik yarar n_pos=19", {
+  data(datasets_ici, package = "SigBenchR")
+  va <- datasets_ici$van_allen_2015
+  expect_identical(unique(as.character(va$sample_meta$treatment)), "anti-CTLA4")
+  expect_equal(as.integer(va$info$n_pos), 19L)
+  expect_equal(as.integer(va$info$n_neg), 23L)
+  expect_equal(as.integer(va$info$n), 42L)
+
+  gide <- datasets_ici$gide_2019
+  expect_identical(unique(as.character(gide$sample_meta$treatment)), "anti-PD1")
+  expect_true(all(grepl("^PD1_", gide$sample_meta$sample_id)))
+  expect_false(any(grepl("^ipiPD1_", gide$sample_meta$sample_id)))
+  expect_equal(as.integer(gide$info$n), 41L)
+  expect_equal(as.integer(gide$info$n_pos), 19L)
+  expect_equal(as.integer(gide$info$n_neg), 16L)
+  expect_equal(as.integer(gide$info$n_excluded_sd), 6L)
+})

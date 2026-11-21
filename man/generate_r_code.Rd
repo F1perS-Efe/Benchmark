@@ -37,7 +37,10 @@ generate_r_code(
 
 \item{seed}{Rastgelelik tohumu.}
 
-\item{dataset_names}{Demo veri seti adlari.}
+\item{dataset_names}{Veri seti adlari. ICI kohort adlari
+(\code{van_allen_2015}, \code{hugo_2016}, \code{riaz_2017}, \code{gide_2019}) verilirse
+uretilen kod \code{data(datasets_ici)} ve \code{datasets_ici[...]} kullanir;
+aksi halde \code{datasets_demo}.}
 
 \item{compute_pr}{PR-AUC hesaplansin mi.}
 

@@ -3,9 +3,13 @@
 ##
 ## Kaynaklar:
 ## - Van Allen 2015: GitHub TPM (vanallenlab/VanAllen_CTLA4_Science_RNASeq_TPM)
+##   Klinik: xmuyulab mel_van_cli_data.csv (clinical benefit -> n_pos=19);
+##   sample_meta$treatment = "anti-CTLA4"
 ## - Hugo 2016: GEO GSE78220 FPKM
 ## - Riaz 2017: GEO GSE91061 FPKM (PRCR -> PR; UNK dislanir)
 ## - Gide 2019: GitHub normalized counts (miabioinformatics/Gide_Quek_CancerCell2019)
+##   Klinik: xmuyulab mel_gide19_cli_data.csv pre (n=41); ENA PD1_*_PRE monoterapi;
+##   sample_meta$treatment = "anti-PD1" (ipiPD1 kombinasyon HARIC)
 ## - Liu 2019 (cBioPortal): S3 403 / erisim engeli nedeniyle ATLANDI
 ##
 ## Tarafsiz null havuzu: tum demo imza genleri + sifir-varyanssiz genlerden
@@ -213,7 +217,8 @@ finalize_dataset <- function(expr,
 }
 
 map_binary_response <- function(x) {
-  # 1 = yanitli, 0 = ilerleme, -1 = SD
+  # xmuyulab/ims_gene_signature klinik CSV kodlamasi:
+  # 1 = yanitli / klinik yarar, 0 = ilerleme, -1 = SD
   ifelse(x == 1, "PR", ifelse(x == 0, "PD", ifelse(x == -1, "SD", NA_character_)))
 }
 
@@ -288,6 +293,13 @@ syms <- unname(gene_maps$ensembl[ens])
 va_mat <- collapse_to_symbols(va_mat, syms)
 
 va_cli <- utils::read.csv(file.path(cache_dir, "mel_van_cli_data.csv"), row.names = 1, check.names = FALSE)
+# Klinik etiket seffafligi (van_allen_2015):
+# xmuyulab mel_van_cli_data.csv ikili `response` alani kullanilir (1/0; bu kohortta -1/SD yok).
+# IMS paketlemesi Van Allen (Science 2015) klinik yarar (clinical benefit) siniflamasina dayanir:
+#   yanit (CR/PR) veya uzun sagkalimli SD -> 1 (bizde PR / n_pos),
+#   PD veya kisa sagkalimli SD -> 0 (bizde PD / n_neg).
+# Sonuc: n = 42, n_pos = 19, n_neg = 23, n_excluded_sd = 0.
+# sample_meta$treatment = "anti-CTLA4" (ipilimumab monoterapi).
 # Sutun: MEL-IPI_Pat02 -> Pat02
 va_patients <- sub("^MEL-IPI_", "", colnames(va_mat))
 keep_va <- va_patients %in% rownames(va_cli)
@@ -315,7 +327,7 @@ va_out <- finalize_dataset(
     source = "GitHub vanallenlab/VanAllen_CTLA4_Science_RNASeq_TPM (TPM_RSEM_VAScience2015.txt); klinik: xmuyulab/ims_gene_signature mel_van_cli_data.csv",
     license = "Veri orijinal yayina / dbGaP phs000452 tabi; paket egitim/arastirma amaclidir",
     citation = "Van Allen et al., Science 2015",
-    description = "Pre-treatment melanoma anti-CTLA4 (ipilimumab) RNA-seq TPM"
+    description = "Pre-treatment melanoma anti-CTLA4 (ipilimumab) RNA-seq TPM; n_pos=19 klinik yarar (IMS binary response)"
   )
 )
 datasets_ici$van_allen_2015 <- va_out$dataset
@@ -485,7 +497,12 @@ gide_mat <- collapse_to_symbols(gide_mat, rownames(gide_mat))
 ena <- utils::read.delim(file.path(cache_dir, "gide_ena.tsv"), stringsAsFactors = FALSE)
 alias_to_err <- setNames(as.character(ena$run_accession), as.character(ena$sample_alias))
 gide_cli <- utils::read.csv(file.path(cache_dir, "mel_gide19_cli_data.csv"), row.names = 1, check.names = FALSE)
-# Yalniz pre klinik
+# Klinik etiket / tedavi kolu seffafligi (gide_2019):
+# xmuyulab mel_gide19_cli_data.csv icinde `treatment` sutunu zamanlama (pre/on) anlamindadir.
+# IMS pre alt kumesi n = 41; ENA ornek adlari bu 41 satirin tamaminda `PD1_*_PRE` (anti-PD1
+# monoterapi). `ipiPD1_*_PRE` (anti-PD1 + anti-CTLA4 kombinasyon) dahil edilmez.
+# Bu nedenle sample_meta$treatment = "anti-PD1" (kombinasyon degil).
+# Yanit: IMS binary response (1->PR, 0->PD, -1->SD) -> n_pos=19, n_neg=16, n_SD=6.
 gide_cli_pre <- gide_cli[gide_cli$treatment == "pre", , drop = FALSE]
 
 gide_err <- unname(alias_to_err[colnames(gide_mat)])
@@ -495,12 +512,14 @@ gide_err <- gide_err[keep_g]
 gide_resp <- map_binary_response(gide_cli_pre[gide_err, "response"])
 
 gide_patient <- sub("_PRE$", "", colnames(gide_mat))
+# Guvenlik: yalniz PD1_* monoterapi ornekleri (ipiPD1 kombinasyon disi)
+stopifnot(all(grepl("^PD1_", colnames(gide_mat))))
 gide_meta <- data.frame(
   sample_id = colnames(gide_mat),
   patient_id = gide_patient,
   response_label = gide_resp,
   cancer = "SKCM",
-  treatment = "anti-PD1/CTLA4",
+  treatment = "anti-PD1",
   timing = "pre",
   stringsAsFactors = FALSE
 )
@@ -517,7 +536,7 @@ gide_out <- finalize_dataset(
     source = "GitHub miabioinformatics/Gide_Quek_CancerCell2019 (cancercell_normalized_counts_genenames.txt); klinik: xmuyulab mel_gide19_cli_data.csv + ENA PRJEB23709",
     license = "ENA PRJEB23709 / orijinal yayina tabi; paket egitim/arastirma amaclidir",
     citation = "Gide et al., Cancer Cell 2019",
-    description = "Pre-treatment melanoma ICI normalized counts; yalniz *_PRE; hasta basina tek ornek"
+    description = "Pre-treatment melanoma anti-PD1 monoterapi (PD1_*_PRE; ipiPD1 kombinasyon haric); n=41"
   )
 )
 datasets_ici$gide_2019 <- gide_out$dataset

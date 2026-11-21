@@ -13,7 +13,10 @@
 #' @param n_boot PR bootstrap tekrari.
 #' @param n_perm Null permutasyon sayisi.
 #' @param seed Rastgelelik tohumu.
-#' @param dataset_names Demo veri seti adlari.
+#' @param dataset_names Veri seti adlari. ICI kohort adlari
+#'   (`van_allen_2015`, `hugo_2016`, `riaz_2017`, `gide_2019`) verilirse
+#'   uretilen kod `data(datasets_ici)` ve `datasets_ici[...]` kullanir;
+#'   aksi halde `datasets_demo`.
 #' @param compute_pr PR-AUC hesaplansin mi.
 #' @param compute_null Null permutasyon calissin mi.
 #'

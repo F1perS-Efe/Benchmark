@@ -81,18 +81,24 @@ Shiny varsayılanı gerçek ICI kohortlarıdır (`van_allen_2015`, `hugo_2016`, 
 
 ## Faz 3B Paket A — gerçek kohortlar
 
-| Kohort | n | n_pos | n_neg | n_excluded_sd | Normalizasyon | Kaynak |
-|--------|--:|------:|------:|--------------:|---------------|--------|
-| `van_allen_2015` | 42 | 19 | 23 | 0 | TPM | GitHub vanallenlab TPM |
-| `hugo_2016` | 26 | 14 | 12 | 0 | FPKM | GEO GSE78220 |
-| `riaz_2017` | 49 | 10 | 23 | 16 | FPKM | GEO GSE91061 (`PRCR`→`PR`, `UNK` dışlandı) |
-| `gide_2019` | 41 | 19 | 16 | 6 | normalized counts | GitHub Gide/Quek |
+| Kohort | n | n_pos | n_neg | n_SD | Normalizasyon | Ölçek | Kaynak |
+|--------|--:|------:|------:|----:|---------------|-------|--------|
+| `van_allen_2015` | 42 | 19 | 23 | 0 | TPM | linear | GitHub vanallenlab TPM |
+| `hugo_2016` | 26 | 14 | 12 | 0 | FPKM | linear | GEO GSE78220 |
+| `riaz_2017` | 49 | 10 | 23 | 16 | FPKM | linear | GEO GSE91061 (`PRCR`→`PR`, `UNK` dışlandı) |
+| `gide_2019` | 41 | 19 | 16 | 6 | normalized counts | linear | GitHub Gide/Quek |
 
 Liu 2019 (cBioPortal) S3/LFS **403** verdiği için dahil edilmedi.
 
+**Klinik etiket şeffaflığı**
+
+- `van_allen_2015` (`sample_meta$treatment = "anti-CTLA4"`): Yanıt etiketleri `xmuyulab/ims_gene_signature` `mel_van_cli_data.csv` ikili `response` alanından gelir (`1`→PR/pozitif, `0`→PD/negatif; bu kohortta SD/`-1` yok). IMS paketlemesi Van Allen (Science 2015) **klinik yarar** (clinical benefit: CR/PR veya uzun sağkalımlı SD) sınıflamasına dayanır → **`n_pos = 19`**, `n_neg = 23`, `n = 42`.
+- `gide_2019` (`sample_meta$treatment = "anti-PD1"`): `n = 41` alt kümesi yalnızca ENA `PD1_*_PRE` örnekleridir (**anti-PD1 monoterapi**). `ipiPD1_*_PRE` (anti-PD1 + anti-CTLA4 kombinasyon) dahil değildir; IMS `mel_gide19_cli_data.csv` pre satırları ile birebir örtüşür (`n_pos = 19`, `n_neg = 16`, `n_SD = 6`).
+
 **Ön işleme:** yalnızca pre-treatment; hasta başına tek örnek (pseudo-replication yok).  
-**Paket boyutu:** her kohortta demo imza genleri + sıfır varyanslı olmayan genlerden `seed = 42` ile rastgele ~2800 gen; `compress = "xz"`; `data/` toplamı **&lt; 5 MB**. Ayrıntı ve yeniden üretim: `data-raw/prepare_ici_datasets.R`, `data-raw/ici_cohort_summary.csv`.  
-**Bağımsızlık:** `Cytokine-5$derived_from` bu kohort adlarını içerir (`independent = FALSE`); `IFNG6$derived_from` boştur (`independent = TRUE`).
+**Tarafsız null havuzu / paket boyutu:** her kohortta demo imza genleri + sıfır varyanslı olmayan genlerden **`seed = 42`** ile rastgele **~2.800 gen**; `compress = "xz"`; `data/` toplamı **&lt; 5 MB**. Ayrıntı ve yeniden üretim: `data-raw/prepare_ici_datasets.R`, `data-raw/ici_cohort_summary.csv`.  
+**Bağımsızlık:** `Cytokine-5$derived_from` bu kohort adlarını içerir (`independent = FALSE`); `IFNG6$derived_from` boştur (`independent = TRUE`).  
+**Yazar:** `DESCRIPTION` içinde `Efe Kaan Şengönül <fperskaan@gmail.com>` (`aut`, `cre`); placeholder yok.
 
 ## SigBenchR v1 kapsam dışı
 
