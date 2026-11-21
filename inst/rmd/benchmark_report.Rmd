@@ -24,9 +24,9 @@ fsig <- if (!is.null(pl$forest_signature)) as.character(pl$forest_signature)[1] 
 cov_thr <- if (!is.null(pl$coverage_threshold)) as.numeric(pl$coverage_threshold)[1] else 0.70
 ```
 
-> **Bilimsel yorum siniri:** Bu rapor arastirma amaclidir; klinik karar araci degildir.
-> Sonuclar kucuk orneklemlerde belirsiz olabilir. "Kanit yok" da geceli bir bulgudur.
-> Esikler ve varsayilanlar sonuclara bakildiktan sonra degistirilmemelidir.
+> **Bilimsel yorum sınırı:** Bu rapor araştırma amaçlıdır; klinik karar aracı değildir.
+> Sonuçlar küçük örneklemlerde belirsiz olabilir. "Kanıt yok" da geçerli bir bulgudur.
+> Eşikler ve varsayılanlar sonuçlara bakıldıktan sonra değiştirilmemelidir.
 
 ## Analiz parametreleri
 
@@ -62,7 +62,7 @@ param_df <- data.frame(
 knitr::kable(param_df)
 ```
 
-## Sonuc tablosu
+## Sonuç tablosu
 
 ```{r results-table}
 if (is.data.frame(results) && nrow(results) > 0) {
@@ -77,51 +77,51 @@ if (is.data.frame(results) && nrow(results) > 0) {
   )
   knitr::kable(results[, cols, drop = FALSE], digits = 3)
 } else {
-  cat("Sonuc tablosu bos.\n")
+  cat("Sonuç tablosu boş.\n")
 }
 ```
 
-## Agirlikli ozet (n-agirlikli + ters-varyans, Q, I2)
+## Ağırlıklı Özet (n-ağırlıklı + ters-varyans, Q, I2)
 
 ```{r summary-table}
 if (is.data.frame(summary_tbl) && nrow(summary_tbl) > 0) {
   knitr::kable(summary_tbl, digits = 3)
 } else {
-  cat("Ozet tablosu bos.\n")
+  cat("Özet tablosu boş.\n")
 }
 ```
 
-## Dayaniklilik (sensitivity)
+## Dayanıklılık (sensitivity)
 
 ```{r sensitivity-table}
 if (is.data.frame(sensitivity_tbl) && nrow(sensitivity_tbl) > 0) {
   knitr::kable(sensitivity_tbl, digits = 3)
 } else {
-  cat("Dayaniklilik tablosu bos.\n")
+  cat("Dayanıklılık tablosu boş.\n")
 }
 ```
 
-## AUC isi haritasi
+## AUC ısı haritası
 
-```{r heatmap, fig.cap="AUC isi haritasi (dusuk kapsama gri)"}
+```{r heatmap, fig.cap="AUC ısı haritası (düşük kapsama gri)"}
 ok_hm <- is.data.frame(results) &&
   nrow(results) > 0 &&
-  any(results$method == hm & !isTRUE(results$skipped))
+  any(results$method == hm & !(results$skipped %in% TRUE))
 if (ok_hm) {
   print(SigBenchR::plot_auc_heatmap(results, method = hm, coverage_threshold = cov_thr))
 } else {
-  cat("Isi haritasi icin uygun satir yok.\n")
+  cat("Isı haritası için uygun satır yok.\n")
 }
 ```
 
-## AUC forest grafigi
+## AUC forest grafiği
 
 ```{r forest, fig.cap="AUC forest (DeLong %95 GA)"}
 ok_fr <- is.data.frame(results) &&
   nrow(results) > 0 &&
   !is.na(fsig) &&
   nzchar(fsig) &&
-  any(results$signature == fsig & results$method == hm & !isTRUE(results$skipped))
+  any(results$signature == fsig & results$method == hm & !(results$skipped %in% TRUE))
 if (ok_fr) {
   print(
     SigBenchR::plot_auc_forest(
@@ -132,11 +132,11 @@ if (ok_fr) {
     )
   )
 } else {
-  cat("Forest grafigi icin uygun satir yok.\n")
+  cat("Forest grafiği için uygun satır yok.\n")
 }
 ```
 
-## Paket surumleri ve oturum bilgisi
+## Paket sürümleri ve oturum bilgisi
 
 ```{r session}
 pkgs <- c("SigBenchR", "pROC", "PRROC", "ggplot2", "withr", "rmarkdown", "knitr")

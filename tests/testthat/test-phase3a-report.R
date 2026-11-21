@@ -19,6 +19,7 @@ test_that("generate_r_code gecerli R sozdizimi ve parametreler uretir", {
   expect_true(grepl("n_boot = 100L", code, fixed = TRUE))
   expect_true(grepl("n_perm = 25L", code, fixed = TRUE))
   expect_true(grepl("Cytokine-5", code, fixed = TRUE))
+  expect_true(grepl('sigs[[1]]$direction <- "<"', code, fixed = TRUE))
   expect_true(grepl('"mean"', code, fixed = TRUE))
   expect_true(grepl('"zscore"', code, fixed = TRUE))
   expect_true(grepl("coverage_threshold = 0.7", code, fixed = TRUE))

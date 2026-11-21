@@ -20,5 +20,5 @@ plot_auc_forest(results, signature = NULL, method = NULL, summary = NULL)
 }
 \description{
 Her veri seti icin AUC noktasi ve DeLong \%95 GA cubugu.
-\code{summarize_auc()} ozeti verilirse n-agirlikli ortalama referans cizgisi eklenir.
+\code{summarize_auc()} ozeti verilirse IVW (yoksa n-agirlikli) referans cizgisi eklenir.
 }

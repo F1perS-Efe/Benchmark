@@ -1,7 +1,7 @@
 #' AUC orman (forest) grafigi
 #'
 #' Her veri seti icin AUC noktasi ve DeLong %95 GA cubugu.
-#' `summarize_auc()` ozeti verilirse n-agirlikli ortalama referans cizgisi eklenir.
+#' `summarize_auc()` ozeti verilirse IVW (yoksa n-agirlikli) referans cizgisi eklenir.
 #'
 #' @param results `run_benchmark()` cikti.
 #' @param signature Tek imza adi; `NULL` ise ilk imza.
@@ -17,7 +17,7 @@ plot_auc_forest <- function(results,
   if (!is.data.frame(results) || nrow(results) == 0L) {
     stop("`results` bos olamaz.", call. = FALSE)
   }
-  df <- results[!isTRUE(results$skipped) & is.finite(results$auc), , drop = FALSE]
+  df <- results[!(results$skipped %in% TRUE) & is.finite(results$auc), , drop = FALSE]
   if (is.null(method)) method <- df$method[1]
   if (is.null(signature)) signature <- df$signature[1]
   df <- df[df$method == method & df$signature == signature, , drop = FALSE]
@@ -63,19 +63,27 @@ plot_auc_forest <- function(results,
   if (!is.null(summary) && is.data.frame(summary) && nrow(summary) > 0L) {
     sm <- summary
     sm <- sm[sm$signature == signature & sm$method == method, , drop = FALSE]
-    if (nrow(sm) == 1L && is.finite(sm$auc_n_weighted[1])) {
-      p <- p + ggplot2::geom_vline(
-        xintercept = sm$auc_n_weighted[1],
-        color = "steelblue",
-        linetype = "solid"
-      ) +
-        ggplot2::labs(
-          caption = paste0(
-            "Mavi cizgi: n-agirlikli ozet AUC = ",
-            sprintf("%.3f", sm$auc_n_weighted[1]),
-            ". Kesikli: 0.5."
+    if (nrow(sm) == 1L) {
+      ref_val <- sm$auc_ivw[1]
+      ref_lab <- "auc_ivw (ters-varyans)"
+      if (!is.finite(ref_val)) {
+        ref_val <- sm$auc_n_weighted[1]
+        ref_lab <- "auc_n_weighted (n-agirlikli)"
+      }
+      if (is.finite(ref_val)) {
+        p <- p + ggplot2::geom_vline(
+          xintercept = ref_val,
+          color = "steelblue",
+          linetype = "solid"
+        ) +
+          ggplot2::labs(
+            caption = paste0(
+              "Mavi cizgi: ", ref_lab, " = ",
+              sprintf("%.3f", ref_val),
+              ". Kesikli: 0.5."
+            )
           )
-        )
+      }
     }
   }
 

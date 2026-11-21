@@ -15,9 +15,9 @@ auc_mw(scores, response)
 Skaler AUC.
 }
 \description{
-Vektorlestirilmis formül (esit degerlerde average ranks):
+Vektorlestirilmis formul (esit degerlerde average ranks):
 \code{AUC = (sum(rank_pos) - n_pos * (n_pos + 1) / 2) / (n_pos * n_neg)}.
 }
 \details{
-Null permütasyon hizlandirmasi icin; \code{pROC} ile \verb{<= 1e-12} eslesmelidir.
+Null permutasyon hizlandirmasi icin; \code{pROC} ile \verb{<= 1e-12} eslesmelidir.
 }

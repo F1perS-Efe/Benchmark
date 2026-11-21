@@ -40,15 +40,22 @@ generate_r_code <- function(signature_name = "Cytokine-5",
     stop("`dataset_names` bos olamaz.", call. = FALSE)
   }
 
-  use_custom <- is.null(signature_name) || !nzchar(as.character(signature_name)[1])
-  if (use_custom) {
-    genes <- as.character(genes)
-    genes <- genes[nzchar(genes)]
-    if (length(genes) < 1L) {
-      stop("Ozel imza icin `genes` gerekli (veya `signature_name` verin).", call. = FALSE)
-    }
+  demo_names <- if (is.null(signature_name)) {
+    character(0)
   } else {
-    signature_name <- as.character(signature_name)[1]
+    as.character(signature_name)
+  }
+  demo_names <- demo_names[nzchar(demo_names)]
+  custom_genes <- if (is.null(genes)) {
+    character(0)
+  } else {
+    g <- as.character(genes)
+    g[nzchar(g)]
+  }
+  use_demo <- length(demo_names) > 0L
+  use_custom <- length(custom_genes) > 0L
+  if (!use_demo && !use_custom) {
+    stop("Ozel imza icin `genes` gerekli (veya `signature_name` verin).", call. = FALSE)
   }
 
   fmt_chr_vec <- function(x) {
@@ -63,19 +70,39 @@ generate_r_code <- function(signature_name = "Cytokine-5",
     ""
   )
 
-  if (use_custom) {
+  if (use_demo && !use_custom) {
+    if (length(demo_names) == 1L) {
+      lines <- c(
+        lines,
+        paste0('sigs <- signatures_demo["', demo_names, '"]'),
+        paste0('sigs[[1]]$direction <- "', direction, '"')
+      )
+    } else {
+      lines <- c(
+        lines,
+        paste0("sigs <- signatures_demo[", fmt_chr_vec(demo_names), "]"),
+        paste0('for (nm in names(sigs)) sigs[[nm]]$direction <- "', direction, '"')
+      )
+    }
+  } else if (use_custom && !use_demo) {
     lines <- c(
       lines,
       paste0(
         "sigs <- list(Custom = list(genes = ",
-        fmt_chr_vec(genes),
+        fmt_chr_vec(custom_genes),
         ", direction = \"", direction, "\"))"
       )
     )
   } else {
     lines <- c(
       lines,
-      paste0('sigs <- signatures_demo["', signature_name, '"]')
+      paste0("sigs <- signatures_demo[", fmt_chr_vec(demo_names), "]"),
+      paste0('for (nm in names(sigs)) sigs[[nm]]$direction <- "', direction, '"'),
+      paste0(
+        "sigs$Custom <- list(genes = ",
+        fmt_chr_vec(custom_genes),
+        ", direction = \"", direction, "\")"
+      )
     )
   }
 

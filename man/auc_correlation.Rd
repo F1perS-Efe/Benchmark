@@ -17,6 +17,7 @@ Uzun \code{data.frame}: \code{signature1}, \code{signature2}, \code{correlation}
 }
 \description{
 Secilen skorlama yonteminde her imza icin veri setleri uzerindeki AUC
-vektorleri arasinda Pearson korelasyonu hesaplar. En az 2 ortak veri seti
-gerekir; aksi halde ilgili cift icin \code{NA}.
+vektorleri arasinda Pearson korelasyonu hesaplar. Iki noktada Pearson
+daima +/-1 oldugundan en az 3 ortak sonlu veri seti gerekir
+(\code{n_ok < 3} ise \code{correlation = NA_real_}).
 }

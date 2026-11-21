@@ -16,7 +16,7 @@ summarize_auc(
 
 \item{method}{Belirli skorlama yontemi; \code{NULL} ise tum yontemler ayri ozetlenir.}
 
-\item{include_nonindependent}{\code{TRUE} ise bagimsiz-olmayan satirlar ozetee girer.}
+\item{include_nonindependent}{\code{TRUE} ise bagimsiz-olmayan satirlar ozete girer.}
 
 \item{exclude_var_zero}{\code{TRUE} (varsayilan) ise varyansi 0/NA olanlar cikarilir.}
 }

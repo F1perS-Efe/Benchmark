@@ -1,8 +1,9 @@
 #' Veri setleri boyunca imza AUC korelasyonu
 #'
 #' Secilen skorlama yonteminde her imza icin veri setleri uzerindeki AUC
-#' vektorleri arasinda Pearson korelasyonu hesaplar. En az 2 ortak veri seti
-#' gerekir; aksi halde ilgili cift icin `NA`.
+#' vektorleri arasinda Pearson korelasyonu hesaplar. Iki noktada Pearson
+#' daima +/-1 oldugundan en az 3 ortak sonlu veri seti gerekir
+#' (`n_ok < 3` ise `correlation = NA_real_`).
 #'
 #' @param results `run_benchmark()` cikti tablosu.
 #' @param method Skorlama yontemi. `NULL` ise ilk yontem.
@@ -20,7 +21,7 @@ auc_correlation <- function(results, method = NULL) {
     stop("`results` eksik sutunlar: ", paste(miss, collapse = ", "), call. = FALSE)
   }
 
-  df <- results[!isTRUE(results$skipped) & is.finite(results$auc), , drop = FALSE]
+  df <- results[!(results$skipped %in% TRUE) & is.finite(results$auc), , drop = FALSE]
   if (is.null(method)) {
     method <- df$method[1]
   }
@@ -50,7 +51,8 @@ auc_correlation <- function(results, method = NULL) {
       y <- mat[, sigs[j]]
       ok <- is.finite(x) & is.finite(y)
       n_ok <- sum(ok)
-      cor_val <- if (n_ok >= 2L) {
+      # 2 noktada Pearson daima +/-1; anlamli korelasyon icin >= 3
+      cor_val <- if (n_ok >= 3L) {
         suppressWarnings(stats::cor(x[ok], y[ok], method = "pearson"))
       } else {
         NA_real_

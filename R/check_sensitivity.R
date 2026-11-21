@@ -27,7 +27,7 @@ check_sensitivity <- function(results, threshold = 0.10) {
     stop("`threshold` negatif olmayan tek bir sayi olmalidir.", call. = FALSE)
   }
 
-  df <- results[!isTRUE(results$skipped) & is.finite(results$auc), , drop = FALSE]
+  df <- results[!(results$skipped %in% TRUE) & is.finite(results$auc), , drop = FALSE]
   if (nrow(df) == 0L) {
     return(data.frame(
       dataset = character(),

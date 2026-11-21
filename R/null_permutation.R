@@ -1,10 +1,12 @@
-#' Rastgele gen null permütasyon testi (vektorlestirilmis AUC)
+#' Rastgele gen null permutasyon testi (vektorlestirilmis AUC)
 #'
 #' Bulunan imza gen sayisi kadar rastgele gen seti skorlanir; gozlenen AUC
 #' ile null dagilimdan tek yonlu ampirik p hesaplanir:
 #' `(sum(null_aucs >= obs_auc) + 1) / (B + 1)`.
 #'
 #' Null AUC'ler `auc_mw()` ile hesaplanir (dongude `pROC` yok).
+#' `zscore` / `rank` icin havuz satirlari donguden once bir kez donusturulur;
+#' `mean` / `median` icin dongu ici `match_genes()` tekrari yoktur.
 #'
 #' @param mat Gen x ornek ifade matrisi (hazirlanmis).
 #' @param response 0/1 yanit (ornek sirasi `colnames(mat)` ile hizali veya isimli).
@@ -12,7 +14,7 @@
 #' @param exclude_genes Havuzdan cikarilacak genler (imza genleri).
 #' @param method Skorlama yontemi (`score_signature`).
 #' @param direction Imza yonu.
-#' @param n_perm Permütasyon sayisi B. Varsayilan 200.
+#' @param n_perm Permutasyon sayisi B. Varsayilan 200.
 #' @param seed RNG tohumu.
 #' @param match_expression TRUE ise imza genlerinin ortalama ifadesine yakin
 #'   quantile-bin eslestirilmis ornekleme yapar.
@@ -144,6 +146,26 @@ null_permutation_test <- function(mat,
     }
   }
 
+  # Havuz matrisini donguden once hazirla (zscore/rank satir donusumu bir kez)
+  pool_mat <- mat[pool_idx, , drop = FALSE]
+  rownames(pool_mat) <- pool_genes
+  if (method == "zscore") {
+    score_mat <- t(scale(t(pool_mat)))
+  } else if (method == "rank") {
+    score_mat <- t(apply(pool_mat, 1L, function(x) {
+      m <- sum(!is.na(x))
+      if (m <= 1L) {
+        return(rep(NA_real_, length(x)))
+      }
+      r <- rank(x, ties.method = "average", na.last = "keep")
+      (r - 1) / (m - 1)
+    }))
+    colnames(score_mat) <- colnames(pool_mat)
+    rownames(score_mat) <- rownames(pool_mat)
+  } else {
+    score_mat <- pool_mat
+  }
+
   null_aucs <- withr::with_seed(seed, {
     vapply(seq_len(n_perm), function(b) {
       if (isTRUE(match_expression) && !is.null(sig_bins)) {
@@ -165,30 +187,31 @@ null_permutation_test <- function(mat,
         picked <- sample(pool_genes, size = n_genes, replace = FALSE)
       }
 
-      sc <- score_signature(mat, genes = picked, method = method, min_genes = min_genes)
-      if (isTRUE(sc$skipped) || is.null(sc$scores)) {
+      row_idx <- match(picked, rownames(score_mat))
+      if (anyNA(row_idx)) {
         return(NA_real_)
       }
-      # Ayni ornek sirasi / ortak
-      if (!is.null(names(sc$scores)) && !is.null(names(obs_scores))) {
-        # obs_scores isimleri common'dan geldi; mat colnames kullan
-        nm <- names(sc$scores)
-        idx <- match(nm, colnames(mat))
-        r <- response[idx]
-        keep <- is.finite(sc$scores) & !is.na(r)
-        s_or <- orient_score(sc$scores[keep], direction = direction)
-        auc_mw(s_or, r[keep])
+      sub <- score_mat[row_idx, , drop = FALSE]
+      if (method == "median") {
+        scores <- apply(sub, 2L, function(x) {
+          if (all(is.na(x))) {
+            NA_real_
+          } else {
+            stats::median(x, na.rm = TRUE)
+          }
+        })
       } else {
-        s_or <- orient_score(sc$scores, direction = direction)
-        # response mat sutun sirasinda; skor isimleri colnames alt kumesiyse hizala
-        if (!is.null(names(sc$scores))) {
-          r <- response[match(names(sc$scores), colnames(mat))]
-        } else {
-          r <- response
-        }
-        keep <- is.finite(s_or) & !is.na(r)
-        auc_mw(s_or[keep], r[keep])
+        scores <- colMeans(sub, na.rm = TRUE)
+        scores[colSums(!is.na(sub)) == 0L] <- NA_real_
       }
+      names(scores) <- colnames(score_mat)
+
+      keep <- is.finite(scores) & !is.na(response)
+      if (sum(keep) < 2L) {
+        return(NA_real_)
+      }
+      s_or <- orient_score(scores[keep], direction = direction)
+      auc_mw(s_or, response[keep])
     }, numeric(1))
   })
 

@@ -46,9 +46,9 @@ run_benchmark(
 
 \item{n_boot}{PR-AUC bootstrap tekrari. Varsayilan 1000; hizli onizleme icin dusurulebilir.}
 
-\item{compute_null}{Null permütasyon testi. Varsayilan FALSE.}
+\item{compute_null}{Null permutasyon testi. Varsayilan FALSE.}
 
-\item{n_perm}{Null permütasyon sayisi. Varsayilan 200.}
+\item{n_perm}{Null permutasyon sayisi. Varsayilan 200.}
 
 \item{seed}{Rastgelelik tohumu (PR bootstrap ve null).}
 

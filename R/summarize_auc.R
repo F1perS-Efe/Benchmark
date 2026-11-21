@@ -14,7 +14,7 @@
 #'
 #' @param results `run_benchmark()` cikti tablosu.
 #' @param method Belirli skorlama yontemi; `NULL` ise tum yontemler ayri ozetlenir.
-#' @param include_nonindependent `TRUE` ise bagimsiz-olmayan satirlar ozetee girer.
+#' @param include_nonindependent `TRUE` ise bagimsiz-olmayan satirlar ozete girer.
 #' @param exclude_var_zero `TRUE` (varsayilan) ise varyansi 0/NA olanlar cikarilir.
 #'
 #' @return `data.frame` ozet satirlari.
@@ -36,7 +36,7 @@ summarize_auc <- function(results,
   if (!is.null(method)) {
     df <- df[df$method == method, , drop = FALSE]
   }
-  df <- df[!isTRUE(df$skipped) & is.finite(df$auc), , drop = FALSE]
+  df <- df[!(df$skipped %in% TRUE) & is.finite(df$auc), , drop = FALSE]
   if (nrow(df) == 0L) {
     return(.summarize_auc_empty())
   }
@@ -68,7 +68,6 @@ summarize_auc <- function(results,
       is.na(g$auc_var) |
       (!is.na(g$auc_var) & g$auc_var == 0)
     n_nonindep <- sum(!indep_flag, na.rm = TRUE)
-    n_var_zero <- sum(var_zero_flag, na.rm = TRUE)
     n_small <- sum(as.logical(g$small_cohort), na.rm = TRUE)
 
     use <- g
@@ -79,6 +78,8 @@ summarize_auc <- function(results,
     } else {
       use_var_zero <- var_zero_flag
     }
+    # var_zero sayimi: independent filtresi sonrasi kalan satirlar
+    n_var_zero <- sum(use_var_zero, na.rm = TRUE)
     if (isTRUE(exclude_var_zero) && nrow(use) > 0L) {
       use <- use[!use_var_zero, , drop = FALSE]
     }

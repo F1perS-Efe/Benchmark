@@ -1,4 +1,4 @@
-test_that("withr::with_seed ile skor üretimi tekrarlanabilir", {
+test_that("withr::with_seed ile skor uretimi tekrarlanabilir", {
   skip_if_not_installed("withr")
 
   make_mat <- function() {

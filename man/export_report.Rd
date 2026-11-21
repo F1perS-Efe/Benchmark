@@ -25,5 +25,5 @@ export_report(results, summary_tbl, sensitivity_tbl, params_list, output_file)
 }
 \description{
 \code{inst/rmd/benchmark_report.Rmd} sablonunu \code{rmarkdown::render()} ile
-isler. \code{rmarkdown} Suggests bagimliligidır; yoksa anlasilir hata verir.
+isler. \code{rmarkdown} Suggests bagimliligidir; yoksa anlasilir hata verir.
 }

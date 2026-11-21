@@ -15,8 +15,8 @@
 #' @param min_n,min_per_class Kucuk kohort esikleri (`roc_auc`).
 #' @param compute_pr PR-AUC hesapla. Varsayilan TRUE.
 #' @param n_boot PR-AUC bootstrap tekrari. Varsayilan 1000; hizli onizleme icin dusurulebilir.
-#' @param compute_null Null permütasyon testi. Varsayilan FALSE.
-#' @param n_perm Null permütasyon sayisi. Varsayilan 200.
+#' @param compute_null Null permutasyon testi. Varsayilan FALSE.
+#' @param n_perm Null permutasyon sayisi. Varsayilan 200.
 #' @param seed Rastgelelik tohumu (PR bootstrap ve null).
 #' @param match_expression Null icin ifade-eslesmeli ornekleme.
 #'
@@ -146,6 +146,12 @@ run_benchmark <- function(signatures,
           independent = NA
         )
 
+        derived <- sig$derived_from
+        if (is.null(derived)) {
+          derived <- character(0)
+        }
+        base$independent <- !ds_name %in% derived
+
         if (isTRUE(scored$skipped)) {
           row_i <- row_i + 1L
           rows[[row_i]] <- base
@@ -159,12 +165,6 @@ run_benchmark <- function(signatures,
 
         scores_use <- scored$scores[keep]
         resp_use <- resp[keep]
-
-        derived <- sig$derived_from
-        if (is.null(derived)) {
-          derived <- character(0)
-        }
-        base$independent <- !ds_name %in% derived
 
         if (length(unique(resp_use)) < 2L) {
           base$skipped <- TRUE
@@ -214,7 +214,13 @@ run_benchmark <- function(signatures,
             ),
             error = function(e) e
           )
-          if (!inherits(pr_res, "error")) {
+          if (inherits(pr_res, "error")) {
+            warning(
+              "pr_auc basarisiz (", ds_name, " / ", sig_name, " / ", method, "): ",
+              conditionMessage(pr_res),
+              call. = FALSE
+            )
+          } else {
             base$pr_auc <- pr_res$pr_auc
             base$pr_baseline <- pr_res$pr_baseline
             base$pr_ci_low <- pr_res$pr_ci_low
@@ -243,7 +249,13 @@ run_benchmark <- function(signatures,
             ),
             error = function(e) e
           )
-          if (!inherits(null_res, "error")) {
+          if (inherits(null_res, "error")) {
+            warning(
+              "null_permutation_test basarisiz (", ds_name, " / ", sig_name,
+              " / ", method, "): ", conditionMessage(null_res),
+              call. = FALSE
+            )
+          } else {
             base$null_p <- null_res$null_p
           }
         }

@@ -1,6 +1,6 @@
 #' Imzalar arasi Jaccard gen ortusmesi
 #'
-#' `J = |A ∩ B| / |A ∪ B|`. Genler buyuk harfe cevrilip tekillestirilir.
+#' `J = |A intersect B| / |A union B|`. Genler buyuk harfe cevrilip tekillestirilir.
 #'
 #' @param signatures Isimli liste; her eleman `list(genes = <chr>, ...)` veya
 #'   dogrudan karakter vektoru.

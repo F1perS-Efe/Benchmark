@@ -20,7 +20,7 @@ plot_auc_heatmap <- function(results,
   if (is.null(method)) {
     method <- df$method[1]
   }
-  df <- df[df$method == method & !isTRUE(df$skipped), , drop = FALSE]
+  df <- df[df$method == method & !(df$skipped %in% TRUE), , drop = FALSE]
   if (nrow(df) == 0L) {
     stop("Secilen yontem icin cizilecek satir yok.", call. = FALSE)
   }

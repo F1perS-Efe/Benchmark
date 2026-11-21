@@ -15,5 +15,5 @@ Uzun \code{data.frame}: \code{signature1}, \code{signature2}, \code{jaccard},
 \code{n_intersect}, \code{n_union}, \code{n1}, \code{n2}.
 }
 \description{
-\verb{J = |A ∩ B| / |A ∪ B|}. Genler buyuk harfe cevrilip tekillestirilir.
+\verb{J = |A intersect B| / |A union B|}. Genler buyuk harfe cevrilip tekillestirilir.
 }

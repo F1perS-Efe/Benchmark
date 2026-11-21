@@ -1,9 +1,9 @@
 #' Mann-Whitney U (rank-sum) ile ROC-AUC
 #'
-#' Vektorlestirilmis formül (esit degerlerde average ranks):
+#' Vektorlestirilmis formul (esit degerlerde average ranks):
 #' `AUC = (sum(rank_pos) - n_pos * (n_pos + 1) / 2) / (n_pos * n_neg)`.
 #'
-#' Null permütasyon hizlandirmasi icin; `pROC` ile `<= 1e-12` eslesmelidir.
+#' Null permutasyon hizlandirmasi icin; `pROC` ile `<= 1e-12` eslesmelidir.
 #'
 #' @param scores Sayisal skorlar (yuksek = yanitli yonunde olmali).
 #' @param response 0/1 yanit vektoru.

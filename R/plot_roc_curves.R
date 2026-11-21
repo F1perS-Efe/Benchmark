@@ -56,7 +56,7 @@ plot_roc_curves <- function(datasets,
   }
 
   if (length(curve_rows) == 0L) {
-    stop("Cizilecek ROC egirisi yok.", call. = FALSE)
+    stop("Cizilecek ROC egrisi yok.", call. = FALSE)
   }
   df <- do.call(rbind, curve_rows)
   lab <- unique(df[, c("signature", "auc")])
@@ -71,7 +71,7 @@ plot_roc_curves <- function(datasets,
     ggplot2::geom_line(linewidth = 0.9) +
     ggplot2::coord_equal() +
     ggplot2::labs(
-      title = paste0("ROC egirileri: ", dataset_name, " (", method, ")"),
+      title = paste0("ROC egrileri: ", dataset_name, " (", method, ")"),
       x = "1 - Ozgunluk (FPR)",
       y = "Duyarlilik (TPR)",
       color = "Imza"

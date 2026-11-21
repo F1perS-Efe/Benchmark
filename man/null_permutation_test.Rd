@@ -2,7 +2,7 @@
 % Please edit documentation in R/null_permutation.R
 \name{null_permutation_test}
 \alias{null_permutation_test}
-\title{Rastgele gen null permütasyon testi (vektorlestirilmis AUC)}
+\title{Rastgele gen null permutasyon testi (vektorlestirilmis AUC)}
 \usage{
 null_permutation_test(
   mat,
@@ -32,7 +32,7 @@ null_permutation_test(
 
 \item{direction}{Imza yonu.}
 
-\item{n_perm}{Permütasyon sayisi B. Varsayilan 200.}
+\item{n_perm}{Permutasyon sayisi B. Varsayilan 200.}
 
 \item{seed}{RNG tohumu.}
 
@@ -58,4 +58,6 @@ ile null dagilimdan tek yonlu ampirik p hesaplanir:
 }
 \details{
 Null AUC'ler \code{auc_mw()} ile hesaplanir (dongude \code{pROC} yok).
+\code{zscore} / \code{rank} icin havuz satirlari donguden once bir kez donusturulur;
+\code{mean} / \code{median} icin dongu ici \code{match_genes()} tekrari yoktur.
 }
