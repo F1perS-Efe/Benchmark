@@ -12,7 +12,8 @@ datasets_demo
 }
 \description{
 Iki kucuk sentetik ICI-benzeri kohort. Her biri sade bir listedir:
-\code{list(expr, sample_meta, info)}.
+\code{list(expr, sample_meta, info)}. Birim testleri ve hizli ornekler icin;
+Shiny varsayilani gercek kohortlar (\code{datasets_ici}) kullanir.
 }
 \examples{
 data(datasets_demo)

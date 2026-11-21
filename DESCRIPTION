@@ -2,9 +2,9 @@ Package: SigBenchR
 Title: Gene Signature Benchmarking for Immunotherapy Response
 Version: 0.1.0
 Authors@R: 
-    person(given = "Kaan", family = "Developer",
+    person(given = "Efe Kaan", family = "Şengönül",
            role = c("aut", "cre"),
-           email = "kaan@example.com")
+           email = "fperskaan@gmail.com")
 Description: Statistically validates whether a gene signature predicts
     immunotherapy response across multiple datasets in a reproducible way.
     Core computations are independent of Shiny; an optional web UI is provided

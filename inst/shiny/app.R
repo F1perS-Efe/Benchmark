@@ -61,14 +61,20 @@ ui <- shiny::fluidPage(
       shiny::numericInput("n_perm", "Null B", value = 200, min = 10, max = 2000, step = 10),
       shiny::numericInput("seed", "Seed", value = 42, min = 1, step = 1),
       shiny::checkboxGroupInput(
-        "datasets", "Veri setleri",
-        choices = c("demo_A", "demo_B"), selected = c("demo_A", "demo_B")
+        "datasets", "Veri setleri (ICI kohortları)",
+        choices = c(
+          "van_allen_2015", "hugo_2016", "riaz_2017", "gide_2019"
+        ),
+        selected = c("van_allen_2015", "hugo_2016", "riaz_2017", "gide_2019")
       ),
       shiny::actionButton("run", "Analizi çalıştır", class = "btn-primary"),
       shiny::downloadButton("download_report", "Tüm sonuçları HTML rapor olarak indir"),
       shiny::hr(),
       shiny::h5("DeLong: iki imza (aynı veri seti)"),
-      shiny::selectInput("cmp_dataset", "Veri seti", choices = c("demo_A", "demo_B")),
+      shiny::selectInput(
+        "cmp_dataset", "Veri seti",
+        choices = c("van_allen_2015", "hugo_2016", "riaz_2017", "gide_2019")
+      ),
       shiny::selectInput("cmp_sig1", "İmza 1", choices = c("Cytokine-5", "IFNG6", "Random3")),
       shiny::selectInput("cmp_sig2", "İmza 2", choices = c("IFNG6", "Cytokine-5", "Random3")),
       shiny::actionButton("run_cmp", "DeLong karşılaştır")
@@ -87,7 +93,10 @@ ui <- shiny::fluidPage(
         ),
         shiny::tabPanel(
           "ROC eğrileri",
-          shiny::selectInput("roc_dataset", "Veri seti", choices = c("demo_A", "demo_B")),
+          shiny::selectInput(
+            "roc_dataset", "Veri seti",
+            choices = c("van_allen_2015", "hugo_2016", "riaz_2017", "gide_2019")
+          ),
           shiny::plotOutput("roc_plot", height = "420px")
         ),
         shiny::tabPanel(
@@ -135,8 +144,9 @@ ui <- shiny::fluidPage(
 )
 
 server <- function(input, output, session) {
-  data(datasets_demo, package = "SigBenchR", envir = environment())
+  data(datasets_ici, package = "SigBenchR", envir = environment())
   data(signatures_demo, package = "SigBenchR", envir = environment())
+  # Shiny varsayilani gercek ICI kohortlari; sentetik demo_A/demo_B testlerde kalir.
 
   active_sig_names <- shiny::reactive({
     chosen <- as.character(input$sig_choice)
@@ -211,7 +221,7 @@ server <- function(input, output, session) {
   results <- shiny::eventReactive(input$run, {
     shiny::req(length(input$datasets) > 0, length(input$methods) > 0)
     sigs <- build_sigs()
-    ds <- datasets_demo[input$datasets]
+    ds <- datasets_ici[input$datasets]
 
     shiny::withProgress(message = "Benchmark çalışıyor...", value = 0.2, {
       shiny::incProgress(0.3, detail = "ROC / PR / null")
@@ -362,7 +372,7 @@ server <- function(input, output, session) {
       signatures_demo
     }
     SigBenchR::plot_roc_curves(
-      datasets = datasets_demo,
+      datasets = datasets_ici,
       signatures = sigs,
       dataset_name = input$roc_dataset,
       method = input$heatmap_method,
@@ -395,7 +405,7 @@ server <- function(input, output, session) {
 
       s1 <- tryCatch(
         SigBenchR::score_for_dataset(
-          datasets_demo[[input$cmp_dataset]],
+          datasets_ici[[input$cmp_dataset]],
           genes = genes1,
           method = input$heatmap_method,
           direction = input$direction
@@ -409,7 +419,7 @@ server <- function(input, output, session) {
 
       s2 <- tryCatch(
         SigBenchR::score_for_dataset(
-          datasets_demo[[input$cmp_dataset]],
+          datasets_ici[[input$cmp_dataset]],
           genes = genes2,
           method = input$heatmap_method,
           direction = input$direction

@@ -1,0 +1,5 @@
+"cohort","n","n_pos","n_neg","n_excluded_sd","n_genes","normalization","scale","source","license"
+"van_allen_2015",42,19,23,0,2800,"TPM","linear","GitHub vanallenlab/VanAllen_CTLA4_Science_RNASeq_TPM (TPM_RSEM_VAScience2015.txt); klinik: xmuyulab/ims_gene_signature mel_van_cli_data.csv","Veri orijinal yayina / dbGaP phs000452 tabi; paket egitim/arastirma amaclidir"
+"hugo_2016",26,14,12,0,2800,"FPKM","linear","GEO GSE78220 (GSE78220_PatientFPKM.xlsx + family.soft)","GEO acik erisim; orijinal yayina atif zorunlu"
+"riaz_2017",49,10,23,16,2800,"FPKM","linear","GEO GSE91061 (BMS038 FPKM + family.soft); PRCR->PR, UNK excluded","GEO acik erisim; orijinal yayina atif zorunlu"
+"gide_2019",41,19,16,6,2800,"normalized_counts","linear","GitHub miabioinformatics/Gide_Quek_CancerCell2019 (cancercell_normalized_counts_genenames.txt); klinik: xmuyulab mel_gide19_cli_data.csv + ENA PRJEB23709","ENA PRJEB23709 / orijinal yayina tabi; paket egitim/arastirma amaclidir"

@@ -63,9 +63,13 @@ generate_r_code <- function(signature_name = "Cytokine-5",
   }
   fmt_logical <- function(x) if (isTRUE(x)) "TRUE" else "FALSE"
 
+  ici_names <- c("van_allen_2015", "hugo_2016", "riaz_2017", "gide_2019", "liu_2019")
+  use_ici_data <- any(dataset_names %in% ici_names)
+  data_obj <- if (use_ici_data) "datasets_ici" else "datasets_demo"
+
   lines <- c(
     "library(SigBenchR)",
-    "data(datasets_demo)",
+    paste0("data(", data_obj, ")"),
     "data(signatures_demo)",
     ""
   )
@@ -108,7 +112,7 @@ generate_r_code <- function(signature_name = "Cytokine-5",
 
   lines <- c(
     lines,
-    paste0("ds <- datasets_demo[", fmt_chr_vec(dataset_names), "]"),
+    paste0("ds <- ", data_obj, "[", fmt_chr_vec(dataset_names), "]"),
     "",
     "res <- run_benchmark(",
     "  signatures = sigs,",

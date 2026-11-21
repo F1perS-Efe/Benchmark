@@ -3,7 +3,7 @@
 \docType{data}
 \name{signatures_demo}
 \alias{signatures_demo}
-\title{Demo gen imzalari (Faz 1)}
+\title{Demo gen imzalari}
 \format{
 Isimli liste; her eleman \code{list(genes, direction, derived_from, citation)}.
 }
@@ -12,9 +12,12 @@ signatures_demo
 }
 \description{
 Cytokine-5 (Kus et al. 2025), IFNG6 (Ayers et al. 2017) ve Random3.
+\code{Cytokine-5$derived_from} gercek ICI kohort adlarini icerir
+(\code{independent = FALSE}); \code{IFNG6$derived_from} bostur (\code{independent = TRUE}).
 }
 \examples{
 data(signatures_demo)
 signatures_demo$`Cytokine-5`$genes
+signatures_demo$`Cytokine-5`$derived_from
 }
 \keyword{datasets}

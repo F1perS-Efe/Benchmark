@@ -92,11 +92,15 @@ demo_ds_b <- make_dataset(
   signal = 1.0
 )
 
+# Cytokine-5 derived_from: Faz 3B gercek kohort adlari (prepare_ici_datasets.R
+# ile de guncellenir). IFNG6 bagimsiz dogrulama icin bos birakilir.
+ici_cohort_names <- c("van_allen_2015", "hugo_2016", "riaz_2017", "gide_2019")
+
 signatures_demo <- list(
   `Cytokine-5` = list(
     genes = cytokine5,
     direction = "<",
-    derived_from = character(0),
+    derived_from = ici_cohort_names,
     citation = "Kus et al., EMBO Reports 2025 (TCGEx)"
   ),
   IFNG6 = list(

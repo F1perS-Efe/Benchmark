@@ -21,17 +21,17 @@ install.packages("rmarkdown")
 
 ## Hızlı başlangıç
 
-### CLI
+### CLI (gerçek ICI kohortları)
 
 ```r
 library(SigBenchR)
 
-data(datasets_demo)
+data(datasets_ici)
 data(signatures_demo)
 
 res <- run_benchmark(
   signatures = signatures_demo,
-  datasets = datasets_demo,
+  datasets = datasets_ici,
   methods = c("mean", "zscore", "median", "rank"),
   seed = 42L
 )
@@ -40,14 +40,20 @@ print(res)
 plot_auc_heatmap(res, method = "mean")
 
 sm <- summarize_auc(res, method = "mean")
-plot_auc_forest(res, signature = "Cytokine-5", method = "mean", summary = sm)
+plot_auc_forest(res, signature = "IFNG6", method = "mean", summary = sm)
 jaccard_signatures(signatures_demo)
 auc_correlation(res, method = "mean")
 
 # Tekrarlanabilir R kodu / HTML rapor
-cat(generate_r_code(signature_name = "Cytokine-5", methods = c("mean", "zscore"), seed = 42L))
-# export_report(res, sm, check_sensitivity(res), params_list = list(...), output_file = "report.html")
+cat(generate_r_code(
+  signature_name = "IFNG6",
+  methods = c("mean", "zscore"),
+  seed = 42L,
+  dataset_names = names(datasets_ici)
+))
 ```
+
+Sentetik `datasets_demo` (`demo_A`, `demo_B`) birim testleri ve hızlı denemeler için durur.
 
 ### Shiny arayüzü
 
@@ -55,7 +61,7 @@ cat(generate_r_code(signature_name = "Cytokine-5", methods = c("mean", "zscore")
 SigBenchR::run_app()
 ```
 
-Arayüzde sonuç tablosu, ısı haritası, ROC, DeLong, ağırlıklı özet, forest, Jaccard, AUC korelasyonu, **HTML rapor indirme** ve **“Bu analizin R kodunu kopyala”** bulunur.
+Shiny varsayılanı gerçek ICI kohortlarıdır (`van_allen_2015`, `hugo_2016`, `riaz_2017`, `gide_2019`). Arayüzde sonuç tablosu, ısı haritası, ROC, DeLong, ağırlıklı özet, forest, Jaccard, AUC korelasyonu, **HTML rapor indirme** ve **“Bu analizin R kodunu kopyala”** bulunur.
 
 ## Özellik özeti
 
@@ -71,7 +77,22 @@ Arayüzde sonuç tablosu, ısı haritası, ROC, DeLong, ağırlıklı özet, for
 - Skorlama dayanıklılığı: `check_sensitivity()` (eşik 0.10 keyfidir)
 - HTML rapor: `export_report()` (`inst/rmd/benchmark_report.Rmd`)
 - Tekrarlanabilir betik: `generate_r_code()`
-- Sentetik demo veri + Shiny
+- Gerçek melanoma ICI kohortları (`datasets_ici`) + sentetik demo + Shiny
+
+## Faz 3B Paket A — gerçek kohortlar
+
+| Kohort | n | n_pos | n_neg | n_excluded_sd | Normalizasyon | Kaynak |
+|--------|--:|------:|------:|--------------:|---------------|--------|
+| `van_allen_2015` | 42 | 19 | 23 | 0 | TPM | GitHub vanallenlab TPM |
+| `hugo_2016` | 26 | 14 | 12 | 0 | FPKM | GEO GSE78220 |
+| `riaz_2017` | 49 | 10 | 23 | 16 | FPKM | GEO GSE91061 (`PRCR`→`PR`, `UNK` dışlandı) |
+| `gide_2019` | 41 | 19 | 16 | 6 | normalized counts | GitHub Gide/Quek |
+
+Liu 2019 (cBioPortal) S3/LFS **403** verdiği için dahil edilmedi.
+
+**Ön işleme:** yalnızca pre-treatment; hasta başına tek örnek (pseudo-replication yok).  
+**Paket boyutu:** her kohortta demo imza genleri + sıfır varyanslı olmayan genlerden `seed = 42` ile rastgele ~2800 gen; `compress = "xz"`; `data/` toplamı **&lt; 5 MB**. Ayrıntı ve yeniden üretim: `data-raw/prepare_ici_datasets.R`, `data-raw/ici_cohort_summary.csv`.  
+**Bağımsızlık:** `Cytokine-5$derived_from` bu kohort adlarını içerir (`independent = FALSE`); `IFNG6$derived_from` boştur (`independent = TRUE`).
 
 ## SigBenchR v1 kapsam dışı
 
