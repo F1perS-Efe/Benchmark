@@ -1,9 +1,25 @@
-# SigBenchR Shiny (Faz 2C) - tek dosya
+# SigBenchR Shiny (Faz 3A) - tek dosya
 
 options(shiny.maxRequestSize = 25 * 1024^2)
 
 ui <- shiny::fluidPage(
-  shiny::titlePanel("SigBenchR - Imza Dogrulama (Faz 2C)"),
+  shiny::tags$head(
+    shiny::tags$script(shiny::HTML(
+      "function sigbenchrCopyRcode() {
+         var el = document.getElementById('r_code_text');
+         if (!el) return;
+         var txt = el.value || '';
+         if (navigator.clipboard && navigator.clipboard.writeText) {
+           navigator.clipboard.writeText(txt);
+         } else {
+           el.focus();
+           el.select();
+           document.execCommand('copy');
+         }
+       }"
+    ))
+  ),
+  shiny::titlePanel("SigBenchR - Imza Dogrulama (Faz 3A)"),
   shiny::tags$p(
     shiny::em(
       "Arastirma amaclidir; klinik karar araci degildir. ",
@@ -39,7 +55,7 @@ ui <- shiny::fluidPage(
       shiny::sliderInput("sensitivity_threshold", "Dayaniklilik esigi (keyfi)", 0.05, 0.3, 0.10, 0.01),
       shiny::checkboxInput("compute_pr", "PR-AUC + bootstrap GA", TRUE),
       shiny::numericInput("n_boot", "PR bootstrap (n_boot)", value = 200, min = 0, max = 2000, step = 50),
-      shiny::checkboxInput("compute_null", "Null permütasyon", FALSE),
+      shiny::checkboxInput("compute_null", "Null permutasyon", FALSE),
       shiny::numericInput("n_perm", "Null B", value = 50, min = 10, max = 500, step = 10),
       shiny::numericInput("seed", "Seed", value = 42, min = 1, step = 1),
       shiny::checkboxGroupInput(
@@ -47,6 +63,7 @@ ui <- shiny::fluidPage(
         choices = c("demo_A", "demo_B"), selected = c("demo_A", "demo_B")
       ),
       shiny::actionButton("run", "Analizi calistir", class = "btn-primary"),
+      shiny::downloadButton("download_report", "Tum sonuclari HTML rapor olarak indir"),
       shiny::hr(),
       shiny::h5("DeLong: iki imza (ayni veri seti)"),
       shiny::selectInput("cmp_dataset", "Veri seti", choices = c("demo_A", "demo_B")),
@@ -90,6 +107,25 @@ ui <- shiny::fluidPage(
           if (requireNamespace("DT", quietly = TRUE)) DT::DTOutput("jaccard_table") else shiny::tableOutput("jaccard_fallback"),
           shiny::h4("AUC korelasyonu (veri setleri boyunca)"),
           if (requireNamespace("DT", quietly = TRUE)) DT::DTOutput("corr_table") else shiny::tableOutput("corr_fallback")
+        ),
+        shiny::tabPanel(
+          "R kodu",
+          shiny::h4("Bu analizin R kodunu kopyala"),
+          shiny::tags$p("Secili parametrelerden uretilen, dogrudan calistirilabilir kod:"),
+          shiny::textAreaInput(
+            "r_code_text",
+            label = NULL,
+            value = "",
+            rows = 18,
+            width = "100%"
+          ),
+          shiny::tags$button(
+            "Kodu kopyala",
+            id = "copy_r_code",
+            class = "btn btn-default",
+            type = "button",
+            onclick = "sigbenchrCopyRcode();"
+          )
         )
       )
     )
@@ -140,6 +176,68 @@ server <- function(input, output, session) {
     shiny::req(results())
     SigBenchR::check_sensitivity(results(), threshold = input$sensitivity_threshold)
   })
+
+  summary_res <- shiny::reactive({
+    shiny::req(results())
+    suppressWarnings(
+      SigBenchR::summarize_auc(results(), method = input$heatmap_method)
+    )
+  })
+
+  shiny::observe({
+    sig_name <- if (identical(input$sig_choice, "custom")) NULL else input$sig_choice
+    genes <- if (identical(input$sig_choice, "custom")) {
+      SigBenchR::parse_genes(input$custom_genes)
+    } else {
+      NULL
+    }
+    code <- tryCatch(
+      SigBenchR::generate_r_code(
+        signature_name = sig_name,
+        genes = genes,
+        methods = input$methods,
+        direction = input$direction,
+        coverage_threshold = input$coverage_threshold,
+        n_boot = as.integer(input$n_boot),
+        n_perm = as.integer(input$n_perm),
+        seed = as.integer(input$seed),
+        dataset_names = input$datasets,
+        compute_pr = isTRUE(input$compute_pr),
+        compute_null = isTRUE(input$compute_null)
+      ),
+      error = function(e) paste0("# Kod uretilemedi: ", conditionMessage(e))
+    )
+    shiny::updateTextAreaInput(session, "r_code_text", value = code)
+  })
+
+  output$download_report <- shiny::downloadHandler(
+    filename = function() {
+      paste0("sigbenchr_report_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".html")
+    },
+    content = function(file) {
+      shiny::req(results())
+      if (!requireNamespace("rmarkdown", quietly = TRUE)) {
+        stop("HTML rapor icin 'rmarkdown' paketini kurun.", call. = FALSE)
+      }
+      SigBenchR::export_report(
+        results = results(),
+        summary_tbl = summary_res(),
+        sensitivity_tbl = sens(),
+        params_list = list(
+          methods = input$methods,
+          direction = input$direction,
+          coverage_threshold = input$coverage_threshold,
+          sensitivity_threshold = input$sensitivity_threshold,
+          n_boot = as.integer(input$n_boot),
+          n_perm = as.integer(input$n_perm),
+          seed = as.integer(input$seed),
+          heatmap_method = input$heatmap_method,
+          forest_signature = input$forest_sig
+        ),
+        output_file = file
+      )
+    }
+  )
 
   output$status <- shiny::renderText({
     if (is.null(results())) return("Analizi calistirmak icin dugmeye basin.")
@@ -239,13 +337,6 @@ server <- function(input, output, session) {
     DT::renderDT({ shiny::req(cmp_res()); DT::datatable(cmp_res()) })
   } else NULL
   output$cmp_fallback <- shiny::renderTable({ shiny::req(cmp_res()); cmp_res() })
-
-  summary_res <- shiny::reactive({
-    shiny::req(results())
-    suppressWarnings(
-      SigBenchR::summarize_auc(results(), method = input$heatmap_method)
-    )
-  })
 
   output$summary_table <- if (requireNamespace("DT", quietly = TRUE)) {
     DT::renderDT({ shiny::req(summary_res()); DT::datatable(summary_res()) })

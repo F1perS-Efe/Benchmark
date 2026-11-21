@@ -1,0 +1,155 @@
+---
+title: "SigBenchR Benchmark Raporu"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+params:
+  results: NULL
+  summary_tbl: NULL
+  sensitivity_tbl: NULL
+  params_list: NULL
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, fig.width = 8, fig.height = 4.5)
+results <- params$results
+summary_tbl <- params$summary_tbl
+sensitivity_tbl <- params$sensitivity_tbl
+pl <- params$params_list
+if (is.null(pl)) pl <- list()
+hm <- if (!is.null(pl$heatmap_method)) as.character(pl$heatmap_method)[1] else "mean"
+fsig <- if (!is.null(pl$forest_signature)) as.character(pl$forest_signature)[1] else NA_character_
+cov_thr <- if (!is.null(pl$coverage_threshold)) as.numeric(pl$coverage_threshold)[1] else 0.70
+```
+
+> **Bilimsel yorum siniri:** Bu rapor arastirma amaclidir; klinik karar araci degildir.
+> Sonuclar kucuk orneklemlerde belirsiz olabilir. "Kanit yok" da geceli bir bulgudur.
+> Esikler ve varsayilanlar sonuclara bakildiktan sonra degistirilmemelidir.
+
+## Analiz parametreleri
+
+```{r params-table}
+pick <- function(x, default = NA) {
+  if (is.null(x) || length(x) == 0L) default else x
+}
+param_df <- data.frame(
+  parametre = c(
+    "methods",
+    "direction",
+    "coverage_threshold",
+    "sensitivity_threshold",
+    "n_boot",
+    "n_perm",
+    "seed",
+    "heatmap_method",
+    "forest_signature"
+  ),
+  deger = c(
+    paste(pick(pl$methods, character(0)), collapse = ", "),
+    as.character(pick(pl$direction, "<")),
+    as.character(pick(pl$coverage_threshold, NA)),
+    as.character(pick(pl$sensitivity_threshold, NA)),
+    as.character(pick(pl$n_boot, NA)),
+    as.character(pick(pl$n_perm, NA)),
+    as.character(pick(pl$seed, NA)),
+    hm,
+    as.character(fsig)
+  ),
+  stringsAsFactors = FALSE
+)
+knitr::kable(param_df)
+```
+
+## Sonuc tablosu
+
+```{r results-table}
+if (is.data.frame(results) && nrow(results) > 0) {
+  cols <- intersect(
+    c(
+      "dataset", "signature", "method", "n", "n_pos", "n_neg",
+      "coverage_label", "low_coverage", "auc", "auc_ci_low", "auc_ci_high",
+      "auc_var", "var_zero", "small_cohort", "pr_auc", "null_p", "null_p_adj_bh",
+      "independent", "skipped", "skip_reason"
+    ),
+    names(results)
+  )
+  knitr::kable(results[, cols, drop = FALSE], digits = 3)
+} else {
+  cat("Sonuc tablosu bos.\n")
+}
+```
+
+## Agirlikli ozet (n-agirlikli + ters-varyans, Q, I2)
+
+```{r summary-table}
+if (is.data.frame(summary_tbl) && nrow(summary_tbl) > 0) {
+  knitr::kable(summary_tbl, digits = 3)
+} else {
+  cat("Ozet tablosu bos.\n")
+}
+```
+
+## Dayaniklilik (sensitivity)
+
+```{r sensitivity-table}
+if (is.data.frame(sensitivity_tbl) && nrow(sensitivity_tbl) > 0) {
+  knitr::kable(sensitivity_tbl, digits = 3)
+} else {
+  cat("Dayaniklilik tablosu bos.\n")
+}
+```
+
+## AUC isi haritasi
+
+```{r heatmap, fig.cap="AUC isi haritasi (dusuk kapsama gri)"}
+ok_hm <- is.data.frame(results) &&
+  nrow(results) > 0 &&
+  any(results$method == hm & !isTRUE(results$skipped))
+if (ok_hm) {
+  print(SigBenchR::plot_auc_heatmap(results, method = hm, coverage_threshold = cov_thr))
+} else {
+  cat("Isi haritasi icin uygun satir yok.\n")
+}
+```
+
+## AUC forest grafigi
+
+```{r forest, fig.cap="AUC forest (DeLong %95 GA)"}
+ok_fr <- is.data.frame(results) &&
+  nrow(results) > 0 &&
+  !is.na(fsig) &&
+  nzchar(fsig) &&
+  any(results$signature == fsig & results$method == hm & !isTRUE(results$skipped))
+if (ok_fr) {
+  print(
+    SigBenchR::plot_auc_forest(
+      results,
+      signature = fsig,
+      method = hm,
+      summary = summary_tbl
+    )
+  )
+} else {
+  cat("Forest grafigi icin uygun satir yok.\n")
+}
+```
+
+## Paket surumleri ve oturum bilgisi
+
+```{r session}
+pkgs <- c("SigBenchR", "pROC", "PRROC", "ggplot2", "withr", "rmarkdown", "knitr")
+vers <- vapply(pkgs, function(p) {
+  if (requireNamespace(p, quietly = TRUE)) {
+    as.character(utils::packageVersion(p))
+  } else {
+    NA_character_
+  }
+}, character(1))
+knitr::kable(data.frame(paket = pkgs, surum = unname(vers), stringsAsFactors = FALSE))
+```
+
+```{r sessioninfo}
+sessionInfo()
+```
