@@ -18,13 +18,15 @@ run_benchmark(
   compute_pr = TRUE,
   n_boot = 1000L,
   compute_null = FALSE,
-  n_perm = 200L,
+  n_perm = 1000L,
   seed = 42L,
   match_expression = FALSE
 )
 }
 \arguments{
-\item{signatures}{Isimli liste; her eleman \verb{list(genes = <chr>, direction = "<"|">", derived_from = <chr>)}. \code{direction} ve \code{derived_from} istege bagli.}
+\item{signatures}{Isimli liste; her eleman \verb{list(genes = <chr>, direction = "<"|">", derived_from = <chr>)}. \code{direction} ve \code{derived_from} istege bagli.
+\code{derived_from = NULL} (belirtilmemis) -> \code{independent = NA} (fail-closed).
+\code{derived_from = character(0)} -> bagimsiz (\code{TRUE}).}
 
 \item{datasets}{Isimli liste; her eleman \code{validate_dataset()} yapisinda.}
 
@@ -48,9 +50,9 @@ run_benchmark(
 
 \item{compute_null}{Null permutasyon testi. Varsayilan FALSE.}
 
-\item{n_perm}{Null permutasyon sayisi. Varsayilan 200.}
+\item{n_perm}{Null permutasyon sayisi. Varsayilan 1000.}
 
-\item{seed}{Rastgelelik tohumu (PR bootstrap ve null).}
+\item{seed}{Rastgelelik tohumu (PR bootstrap ve null); hucre basina turetilir.}
 
 \item{match_expression}{Null icin ifade-eslesmeli ornekleme.}
 }

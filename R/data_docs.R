@@ -18,10 +18,12 @@
 #' Liu 2019 (cBioPortal) S3 403 nedeniyle dahil edilmedi.
 #'
 #' Klinik etiket notlari:
-#' - `van_allen_2015`: `sample_meta$treatment = "anti-CTLA4"`; IMS
-#'   `mel_van_cli_data.csv` ikili clinical-benefit yaniti (`n_pos = 19`).
-#' - `gide_2019`: `sample_meta$treatment = "anti-PD1"`; yalniz `PD1_*_PRE`
-#'   monoterapi (`n = 41`); `ipiPD1_*` kombinasyon dahil degil.
+#' - `van_allen_2015`: anti-CTLA-4; IMS ikili **klinik yarar** (clinical benefit)
+#'   etiketi (`n_pos = 19`, `n_neg = 23`). RECIST CR/PR-PD ile birebir degildir.
+#' - `hugo_2016` / `riaz_2017` / `gide_2019`: anti-PD-1; RECIST CR/PR vs PD.
+#'   `riaz_2017` 16 SD + once anti-CTLA-4 maruziyeti tasir.
+#' - `gide_2019`: yalniz `PD1_*_PRE` monoterapi (`n = 41`); normalizasyon
+#'   "normalized counts"; `ipiPD1_*` kombinasyon dahil degil.
 #'
 #' @format Isimli liste: `van_allen_2015`, `hugo_2016`, `riaz_2017`, `gide_2019`.
 #' @examples
@@ -34,7 +36,9 @@
 #'
 #' Cytokine-5 (Kus et al. 2025), IFNG6 (Ayers et al. 2017) ve Random3.
 #' `Cytokine-5$derived_from` gercek ICI kohort adlarini icerir
-#' (`independent = FALSE`); `IFNG6$derived_from` bostur (`independent = TRUE`).
+#' (`independent = FALSE`). `IFNG6` ve `Random3` acikca
+#' `derived_from = character(0)` tasir (`independent = TRUE`).
+#' `derived_from = NULL` (belirtilmemis) fail-closed `independent = NA` uretir.
 #'
 #' @format Isimli liste; her eleman `list(genes, direction, derived_from, citation)`.
 #' @examples

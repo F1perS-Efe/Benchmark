@@ -8,13 +8,16 @@
 #' `zscore` / `rank` icin havuz satirlari donguden once bir kez donusturulur;
 #' `mean` / `median` icin dongu ici `match_genes()` tekrari yoktur.
 #'
+#' Not: `rank` kohort-ici ornekler arasi goreli siralamadir (singscore degil);
+#' `zscore` basit ortalama gen z-skorudur (`sqrt(k)` olcekli GSVA degil).
+#'
 #' @param mat Gen x ornek ifade matrisi (hazirlanmis).
 #' @param response 0/1 yanit (ornek sirasi `colnames(mat)` ile hizali veya isimli).
 #' @param n_genes Cekilecek rastgele gen sayisi (kapsama sonrasi bulunan).
 #' @param exclude_genes Havuzdan cikarilacak genler (imza genleri).
 #' @param method Skorlama yontemi (`score_signature`).
 #' @param direction Imza yonu.
-#' @param n_perm Permutasyon sayisi B. Varsayilan 200.
+#' @param n_perm Permutasyon sayisi B. Varsayilan 1000.
 #' @param seed RNG tohumu.
 #' @param match_expression TRUE ise imza genlerinin ortalama ifadesine yakin
 #'   quantile-bin eslestirilmis ornekleme yapar.
@@ -33,7 +36,7 @@ null_permutation_test <- function(mat,
                                   exclude_genes = character(0),
                                   method = c("mean", "zscore", "median", "rank"),
                                   direction = c("<", ">"),
-                                  n_perm = 200L,
+                                  n_perm = 1000L,
                                   seed = 42L,
                                   match_expression = FALSE,
                                   signature_genes = NULL,
@@ -56,14 +59,23 @@ null_permutation_test <- function(mat,
     }
   }
 
+  # P0-3: NA yanitlari (SD vb.) olceklemeden once cikar
+  keep_y <- !is.na(response)
+  if (!all(keep_y)) {
+    mat <- mat[, keep_y, drop = FALSE]
+    response <- response[keep_y]
+  }
+
   exclude_up <- unique(toupper(as.character(exclude_genes)))
   rows_up <- toupper(rownames(mat))
 
-  # Sifir varyans / tamamen NA genleri cikar
-  gene_ok <- apply(mat, 1L, function(x) {
-    x <- x[is.finite(x)]
-    length(x) > 1L && stats::sd(x) > 0
-  })
+  # P1-1: vektorlestirilmis satir SD (apply yerine)
+  row_n <- rowSums(is.finite(mat))
+  row_mean <- rowMeans(mat, na.rm = TRUE)
+  row_sd <- sqrt(
+    rowSums((mat - row_mean)^2, na.rm = TRUE) / pmax(row_n - 1L, 1L)
+  )
+  gene_ok <- row_n > 1L & is.finite(row_sd) & row_sd > 0
   pool_idx <- which(gene_ok & !(rows_up %in% exclude_up))
   pool_genes <- rownames(mat)[pool_idx]
   pool_size <- length(pool_genes)
@@ -112,7 +124,7 @@ null_permutation_test <- function(mat,
 
   # Eslestirme: imza gen ortalama ifadeleri -> quantile bin
   sig_ref <- if (is.null(signature_genes)) exclude_genes else signature_genes
-  sig_ref_up <- toupper(sig_ref)
+  sig_ref_up <- unique(toupper(as.character(sig_ref)))
   sig_means <- NULL
   if (isTRUE(match_expression)) {
     hit <- match(sig_ref_up, rows_up)
@@ -122,6 +134,11 @@ null_permutation_test <- function(mat,
       match_expression <- FALSE
     } else {
       sig_means <- rowMeans(mat[hit, , drop = FALSE], na.rm = TRUE)
+      sig_means <- sig_means[is.finite(sig_means)]
+      if (length(sig_means) == 0L) {
+        warning("match_expression: imza ortalama ifadesi NA; rastgele orneklemeye dusuldu.", call. = FALSE)
+        match_expression <- FALSE
+      }
     }
   }
 
@@ -131,18 +148,19 @@ null_permutation_test <- function(mat,
   brks <- unique(stats::quantile(all_means[is.finite(all_means)],
                                  probs = seq(0, 1, length.out = 6),
                                  na.rm = TRUE, names = FALSE))
+  pool_bins <- NULL
+  sig_bins <- NULL
   if (length(brks) < 2L) {
     match_expression <- FALSE
-  } else {
-    pool_bins <- if (isTRUE(match_expression)) {
-      as.integer(cut(pool_means, breaks = brks, include.lowest = TRUE, labels = FALSE))
-    } else {
-      NULL
-    }
-    sig_bins <- if (isTRUE(match_expression)) {
-      as.integer(cut(sig_means, breaks = brks, include.lowest = TRUE, labels = FALSE))
-    } else {
-      NULL
+  } else if (isTRUE(match_expression)) {
+    pool_bins <- as.integer(cut(pool_means, breaks = brks, include.lowest = TRUE, labels = FALSE))
+    sig_bins <- as.integer(cut(sig_means, breaks = brks, include.lowest = TRUE, labels = FALSE))
+    sig_bins <- sig_bins[!is.na(sig_bins)]
+    if (length(sig_bins) == 0L) {
+      warning("match_expression: sig_bins NA; rastgele orneklemeye dusuldu.", call. = FALSE)
+      match_expression <- FALSE
+      pool_bins <- NULL
+      sig_bins <- NULL
     }
   }
 
@@ -150,7 +168,14 @@ null_permutation_test <- function(mat,
   pool_mat <- mat[pool_idx, , drop = FALSE]
   rownames(pool_mat) <- pool_genes
   if (method == "zscore") {
-    score_mat <- t(scale(t(pool_mat)))
+    # P1-1: vektorlestirilmis z-score
+    pm_n <- rowSums(is.finite(pool_mat))
+    pm_mean <- rowMeans(pool_mat, na.rm = TRUE)
+    pm_sd <- sqrt(
+      rowSums((pool_mat - pm_mean)^2, na.rm = TRUE) / pmax(pm_n - 1L, 1L)
+    )
+    score_mat <- (pool_mat - pm_mean) / pm_sd
+    score_mat[!is.finite(score_mat)] <- NA_real_
   } else if (method == "rank") {
     score_mat <- t(apply(pool_mat, 1L, function(x) {
       m <- sum(!is.na(x))
@@ -171,16 +196,24 @@ null_permutation_test <- function(mat,
       if (isTRUE(match_expression) && !is.null(sig_bins)) {
         picked <- character(0)
         for (bn in sig_bins) {
-          cand <- pool_genes[pool_bins == bn & !(pool_genes %in% picked)]
+          cand_idx <- which(!is.na(pool_bins) & pool_bins == bn & !(pool_genes %in% picked))
+          cand <- pool_genes[cand_idx]
           if (length(cand) == 0L) {
             cand <- setdiff(pool_genes, picked)
+          }
+          if (length(cand) == 0L) {
+            return(NA_real_)
           }
           picked <- c(picked, sample(cand, size = 1L))
         }
         # Fazla/eksik uzunluk guvence
         if (length(picked) < n_genes) {
           extra <- setdiff(pool_genes, picked)
-          picked <- c(picked, sample(extra, size = n_genes - length(picked)))
+          need <- n_genes - length(picked)
+          if (length(extra) < need) {
+            return(NA_real_)
+          }
+          picked <- c(picked, sample(extra, size = need))
         }
         picked <- picked[seq_len(n_genes)]
       } else {

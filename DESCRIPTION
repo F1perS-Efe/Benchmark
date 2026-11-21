@@ -19,6 +19,8 @@ Imports:
     ggplot2,
     pROC,
     PRROC,
+    stats,
+    utils,
     withr
 Suggests:
     DT,

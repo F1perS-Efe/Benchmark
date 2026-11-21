@@ -11,7 +11,7 @@ null_permutation_test(
   exclude_genes = character(0),
   method = c("mean", "zscore", "median", "rank"),
   direction = c("<", ">"),
-  n_perm = 200L,
+  n_perm = 1000L,
   seed = 42L,
   match_expression = FALSE,
   signature_genes = NULL,
@@ -32,7 +32,7 @@ null_permutation_test(
 
 \item{direction}{Imza yonu.}
 
-\item{n_perm}{Permutasyon sayisi B. Varsayilan 200.}
+\item{n_perm}{Permutasyon sayisi B. Varsayilan 1000.}
 
 \item{seed}{RNG tohumu.}
 
@@ -60,4 +60,7 @@ ile null dagilimdan tek yonlu ampirik p hesaplanir:
 Null AUC'ler \code{auc_mw()} ile hesaplanir (dongude \code{pROC} yok).
 \code{zscore} / \code{rank} icin havuz satirlari donguden once bir kez donusturulur;
 \code{mean} / \code{median} icin dongu ici \code{match_genes()} tekrari yoktur.
+
+Not: \code{rank} kohort-ici ornekler arasi goreli siralamadir (singscore degil);
+\code{zscore} basit ortalama gen z-skorudur (\code{sqrt(k)} olcekli GSVA degil).
 }

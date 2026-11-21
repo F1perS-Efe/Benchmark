@@ -24,17 +24,37 @@ validate_dataset <- function(dataset, name = NULL) {
   if (!is.matrix(dataset$expr) && !is.data.frame(dataset$expr)) {
     stop("`", label, "$expr` matris veya data.frame olmalidir.", call. = FALSE)
   }
+  expr_mat <- as.matrix(dataset$expr)
+  if (!is.numeric(expr_mat)) {
+    stop("`", label, "$expr` sayisal bir matris olmalidir.", call. = FALSE)
+  }
+  if (nrow(expr_mat) < 1L || ncol(expr_mat) < 1L) {
+    stop("`", label, "$expr` en az bir satir ve bir sutun icermelidir.", call. = FALSE)
+  }
   if (is.null(rownames(dataset$expr))) {
     stop("`", label, "$expr` satir adlari (genler) zorunludur.", call. = FALSE)
   }
   if (is.null(colnames(dataset$expr))) {
     stop("`", label, "$expr` sutun adlari (ornekler) zorunludur.", call. = FALSE)
   }
+  if (anyDuplicated(colnames(dataset$expr))) {
+    stop("`", label, "$expr` sutun adlari (ornek id) tekil olmalidir.", call. = FALSE)
+  }
+  if (anyDuplicated(rownames(dataset$expr))) {
+    warning(
+      "`", label, "$expr` satir adlarinda yinelenen genler var; ",
+      "collapse_duplicate_genes() ile birlestirin.",
+      call. = FALSE
+    )
+  }
   if (!is.data.frame(dataset$sample_meta)) {
     stop("`", label, "$sample_meta` data.frame olmalidir.", call. = FALSE)
   }
   if (!"sample_id" %in% names(dataset$sample_meta)) {
     stop("`", label, "$sample_meta` icinde `sample_id` sutunu zorunludur.", call. = FALSE)
+  }
+  if (anyDuplicated(as.character(dataset$sample_meta$sample_id))) {
+    stop("`", label, "$sample_meta$sample_id` degerleri tekil olmalidir.", call. = FALSE)
   }
   if (!"response_label" %in% names(dataset$sample_meta)) {
     stop(
@@ -91,7 +111,14 @@ collapse_duplicate_genes <- function(expr, rule = c("max_mean")) {
       return(idx)
     }
     means <- rowMeans(expr[idx, , drop = FALSE], na.rm = TRUE)
-    idx[which.max(means)]
+    if (length(means) == 0L || all(!is.finite(means))) {
+      return(idx[1L])
+    }
+    wi <- which.max(means)
+    if (length(wi) == 0L) {
+      return(idx[1L])
+    }
+    idx[wi]
   }, integer(1))
 
   expr[sort(unname(keep)), , drop = FALSE]

@@ -87,8 +87,20 @@ compare_signatures_one <- function(scores1,
     )
   }
 
-  # Isimli hizalama
-  if (!is.null(names(scores1)) && !is.null(names(scores2))) {
+  # Isimli hizalama: karisik isimli/isimsiz giriste sessiz eslesme yapma
+  named1 <- !is.null(names(scores1))
+  named2 <- !is.null(names(scores2))
+  if (xor(named1, named2)) {
+    stop(
+      "Mixed named/unnamed score vectors are not allowed; ",
+      "provide names for both scores1 and scores2, or for neither.",
+      call. = FALSE
+    )
+  }
+  if (named1 && named2) {
+    if (anyDuplicated(names(scores1)) || anyDuplicated(names(scores2))) {
+      stop("Duplicate names in scores1 or scores2 are not allowed.", call. = FALSE)
+    }
     common <- intersect(names(scores1), names(scores2))
     if (!is.null(names(response))) {
       common <- intersect(common, names(response))

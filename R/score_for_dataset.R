@@ -21,22 +21,30 @@ score_for_dataset <- function(dataset,
   expr <- prepare_expression(expr, scale = ds$info$scale, apply_log2 = apply_log2)
   enc <- encode_response(ds$sample_meta$response_label, sd_handling = sd_handling)
 
-  scored <- score_signature(expr, genes = genes, method = method, min_genes = min_genes)
+  # P0-3: skorlamadan once SD / NA yanit orneklerini cikar
+  expr_kept <- expr[, enc$kept, drop = FALSE]
+  y_kept <- enc$response[enc$kept]
+  names(y_kept) <- colnames(expr_kept)
+
+  scored <- score_signature(
+    expr_kept,
+    genes = genes,
+    method = method,
+    min_genes = min_genes
+  )
   if (isTRUE(scored$skipped)) {
     stop(scored$skip_reason, call. = FALSE)
   }
 
   sample_ids <- names(scored$scores)
-  meta_idx <- match(sample_ids, ds$sample_meta$sample_id)
-  resp <- enc$response[meta_idx]
-  names(resp) <- sample_ids
-  keep <- enc$kept[meta_idx] & is.finite(scored$scores)
+  resp <- y_kept[sample_ids]
+  keep <- is.finite(scored$scores) & !is.na(resp)
 
   list(
     scores = scored$scores[keep],
     response = resp[keep],
     coverage = scored$coverage,
     direction = direction,
-    expr = expr
+    expr = expr_kept
   )
 }

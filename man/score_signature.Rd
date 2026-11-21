@@ -30,9 +30,11 @@ uzerinde etiketten bagimsiz hesaplanir.
 \details{
 \itemize{
 \item \code{mean}: log olcekli ifadenin ornek basina ortalamasi
-\item \code{zscore}: her gen veri seti genelinde z-score'a cevrilir, sonra ortalanir
+\item \code{zscore}: her gen veri seti (kohort) genelinde z-score'a cevrilir, sonra
+ortalanir. Basit ortalama gen z-skorudur; \code{sqrt(k)} olcekli GSVA degildir.
 \item \code{median}: ham (log olcekli) ifadenin ornek basina medyani
-\item \code{rank}: her gen ornekler arasi ortalama siraya cevrilir, 0-1 araligina
-olceklenir, sonra ornek basina ortalanir
+\item \code{rank}: her gen ornekler arasi (kohort-ici) average-rank'e cevrilir, 0-1
+araligina olceklenir, sonra ornek basina ortalanir. Bu \code{singscore} degildir;
+kohortlar arasi ham skor birlestirilmez.
 }
 }

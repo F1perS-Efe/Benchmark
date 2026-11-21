@@ -4,10 +4,12 @@
 #' uzerinde etiketten bagimsiz hesaplanir.
 #'
 #' - `mean`: log olcekli ifadenin ornek basina ortalamasi
-#' - `zscore`: her gen veri seti genelinde z-score'a cevrilir, sonra ortalanir
+#' - `zscore`: her gen veri seti (kohort) genelinde z-score'a cevrilir, sonra
+#'   ortalanir. Basit ortalama gen z-skorudur; `sqrt(k)` olcekli GSVA degildir.
 #' - `median`: ham (log olcekli) ifadenin ornek basina medyani
-#' - `rank`: her gen ornekler arasi ortalama siraya cevrilir, 0-1 araligina
-#'   olceklenir, sonra ornek basina ortalanir
+#' - `rank`: her gen ornekler arasi (kohort-ici) average-rank'e cevrilir, 0-1
+#'   araligina olceklenir, sonra ornek basina ortalanir. Bu `singscore` degildir;
+#'   kohortlar arasi ham skor birlestirilmez.
 #'
 #' @param expr Gen x ornek matris (hazirlanmis / log olcekli).
 #' @param genes Imza genleri (karakter).

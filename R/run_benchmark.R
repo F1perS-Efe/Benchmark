@@ -5,6 +5,8 @@
 #'
 #' @param signatures Isimli liste; her eleman `list(genes = <chr>, direction = "<"|">",
 #'   derived_from = <chr>)`. `direction` ve `derived_from` istege bagli.
+#'   `derived_from = NULL` (belirtilmemis) -> `independent = NA` (fail-closed).
+#'   `derived_from = character(0)` -> bagimsiz (`TRUE`).
 #' @param datasets Isimli liste; her eleman `validate_dataset()` yapisinda.
 #' @param methods Skorlama yontemleri: `"mean"`, `"zscore"`, `"median"`, `"rank"`.
 #' @param direction Varsayilan imza yonu (imza duzeyinde yoksa).
@@ -16,8 +18,8 @@
 #' @param compute_pr PR-AUC hesapla. Varsayilan TRUE.
 #' @param n_boot PR-AUC bootstrap tekrari. Varsayilan 1000; hizli onizleme icin dusurulebilir.
 #' @param compute_null Null permutasyon testi. Varsayilan FALSE.
-#' @param n_perm Null permutasyon sayisi. Varsayilan 200.
-#' @param seed Rastgelelik tohumu (PR bootstrap ve null).
+#' @param n_perm Null permutasyon sayisi. Varsayilan 1000.
+#' @param seed Rastgelelik tohumu (PR bootstrap ve null); hucre basina turetilir.
 #' @param match_expression Null icin ifade-eslesmeli ornekleme.
 #'
 #' @return `data.frame` sonuc tablosu.
@@ -35,7 +37,7 @@ run_benchmark <- function(signatures,
                           compute_pr = TRUE,
                           n_boot = 1000L,
                           compute_null = FALSE,
-                          n_perm = 200L,
+                          n_perm = 1000L,
                           seed = 42L,
                           match_expression = FALSE) {
   if (is.null(names(signatures)) || any(!nzchar(names(signatures)))) {
@@ -59,6 +61,7 @@ run_benchmark <- function(signatures,
 
   rows <- list()
   row_i <- 0L
+  cell_idx <- 0L
 
   for (ds_name in names(datasets)) {
     ds <- validate_dataset(datasets[[ds_name]], name = ds_name)
@@ -73,6 +76,11 @@ run_benchmark <- function(signatures,
       ds$sample_meta$response_label,
       sd_handling = sd_handling
     )
+
+    # P0-3: SD (veya NA yanit) orneklerini skorlama / null oncesi cikar
+    expr_kept <- expr[, enc$kept, drop = FALSE]
+    y_kept <- enc$response[enc$kept]
+    names(y_kept) <- colnames(expr_kept)
 
     cancer <- if (!is.null(ds$sample_meta$cancer)) {
       paste(unique(as.character(ds$sample_meta$cancer)), collapse = ";")
@@ -96,8 +104,15 @@ run_benchmark <- function(signatures,
       sig_dir <- if (!is.null(sig$direction)) sig$direction else direction
 
       for (method in methods) {
+        cell_idx <- cell_idx + 1L
+        cell_seed <- if (is.null(seed)) {
+          NULL
+        } else {
+          as.integer(seed) + as.integer(cell_idx)
+        }
+
         scored <- score_signature(
-          expr,
+          expr_kept,
           genes = sig$genes,
           method = method,
           min_genes = min_genes
@@ -146,11 +161,13 @@ run_benchmark <- function(signatures,
           independent = NA
         )
 
-        derived <- sig$derived_from
-        if (is.null(derived)) {
-          derived <- character(0)
+        # P0-4: NULL derived_from -> NA (fail-closed); karakter vektor -> case-insensitive
+        if (is.null(sig$derived_from)) {
+          base$independent <- NA
+        } else {
+          derived <- as.character(sig$derived_from)
+          base$independent <- !(tolower(ds_name) %in% tolower(derived))
         }
-        base$independent <- !ds_name %in% derived
 
         if (isTRUE(scored$skipped)) {
           row_i <- row_i + 1L
@@ -159,9 +176,8 @@ run_benchmark <- function(signatures,
         }
 
         sample_ids <- names(scored$scores)
-        meta_idx <- match(sample_ids, ds$sample_meta$sample_id)
-        resp <- enc$response[meta_idx]
-        keep <- enc$kept[meta_idx] & is.finite(scored$scores)
+        resp <- y_kept[sample_ids]
+        keep <- is.finite(scored$scores) & !is.na(resp)
 
         scores_use <- scored$scores[keep]
         resp_use <- resp[keep]
@@ -210,7 +226,7 @@ run_benchmark <- function(signatures,
               scores_use, resp_use,
               direction = sig_dir,
               n_boot = n_boot,
-              seed = seed
+              seed = cell_seed
             ),
             error = function(e) e
           )
@@ -229,19 +245,16 @@ run_benchmark <- function(signatures,
         }
 
         if (isTRUE(compute_null)) {
-          # Null icin yaniti mat sutun sirasina cevir
-          resp_full <- enc$response
-          names(resp_full) <- ds$sample_meta$sample_id
           null_res <- tryCatch(
             null_permutation_test(
-              mat = expr,
-              response = resp_full,
+              mat = expr_kept,
+              response = y_kept,
               n_genes = scored$coverage$n_found,
               exclude_genes = scored$coverage$found,
               method = method,
               direction = sig_dir,
               n_perm = n_perm,
-              seed = seed,
+              seed = cell_seed,
               match_expression = match_expression,
               signature_genes = scored$coverage$found,
               observed_scores = scores_use,

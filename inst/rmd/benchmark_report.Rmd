@@ -22,11 +22,13 @@ if (is.null(pl)) pl <- list()
 hm <- if (!is.null(pl$heatmap_method)) as.character(pl$heatmap_method)[1] else "mean"
 fsig <- if (!is.null(pl$forest_signature)) as.character(pl$forest_signature)[1] else NA_character_
 cov_thr <- if (!is.null(pl$coverage_threshold)) as.numeric(pl$coverage_threshold)[1] else 0.70
+sd_pol <- if (!is.null(pl$sd_handling)) as.character(pl$sd_handling)[1] else "exclude"
 ```
 
 > **Bilimsel yorum sınırı:** Bu rapor araştırma amaçlıdır; klinik karar aracı değildir.
 > Sonuçlar küçük örneklemlerde belirsiz olabilir. "Kanıt yok" da geçerli bir bulgudur.
 > Eşikler ve varsayılanlar sonuçlara bakıldıktan sonra değiştirilmemelidir.
+> AUC, klinik tahmin modeli değil; yanıt sınıfları arası **ayırt edicilik (discrimination)** ölçüsüdür.
 
 ## Analiz parametreleri
 
@@ -38,22 +40,26 @@ param_df <- data.frame(
   parametre = c(
     "methods",
     "direction",
+    "sd_handling",
     "coverage_threshold",
     "sensitivity_threshold",
     "n_boot",
     "n_perm",
     "seed",
+    "match_expression",
     "heatmap_method",
     "forest_signature"
   ),
   deger = c(
     paste(pick(pl$methods, character(0)), collapse = ", "),
     as.character(pick(pl$direction, "<")),
+    as.character(pick(pl$sd_handling, "exclude")),
     as.character(pick(pl$coverage_threshold, NA)),
     as.character(pick(pl$sensitivity_threshold, NA)),
     as.character(pick(pl$n_boot, NA)),
     as.character(pick(pl$n_perm, NA)),
     as.character(pick(pl$seed, NA)),
+    as.character(pick(pl$match_expression, FALSE)),
     hm,
     as.character(fsig)
   ),
@@ -62,7 +68,53 @@ param_df <- data.frame(
 knitr::kable(param_df)
 ```
 
+## Kohort Klinik ve Teknik Özeti
+
+Kohortlar heterojendir: Van Allen 2015 anti-CTLA-4 ve **klinik yarar** (clinical benefit) tanımı kullanır;
+Hugo / Riaz / Gide anti-PD-1 ve RECIST CR/PR–PD eksenine daha yakındır. Riaz 2017'de 16 SD ve önceki
+anti-CTLA-4 maruziyeti ek heterojenlik getirir. `gide_2019` normalizasyonu "normalized counts"tır.
+
+```{r cohort-clinical}
+if (is.data.frame(results) && nrow(results) > 0) {
+  outcome_map <- c(
+    van_allen_2015 = "Van Allen 2015 clinical benefit (anti-CTLA-4; CR/PR veya uzun sagkalimli SD siniflamasi; IMS ikili etiket)",
+    hugo_2016 = "RECIST CR/PR vs PD (anti-PD-1)",
+    riaz_2017 = "RECIST CR/PR vs PD; 16 SD + once anti-CTLA-4 maruziyeti (anti-PD-1)",
+    gide_2019 = "RECIST CR/PR vs PD; anti-PD-1 monoterapi PRE (normalized counts)"
+  )
+  agg <- aggregate(
+    cbind(n = n, n_pos = n_pos, n_neg = n_neg, n_excluded_sd = n_excluded_sd) ~ dataset + normalization + treatment,
+    data = results[!(results$skipped %in% TRUE), , drop = FALSE],
+    FUN = function(x) as.integer(stats::median(x, na.rm = TRUE))
+  )
+  if (nrow(agg) > 0) {
+    agg$yanit_tanimi <- unname(outcome_map[as.character(agg$dataset)])
+    agg$yanit_tanimi[is.na(agg$yanit_tanimi)] <- "Kohorta ozel / kullanici tanimli"
+    agg$sd_politikasi <- sd_pol
+    knitr::kable(
+      agg[, c(
+        "dataset", "treatment", "yanit_tanimi", "normalization",
+        "sd_politikasi", "n", "n_pos", "n_neg", "n_excluded_sd"
+      ), drop = FALSE],
+      col.names = c(
+        "Kohort", "Tedavi", "Orijinal yanit tanimi", "Normalizasyon",
+        "SD politikasi", "Efektif N", "Pozitif", "Negatif", "Dislanan SD"
+      ),
+      digits = 0
+    )
+  } else {
+    cat("Kohort ozeti icin uygun satir yok.\n")
+  }
+} else {
+  cat("Sonuc tablosu bos.\n")
+}
+```
+
 ## Sonuç tablosu
+
+`low_coverage` satırlar ısı haritasında gri gösterilir ve varsayılan `summarize_auc(exclude_low_coverage = TRUE)`
+özetinden çıkarılır. `var_zero` (AUC varyansı 0/NA) kohortlar **n-ağırlıklı** ortalamaya dahil edilir;
+ters-varyans (IVW) özetinden güvenli biçimde çıkarılır (`n_var_zero_excluded`).
 
 ```{r results-table}
 if (is.data.frame(results) && nrow(results) > 0) {
@@ -70,7 +122,9 @@ if (is.data.frame(results) && nrow(results) > 0) {
     c(
       "dataset", "signature", "method", "n", "n_pos", "n_neg",
       "coverage_label", "low_coverage", "auc", "auc_ci_low", "auc_ci_high",
-      "auc_var", "var_zero", "small_cohort", "pr_auc", "null_p", "null_p_adj_bh",
+      "auc_var", "var_zero", "small_cohort",
+      "pr_auc", "pr_baseline", "pr_ci_low", "pr_ci_high",
+      "null_p", "null_p_adj_bh",
       "independent", "skipped", "skip_reason"
     ),
     names(results)
@@ -82,6 +136,11 @@ if (is.data.frame(results) && nrow(results) > 0) {
 ```
 
 ## Ağırlıklı Özet (n-ağırlıklı + ters-varyans, Q, I2)
+
+**Metodoloji notu:** Sabit etkiler IVW, 4 heterojen kohortta keşifseldir (rastgele etkiler / DL yok).
+`independent = NA` (kökeni bilinmeyen) veya `FALSE` (türetilmiş) imzalar varsayılan bağımsız özete girmez.
+`rank` ve `zscore` kohort-içi göreli skorlardır (`singscore` / `sqrt(k)` GSVA değildir); kohortlar arası
+ham skor birleştirilmez. AUC ayırt edicilik ölçer; klinik yanıtı “tahmin eden” kalibre model değildir.
 
 ```{r summary-table}
 if (is.data.frame(summary_tbl) && nrow(summary_tbl) > 0) {

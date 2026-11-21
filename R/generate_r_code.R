@@ -61,34 +61,53 @@ generate_r_code <- function(signature_name = "Cytokine-5",
     stop("Ozel imza icin `genes` gerekli (veya `signature_name` verin).", call. = FALSE)
   }
 
+  fmt_chr <- function(s) {
+    paste(deparse(as.character(s)), collapse = "")
+  }
   fmt_chr_vec <- function(x) {
-    paste0("c(", paste(sprintf('"%s"', x), collapse = ", "), ")")
+    paste0(
+      "c(",
+      paste(vapply(x, fmt_chr, character(1)), collapse = ", "),
+      ")"
+    )
   }
   fmt_logical <- function(x) if (isTRUE(x)) "TRUE" else "FALSE"
 
   ici_names <- c("van_allen_2015", "hugo_2016", "riaz_2017", "gide_2019", "liu_2019")
-  use_ici_data <- any(dataset_names %in% ici_names)
-  data_obj <- if (use_ici_data) "datasets_ici" else "datasets_demo"
+  demo_ds_names <- c("demo_A", "demo_B")
+  known_names <- c(ici_names, demo_ds_names)
+  unknown_ds <- setdiff(dataset_names, known_names)
+  all_ici <- length(dataset_names) > 0L && all(dataset_names %in% ici_names)
+  all_demo <- length(dataset_names) > 0L && all(dataset_names %in% demo_ds_names)
 
-  lines <- c(
-    "library(SigBenchR)",
-    paste0("data(", data_obj, ")"),
-    "data(signatures_demo)",
-    ""
-  )
+  if (length(unknown_ds) > 0L) {
+    data_obj <- NULL
+  } else if (all_ici) {
+    data_obj <- "datasets_ici"
+  } else if (all_demo) {
+    data_obj <- "datasets_demo"
+  } else {
+    data_obj <- NULL
+  }
+
+  lines <- c("library(SigBenchR)")
+  if (!is.null(data_obj)) {
+    lines <- c(lines, paste0("data(", data_obj, ")"))
+  }
+  lines <- c(lines, "data(signatures_demo)", "")
 
   if (use_demo && !use_custom) {
     if (length(demo_names) == 1L) {
       lines <- c(
         lines,
-        paste0('sigs <- signatures_demo["', demo_names, '"]'),
-        paste0('sigs[[1]]$direction <- "', direction, '"')
+        paste0("sigs <- signatures_demo[", fmt_chr(demo_names), "]"),
+        paste0("sigs[[1]]$direction <- ", fmt_chr(direction))
       )
     } else {
       lines <- c(
         lines,
         paste0("sigs <- signatures_demo[", fmt_chr_vec(demo_names), "]"),
-        paste0('for (nm in names(sigs)) sigs[[nm]]$direction <- "', direction, '"')
+        paste0("for (nm in names(sigs)) sigs[[nm]]$direction <- ", fmt_chr(direction))
       )
     }
   } else if (use_custom && !use_demo) {
@@ -97,31 +116,47 @@ generate_r_code <- function(signature_name = "Cytokine-5",
       paste0(
         "sigs <- list(Custom = list(genes = ",
         fmt_chr_vec(custom_genes),
-        ", direction = \"", direction, "\"))"
+        ", direction = ", fmt_chr(direction), "))"
       )
     )
   } else {
     lines <- c(
       lines,
       paste0("sigs <- signatures_demo[", fmt_chr_vec(demo_names), "]"),
-      paste0('for (nm in names(sigs)) sigs[[nm]]$direction <- "', direction, '"'),
+      paste0("for (nm in names(sigs)) sigs[[nm]]$direction <- ", fmt_chr(direction)),
       paste0(
         "sigs$Custom <- list(genes = ",
         fmt_chr_vec(custom_genes),
-        ", direction = \"", direction, "\")"
+        ", direction = ", fmt_chr(direction), ")"
       )
+    )
+  }
+
+  if (is.null(data_obj)) {
+    lines <- c(
+      lines,
+      paste0(
+        "# WARNING: unrecognized dataset_names = ",
+        fmt_chr_vec(dataset_names),
+        "; provide a named list `ds` matching validate_dataset()."
+      ),
+      "ds <- list()  # TODO: user-supplied datasets"
+    )
+  } else {
+    lines <- c(
+      lines,
+      paste0("ds <- ", data_obj, "[", fmt_chr_vec(dataset_names), "]")
     )
   }
 
   lines <- c(
     lines,
-    paste0("ds <- ", data_obj, "[", fmt_chr_vec(dataset_names), "]"),
     "",
     "res <- run_benchmark(",
     "  signatures = sigs,",
     "  datasets = ds,",
     paste0("  methods = ", fmt_chr_vec(methods), ","),
-    paste0("  direction = \"", direction, "\","),
+    paste0("  direction = ", fmt_chr(direction), ","),
     paste0("  coverage_threshold = ", as.numeric(coverage_threshold), ","),
     paste0("  compute_pr = ", fmt_logical(compute_pr), ","),
     paste0("  n_boot = ", as.integer(n_boot), "L,"),
@@ -130,7 +165,8 @@ generate_r_code <- function(signature_name = "Cytokine-5",
     paste0("  seed = ", as.integer(seed), "L"),
     ")",
     "print(res)",
-    paste0('plot_auc_heatmap(res, method = "', methods[1], '")')
+    "print(summarize_auc(res))",
+    paste0("plot_auc_heatmap(res, method = ", fmt_chr(methods[1]), ")")
   )
 
   paste(lines, collapse = "\n")

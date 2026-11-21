@@ -41,6 +41,17 @@ encode_response <- function(labels,
     }
   }
 
+  known <- unique(c(positive, negative, sd_label))
+  unknown_mask <- !is.na(labels_up) & nzchar(labels_up) & !(labels_up %in% known)
+  if (any(unknown_mask)) {
+    unk <- unique(labels_up[unknown_mask])
+    warning(
+      "Unknown response label(s) encoded as NA: ",
+      paste(unk, collapse = ", "),
+      call. = FALSE
+    )
+  }
+
   kept <- !is.na(response)
   list(
     response = response,

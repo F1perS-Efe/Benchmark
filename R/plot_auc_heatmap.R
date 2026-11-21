@@ -25,12 +25,12 @@ plot_auc_heatmap <- function(results,
     stop("Secilen yontem icin cizilecek satir yok.", call. = FALSE)
   }
 
-  # Dusuk kapsama: AUC'yi NA yap -> gri kutu (na.value)
-  if (!"low_coverage" %in% names(df)) {
+  # Dusuk kapsama: esigi dogrudan yeniden hesapla (onceki TRUE kilitlenmesin)
+  if ("coverage_pct" %in% names(df)) {
     df$low_coverage <- df$coverage_pct < (100 * coverage_threshold)
+  } else if (!"low_coverage" %in% names(df)) {
+    df$low_coverage <- FALSE
   }
-  # Esik yeniden uygulanabilir (Shiny'den gelen esik)
-  df$low_coverage <- df$low_coverage | df$coverage_pct < (100 * coverage_threshold)
 
   df$auc_plot <- df$auc
   df$auc_plot[df$low_coverage] <- NA_real_

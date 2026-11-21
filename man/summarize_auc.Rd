@@ -8,7 +8,9 @@ summarize_auc(
   results,
   method = NULL,
   include_nonindependent = FALSE,
-  exclude_var_zero = TRUE
+  independent_only = TRUE,
+  exclude_var_zero = TRUE,
+  exclude_low_coverage = TRUE
 )
 }
 \arguments{
@@ -16,9 +18,14 @@ summarize_auc(
 
 \item{method}{Belirli skorlama yontemi; \code{NULL} ise tum yontemler ayri ozetlenir.}
 
-\item{include_nonindependent}{\code{TRUE} ise bagimsiz-olmayan satirlar ozete girer.}
+\item{include_nonindependent}{\code{TRUE} ise bagimsiz-olmayan / NA satirlar ozete girer.}
 
-\item{exclude_var_zero}{\code{TRUE} (varsayilan) ise varyansi 0/NA olanlar cikarilir.}
+\item{independent_only}{\code{TRUE} (varsayilan) ise yalniz \code{independent == TRUE}.
+\code{include_nonindependent = TRUE} verilirse bu bayrak gecersiz kilinir.}
+
+\item{exclude_var_zero}{\code{TRUE} (varsayilan) ise varyansi 0/NA olanlar IVW'den cikarilir.}
+
+\item{exclude_low_coverage}{\code{TRUE} (varsayilan) ise dusuk kapsama satirlari ozetten cikarilir.}
 }
 \value{
 \code{data.frame} ozet satirlari.
@@ -34,8 +41,9 @@ Her \code{signature} x \code{method} icin:
 \details{
 Varsayilan kurallar:
 \itemize{
-\item \code{independent == FALSE} (\code{derived_from}) satirlar ozetten cikarilir
-\item \code{var_zero == TRUE} (veya \code{auc_var} NA/0) satirlar ozetten cikarilir + uyari
+\item \code{independent_only = TRUE}: yalniz \code{independent == TRUE} (NA / FALSE dislanir)
+\item \code{exclude_low_coverage = TRUE}: \code{low_coverage == TRUE} satirlar dislanir
+\item \code{var_zero} / \code{auc_var <= 0} yalnizca IVW'den cikarilir; n-agirlikli ortalamaya girer
 \item \code{skipped} veya sonlu olmayan AUC satirlar yok sayilir
 }
 

@@ -1,6 +1,8 @@
 # SigBenchR Shiny - tek dosya
 
-options(shiny.maxRequestSize = 25 * 1024^2)
+# Global: oturum basina yeniden yuklemeyi onlemek icin server disinda
+data(datasets_ici, package = "SigBenchR", envir = environment())
+data(signatures_demo, package = "SigBenchR", envir = environment())
 
 ui <- shiny::fluidPage(
   shiny::tags$head(
@@ -22,8 +24,8 @@ ui <- shiny::fluidPage(
   shiny::titlePanel("SigBenchR — Gen İmzası Doğrulama"),
   shiny::tags$p(
     shiny::em(
-      "Araştırma amaçlıdır; klinik karar aracı değildir. ",
-      "Kimliklendirilebilir hasta verisi yüklemeyin."
+      "Dahili halka açık melanoma ICI kohortları üzerinde keşifsel kıyaslama aracı — yalnızca gen sembolleri girin. ",
+      "Araştırma amaçlıdır; klinik karar aracı değildir."
     )
   ),
   shiny::sidebarLayout(
@@ -45,7 +47,7 @@ ui <- shiny::fluidPage(
         selected = c("mean", "zscore")
       ),
       shiny::radioButtons(
-        "heatmap_method", "Isı Haritası / ROC yöntemi",
+        "heatmap_method", "Aktif Görünüm / Özet Yöntemi",
         choices = c("mean", "zscore"), selected = "mean"
       ),
       shiny::radioButtons(
@@ -53,12 +55,26 @@ ui <- shiny::fluidPage(
         choices = c("Yüksek=yanıtlı (<)" = "<", "Düşük=yanıtlı (>)" = ">"),
         selected = "<"
       ),
+      shiny::radioButtons(
+        "sd_handling", "SD politikası",
+        choices = c(
+          "SD dışla [CR/PR vs PD]" = "exclude",
+          "ORR [CR/PR vs SD/PD]" = "as_0",
+          "DCR [CR/PR/SD vs PD]" = "as_1"
+        ),
+        selected = "exclude"
+      ),
+      shiny::checkboxInput(
+        "match_expression",
+        "Null: ifade düzeyine eşleştirilmiş örnekleme",
+        FALSE
+      ),
       shiny::sliderInput("coverage_threshold", "Kapsama eşiği", 0.5, 1, 0.70, 0.05),
       shiny::sliderInput("sensitivity_threshold", "Dayanıklılık eşiği (keyfi)", 0.05, 0.3, 0.10, 0.01),
       shiny::checkboxInput("compute_pr", "PR-AUC + bootstrap GA", TRUE),
       shiny::numericInput("n_boot", "PR bootstrap (n_boot)", value = 200, min = 0, max = 2000, step = 50),
       shiny::checkboxInput("compute_null", "Null permütasyon", FALSE),
-      shiny::numericInput("n_perm", "Null B", value = 200, min = 10, max = 2000, step = 10),
+      shiny::numericInput("n_perm", "Null B", value = 1000, min = 10, max = 2000, step = 50),
       shiny::numericInput("seed", "Seed", value = 42, min = 1, step = 1),
       shiny::checkboxGroupInput(
         "datasets", "Veri setleri (ICI kohortları)",
@@ -84,6 +100,7 @@ ui <- shiny::fluidPage(
         shiny::tabPanel(
           "Sonuçlar",
           shiny::verbatimTextOutput("status"),
+          shiny::uiOutput("stale_note"),
           shiny::h4("Sonuç tablosu"),
           if (requireNamespace("DT", quietly = TRUE)) DT::DTOutput("table") else shiny::tableOutput("table_fallback"),
           shiny::h4("AUC ısı haritası"),
@@ -102,6 +119,7 @@ ui <- shiny::fluidPage(
         shiny::tabPanel(
           "DeLong",
           shiny::verbatimTextOutput("cmp_status"),
+          shiny::tags$p(shiny::em("Tek karşılaştırmada p_adj_bh ham p değerine eşittir.")),
           if (requireNamespace("DT", quietly = TRUE)) DT::DTOutput("cmp_table") else shiny::tableOutput("cmp_fallback")
         ),
         shiny::tabPanel(
@@ -114,7 +132,7 @@ ui <- shiny::fluidPage(
           if (requireNamespace("DT", quietly = TRUE)) DT::DTOutput("summary_table") else shiny::tableOutput("summary_fallback"),
           shiny::h4("AUC forest"),
           shiny::plotOutput("forest_plot", height = "320px"),
-          shiny::h4("Jaccard (demo imzalar)"),
+          shiny::h4("Jaccard (aktif imzalar)"),
           if (requireNamespace("DT", quietly = TRUE)) DT::DTOutput("jaccard_table") else shiny::tableOutput("jaccard_fallback"),
           shiny::h4("AUC korelasyonu (veri setleri boyunca)"),
           if (requireNamespace("DT", quietly = TRUE)) DT::DTOutput("corr_table") else shiny::tableOutput("corr_fallback")
@@ -122,7 +140,7 @@ ui <- shiny::fluidPage(
         shiny::tabPanel(
           "R kodu",
           shiny::h4("Bu analizin R kodunu kopyala"),
-          shiny::tags$p("Seçili parametrelerden üretilen, doğrudan çalıştırılabilir kod:"),
+          shiny::tags$p("Son çalıştırılan snapshot parametrelerinden üretilen kod:"),
           shiny::textAreaInput(
             "r_code_text",
             label = NULL,
@@ -144,8 +162,6 @@ ui <- shiny::fluidPage(
 )
 
 server <- function(input, output, session) {
-  data(datasets_ici, package = "SigBenchR", envir = environment())
-  data(signatures_demo, package = "SigBenchR", envir = environment())
   # Shiny varsayilani gercek ICI kohortlari; sentetik demo_A/demo_B testlerde kalir.
 
   active_sig_names <- shiny::reactive({
@@ -158,25 +174,47 @@ server <- function(input, output, session) {
     unique(chosen)
   })
 
-  build_sigs <- function() {
-    chosen <- as.character(input$sig_choice)
+  build_sigs <- function(direction, sig_choice, custom_genes) {
+    chosen <- as.character(sig_choice)
     chosen <- chosen[nzchar(chosen)]
     sigs <- list()
     for (nm in chosen) {
       shiny::validate(shiny::need(nm %in% names(signatures_demo), paste0("Bilinmeyen imza: ", nm)))
       sig <- signatures_demo[[nm]]
-      sig$direction <- input$direction
+      sig$direction <- direction
       sigs[[nm]] <- sig
     }
-    custom_txt <- if (is.null(input$custom_genes)) "" else input$custom_genes
+    custom_txt <- if (is.null(custom_genes)) "" else custom_genes
     if (nzchar(trimws(custom_txt))) {
       genes <- SigBenchR::parse_genes(custom_txt)
       shiny::validate(shiny::need(length(genes) >= 1, "Özel imza için en az bir gen girin."))
-      sigs[["Custom"]] <- list(genes = genes, direction = input$direction)
+      # derived_from belirtilmez -> independent = NA (fail-closed)
+      sigs[["Custom"]] <- list(genes = genes, direction = direction)
     }
     shiny::validate(shiny::need(length(sigs) >= 1, "En az bir hazır imza seçin veya özel imza ekleyin."))
     sigs
   }
+
+  current_params <- shiny::reactive({
+    list(
+      methods = as.character(input$methods),
+      direction = as.character(input$direction),
+      coverage_threshold = as.numeric(input$coverage_threshold),
+      sensitivity_threshold = as.numeric(input$sensitivity_threshold),
+      n_boot = as.integer(input$n_boot),
+      n_perm = as.integer(input$n_perm),
+      seed = as.integer(input$seed),
+      compute_pr = isTRUE(input$compute_pr),
+      compute_null = isTRUE(input$compute_null),
+      sd_handling = as.character(input$sd_handling),
+      match_expression = isTRUE(input$match_expression),
+      datasets = as.character(input$datasets),
+      sig_choice = as.character(input$sig_choice),
+      custom_genes = if (is.null(input$custom_genes)) "" else as.character(input$custom_genes),
+      heatmap_method = as.character(input$heatmap_method),
+      forest_signature = as.character(input$forest_sig)
+    )
+  })
 
   # Dinamik dropdown: yontemler
   shiny::observe({
@@ -218,46 +256,113 @@ server <- function(input, output, session) {
     shiny::updateSelectInput(session, "cmp_sig2", choices = sigs, selected = sel2)
   })
 
+  # Secili kohortlara gore ROC / DeLong dataset secenekleri
+  shiny::observeEvent(input$datasets, {
+    ds <- as.character(input$datasets)
+    ds <- ds[nzchar(ds)]
+    if (length(ds) < 1L) {
+      return()
+    }
+    cur_roc <- input$roc_dataset
+    cur_cmp <- input$cmp_dataset
+    sel_roc <- if (!is.null(cur_roc) && cur_roc %in% ds) cur_roc else ds[1]
+    sel_cmp <- if (!is.null(cur_cmp) && cur_cmp %in% ds) cur_cmp else ds[1]
+    shiny::updateSelectInput(session, "roc_dataset", choices = ds, selected = sel_roc)
+    shiny::updateSelectInput(session, "cmp_dataset", choices = ds, selected = sel_cmp)
+  }, ignoreNULL = FALSE)
+
   results <- shiny::eventReactive(input$run, {
     shiny::req(length(input$datasets) > 0, length(input$methods) > 0)
-    sigs <- build_sigs()
-    ds <- datasets_ici[input$datasets]
+    params <- current_params()
+    sigs <- build_sigs(params$direction, params$sig_choice, params$custom_genes)
+    ds <- datasets_ici[params$datasets]
 
     shiny::withProgress(message = "Benchmark çalışıyor...", value = 0.2, {
       shiny::incProgress(0.3, detail = "ROC / PR / null")
       out <- SigBenchR::run_benchmark(
         signatures = sigs,
         datasets = ds,
-        methods = input$methods,
-        direction = input$direction,
-        coverage_threshold = input$coverage_threshold,
-        compute_pr = isTRUE(input$compute_pr),
-        n_boot = as.integer(input$n_boot),
-        compute_null = isTRUE(input$compute_null),
-        n_perm = as.integer(input$n_perm),
-        seed = as.integer(input$seed)
+        methods = params$methods,
+        direction = params$direction,
+        coverage_threshold = params$coverage_threshold,
+        sd_handling = params$sd_handling,
+        compute_pr = params$compute_pr,
+        n_boot = params$n_boot,
+        compute_null = params$compute_null,
+        n_perm = params$n_perm,
+        seed = params$seed,
+        match_expression = params$match_expression
       )
       shiny::incProgress(0.5)
-      out
+      list(
+        res = out,
+        sigs = sigs,
+        datasets = ds,
+        params = params
+      )
     })
+  }, ignoreInit = TRUE)
+
+  stale_inputs <- shiny::reactive({
+    snap <- results()
+    if (is.null(snap)) {
+      return(FALSE)
+    }
+    cur <- current_params()
+    keys <- c(
+      "methods", "direction", "coverage_threshold", "n_boot", "n_perm", "seed",
+      "compute_pr", "compute_null", "sd_handling", "match_expression",
+      "datasets", "sig_choice", "custom_genes"
+    )
+    !identical(cur[keys], snap$params[keys])
+  })
+
+  output$stale_note <- shiny::renderUI({
+    if (isTRUE(stale_inputs())) {
+      shiny::tags$p(
+        shiny::em("Ayarlar değişti; güncel sonuç için 'Analizi Çalıştır'a basın."),
+        style = "color:#8a6d3b;"
+      )
+    } else {
+      NULL
+    }
   })
 
   sens <- shiny::reactive({
     shiny::req(results())
-    SigBenchR::check_sensitivity(results(), threshold = input$sensitivity_threshold)
+    snap <- results()
+    SigBenchR::check_sensitivity(
+      snap$res,
+      threshold = snap$params$sensitivity_threshold
+    )
   })
 
   summary_res <- shiny::reactive({
     shiny::req(results())
+    snap <- results()
+    hm <- if (!is.null(input$heatmap_method) && nzchar(input$heatmap_method)) {
+      input$heatmap_method
+    } else {
+      snap$params$heatmap_method
+    }
     suppressWarnings(
-      SigBenchR::summarize_auc(results(), method = input$heatmap_method)
+      SigBenchR::summarize_auc(snap$res, method = hm)
     )
   })
 
   shiny::observe({
-    demo_names <- as.character(input$sig_choice)
+    snap <- results()
+    if (is.null(snap)) {
+      shiny::updateTextAreaInput(
+        session, "r_code_text",
+        value = "# Analizi çalıştırdıktan sonra tekrarlanabilir R kodu burada görünür."
+      )
+      return()
+    }
+    p <- snap$params
+    demo_names <- as.character(p$sig_choice)
     demo_names <- demo_names[nzchar(demo_names)]
-    custom_txt <- if (is.null(input$custom_genes)) "" else input$custom_genes
+    custom_txt <- if (is.null(p$custom_genes)) "" else p$custom_genes
     genes <- if (nzchar(trimws(custom_txt))) {
       SigBenchR::parse_genes(custom_txt)
     } else {
@@ -268,15 +373,15 @@ server <- function(input, output, session) {
       SigBenchR::generate_r_code(
         signature_name = sig_arg,
         genes = genes,
-        methods = input$methods,
-        direction = input$direction,
-        coverage_threshold = input$coverage_threshold,
-        n_boot = as.integer(input$n_boot),
-        n_perm = as.integer(input$n_perm),
-        seed = as.integer(input$seed),
-        dataset_names = input$datasets,
-        compute_pr = isTRUE(input$compute_pr),
-        compute_null = isTRUE(input$compute_null)
+        methods = p$methods,
+        direction = p$direction,
+        coverage_threshold = p$coverage_threshold,
+        n_boot = p$n_boot,
+        n_perm = p$n_perm,
+        seed = p$seed,
+        dataset_names = p$datasets,
+        compute_pr = p$compute_pr,
+        compute_null = p$compute_null
       ),
       error = function(e) paste0("# Kod üretilemedi: ", conditionMessage(e))
     )
@@ -292,20 +397,23 @@ server <- function(input, output, session) {
       if (!requireNamespace("rmarkdown", quietly = TRUE)) {
         stop("HTML rapor için 'rmarkdown' paketini kurun.", call. = FALSE)
       }
+      snap <- results()
       SigBenchR::export_report(
-        results = results(),
+        results = snap$res,
         summary_tbl = summary_res(),
         sensitivity_tbl = sens(),
         params_list = list(
-          methods = input$methods,
-          direction = input$direction,
-          coverage_threshold = input$coverage_threshold,
-          sensitivity_threshold = input$sensitivity_threshold,
-          n_boot = as.integer(input$n_boot),
-          n_perm = as.integer(input$n_perm),
-          seed = as.integer(input$seed),
-          heatmap_method = input$heatmap_method,
-          forest_signature = input$forest_sig
+          methods = snap$params$methods,
+          direction = snap$params$direction,
+          coverage_threshold = snap$params$coverage_threshold,
+          sensitivity_threshold = snap$params$sensitivity_threshold,
+          n_boot = snap$params$n_boot,
+          n_perm = snap$params$n_perm,
+          seed = snap$params$seed,
+          sd_handling = snap$params$sd_handling,
+          match_expression = snap$params$match_expression,
+          heatmap_method = snap$params$heatmap_method,
+          forest_signature = snap$params$forest_signature
         ),
         output_file = file
       )
@@ -313,8 +421,13 @@ server <- function(input, output, session) {
   )
 
   output$status <- shiny::renderText({
-    if (is.null(results())) return("Analizi çalıştırmak için düğmeye basın.")
-    df <- results()
+    if (is.null(input$run) || identical(as.integer(input$run), 0L)) {
+      return("Analizi çalıştırmak için düğmeye basın.")
+    }
+    if (is.null(results())) {
+      return("Analizi çalıştırmak için düğmeye basın.")
+    }
+    df <- results()$res
     paste0(
       "Satır: ", nrow(df),
       " | Düşük kapsama: ", sum(df$low_coverage, na.rm = TRUE),
@@ -323,10 +436,22 @@ server <- function(input, output, session) {
     )
   })
 
+  .dt_round <- function(df) {
+    if (!requireNamespace("DT", quietly = TRUE)) {
+      return(df)
+    }
+    num_cols <- names(df)[vapply(df, is.numeric, logical(1))]
+    dt <- DT::datatable(df, options = list(scrollX = TRUE, pageLength = 8))
+    if (length(num_cols) > 0L) {
+      dt <- DT::formatRound(dt, columns = num_cols, digits = 3)
+    }
+    dt
+  }
+
   output$table <- if (requireNamespace("DT", quietly = TRUE)) {
     DT::renderDT({
       shiny::req(results())
-      df <- results()
+      df <- results()$res
       cols <- c(
         "dataset", "signature", "method", "n", "n_pos", "n_neg",
         "coverage_label", "missing_genes", "low_coverage",
@@ -335,48 +460,52 @@ server <- function(input, output, session) {
         "null_p", "null_p_adj_bh", "independent",
         "skipped", "skip_reason"
       )
-      DT::datatable(df[, intersect(cols, names(df)), drop = FALSE], options = list(scrollX = TRUE, pageLength = 8))
+      .dt_round(df[, intersect(cols, names(df)), drop = FALSE])
     })
   } else NULL
 
   output$table_fallback <- shiny::renderTable({
     shiny::req(results())
-    results()[, intersect(c("dataset", "signature", "method", "auc", "pr_auc", "null_p", "low_coverage"), names(results())), drop = FALSE]
+    results()$res[, intersect(
+      c("dataset", "signature", "method", "auc", "pr_auc", "null_p", "low_coverage"),
+      names(results()$res)
+    ), drop = FALSE]
   })
 
   output$heatmap <- shiny::renderPlot({
     shiny::req(results())
-    df <- results()
+    snap <- results()
+    df <- snap$res
+    hm <- input$heatmap_method
     shiny::validate(shiny::need(
-      any(df$method == input$heatmap_method & !(df$skipped %in% TRUE)),
+      any(df$method == hm & !(df$skipped %in% TRUE)),
       "AUC yok."
     ))
-    SigBenchR::plot_auc_heatmap(df, method = input$heatmap_method, coverage_threshold = input$coverage_threshold)
+    SigBenchR::plot_auc_heatmap(
+      df,
+      method = hm,
+      coverage_threshold = snap$params$coverage_threshold
+    )
   })
 
   output$sensitivity_table <- if (requireNamespace("DT", quietly = TRUE)) {
-    DT::renderDT({ shiny::req(sens()); DT::datatable(sens()) })
+    DT::renderDT({ shiny::req(sens()); .dt_round(sens()) })
   } else NULL
   output$sensitivity_fallback <- shiny::renderTable({ shiny::req(sens()); sens() })
 
   output$roc_plot <- shiny::renderPlot({
-    shiny::req(input$roc_dataset)
-    sigs <- if (!is.null(results())) {
-      sn <- unique(results()$signature)
-      if (all(sn %in% names(signatures_demo))) {
-        signatures_demo[sn]
-      } else {
-        build_sigs()
-      }
-    } else {
-      signatures_demo
+    if (is.null(input$run) || identical(as.integer(input$run), 0L) || is.null(results())) {
+      shiny::validate(shiny::need(FALSE, "ROC için önce analizi çalıştırın."))
     }
+    shiny::req(input$roc_dataset)
+    snap <- results()
     SigBenchR::plot_roc_curves(
-      datasets = datasets_ici,
-      signatures = sigs,
+      datasets = snap$datasets,
+      signatures = snap$sigs,
       dataset_name = input$roc_dataset,
       method = input$heatmap_method,
-      direction = input$direction
+      direction = snap$params$direction,
+      sd_handling = snap$params$sd_handling
     )
   })
 
@@ -408,7 +537,8 @@ server <- function(input, output, session) {
           datasets_ici[[input$cmp_dataset]],
           genes = genes1,
           method = input$heatmap_method,
-          direction = input$direction
+          direction = input$direction,
+          sd_handling = input$sd_handling
         ),
         error = function(e) e
       )
@@ -422,7 +552,8 @@ server <- function(input, output, session) {
           datasets_ici[[input$cmp_dataset]],
           genes = genes2,
           method = input$heatmap_method,
-          direction = input$direction
+          direction = input$direction,
+          sd_handling = input$sd_handling
         ),
         error = function(e) e
       )
@@ -451,36 +582,42 @@ server <- function(input, output, session) {
       ))
       cmp
     })
-  })
+  }, ignoreInit = TRUE)
 
   output$cmp_status <- shiny::renderText({
     if (identical(input$cmp_sig1, input$cmp_sig2)) {
       return("Uyarı: İmza 1 ve İmza 2 aynı olamaz.")
     }
-    if (is.null(cmp_res())) return("Aynı veri setinde iki imza seçip DeLong karşılaştırın.")
+    if (is.null(input$run_cmp) || identical(as.integer(input$run_cmp), 0L) || is.null(cmp_res())) {
+      return("Aynı veri setinde iki imza seçip DeLong karşılaştırın.")
+    }
     r <- cmp_res()
-    sprintf("p=%.4g | p_adj_bh=%.4g | AUC1=%.3f | AUC2=%.3f", r$p_value, r$p_adj_bh, r$auc1, r$auc2)
+    sprintf(
+      "p=%.4g | p_adj_bh=%.4g (tek karşılaştırmada ham p ile eşit) | AUC1=%.3f | AUC2=%.3f",
+      r$p_value, r$p_adj_bh, r$auc1, r$auc2
+    )
   })
   output$cmp_table <- if (requireNamespace("DT", quietly = TRUE)) {
-    DT::renderDT({ shiny::req(cmp_res()); DT::datatable(cmp_res()) })
+    DT::renderDT({ shiny::req(cmp_res()); .dt_round(cmp_res()) })
   } else NULL
   output$cmp_fallback <- shiny::renderTable({ shiny::req(cmp_res()); cmp_res() })
 
   output$summary_table <- if (requireNamespace("DT", quietly = TRUE)) {
-    DT::renderDT({ shiny::req(summary_res()); DT::datatable(summary_res()) })
+    DT::renderDT({ shiny::req(summary_res()); .dt_round(summary_res()) })
   } else NULL
   output$summary_fallback <- shiny::renderTable({ shiny::req(summary_res()); summary_res() })
 
   output$forest_plot <- shiny::renderPlot({
     shiny::req(results())
+    snap <- results()
     shiny::validate(shiny::need(
-      any(results()$signature == input$forest_sig &
-            results()$method == input$heatmap_method &
-            !(results()$skipped %in% TRUE)),
+      any(snap$res$signature == input$forest_sig &
+            snap$res$method == input$heatmap_method &
+            !(snap$res$skipped %in% TRUE)),
       "Seçilen imza/yöntem için AUC yok."
     ))
     SigBenchR::plot_auc_forest(
-      results(),
+      snap$res,
       signature = input$forest_sig,
       method = input$heatmap_method,
       summary = summary_res()
@@ -489,26 +626,30 @@ server <- function(input, output, session) {
 
   output$jaccard_table <- if (requireNamespace("DT", quietly = TRUE)) {
     DT::renderDT({
-      DT::datatable(SigBenchR::jaccard_signatures(signatures_demo))
+      shiny::req(results())
+      .dt_round(SigBenchR::jaccard_signatures(results()$sigs))
     })
   } else NULL
   output$jaccard_fallback <- shiny::renderTable({
-    SigBenchR::jaccard_signatures(signatures_demo)
+    shiny::req(results())
+    SigBenchR::jaccard_signatures(results()$sigs)
   })
 
   output$corr_table <- if (requireNamespace("DT", quietly = TRUE)) {
     DT::renderDT({
       shiny::req(results())
+      snap <- results()
       shiny::validate(shiny::need(
-        length(unique(results()$signature[!(results()$skipped %in% TRUE)])) >= 2,
+        length(unique(snap$res$signature[!(snap$res$skipped %in% TRUE)])) >= 2,
         "Korelasyon için en az iki imza çalıştırın."
       ))
-      DT::datatable(SigBenchR::auc_correlation(results(), method = input$heatmap_method))
+      .dt_round(SigBenchR::auc_correlation(snap$res, method = input$heatmap_method))
     })
   } else NULL
   output$corr_fallback <- shiny::renderTable({
     shiny::req(results())
-    SigBenchR::auc_correlation(results(), method = input$heatmap_method)
+    snap <- results()
+    SigBenchR::auc_correlation(snap$res, method = input$heatmap_method)
   })
 }
 

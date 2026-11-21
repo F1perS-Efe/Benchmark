@@ -13,7 +13,9 @@ signatures_demo
 \description{
 Cytokine-5 (Kus et al. 2025), IFNG6 (Ayers et al. 2017) ve Random3.
 \code{Cytokine-5$derived_from} gercek ICI kohort adlarini icerir
-(\code{independent = FALSE}); \code{IFNG6$derived_from} bostur (\code{independent = TRUE}).
+(\code{independent = FALSE}). \code{IFNG6} ve \code{Random3} acikca
+\code{derived_from = character(0)} tasir (\code{independent = TRUE}).
+\code{derived_from = NULL} (belirtilmemis) fail-closed \code{independent = NA} uretir.
 }
 \examples{
 data(signatures_demo)

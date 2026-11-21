@@ -1,6 +1,6 @@
 # SigBenchR
 
-Bir gen imzasının (gen listesi) immünoterapi yanıtını tahmin etmede birden fazla veri setinde gerçekten güvenilir olup olmadığını istatistiksel olarak sınayan, tekrarlanabilir doğrulama aracı.
+Bir gen imzasının (gen listesi) immünoterapi yanıt sınıfları arasında **ayırt edici** (discrimination) olup olmadığını birden fazla veri setinde istatistiksel olarak sınayan, tekrarlanabilir doğrulama aracı. AUC klinik tahmin / kalibrasyon modeli değildir.
 
 > **Önemli:** Bu araç klinik karar desteği değildir. Sonuçlar araştırma amaçlıdır; küçük örneklemlerde belirsizdir. “Kanıt yok” sonucu da netçe raporlanır. Eşikler ve varsayılanlar sonuçlara bakıldıktan sonra değiştirilmemelidir.
 
@@ -65,8 +65,8 @@ Shiny varsayılanı gerçek ICI kohortlarıdır (`van_allen_2015`, `hugo_2016`, 
 
 ## Özellik özeti
 
-- Skorlama: `mean`, `zscore`, `median`, `rank`
-- ROC-AUC + DeLong %95 GA / varyans; küçük kohort uyarısı
+- Skorlama: `mean`, `zscore` (basit ortalama gen z-skoru; GSVA değil), `median`, `rank` (kohort-içi göreli sıralama; singscore değil)
+- ROC-AUC (ayırt edicilik) + DeLong %95 GA / varyans; küçük kohort uyarısı
 - PR-AUC + prevalans + tabakalı bootstrap GA (`PRROC`)
 - Null permütasyon (`auc_mw` vektörize; p = (k+1)/(B+1)); `null_p_adj_bh`
 - Eşleştirilmiş DeLong iki imza karşılaştırması (`compare_signatures`, BH)
@@ -92,12 +92,13 @@ Liu 2019 (cBioPortal) S3/LFS **403** verdiği için dahil edilmedi.
 
 **Klinik etiket şeffaflığı**
 
-- `van_allen_2015` (`sample_meta$treatment = "anti-CTLA4"`): Yanıt etiketleri `xmuyulab/ims_gene_signature` `mel_van_cli_data.csv` ikili `response` alanından gelir (`1`→PR/pozitif, `0`→PD/negatif; bu kohortta SD/`-1` yok). IMS paketlemesi Van Allen (Science 2015) **klinik yarar** (clinical benefit: CR/PR veya uzun sağkalımlı SD) sınıflamasına dayanır → **`n_pos = 19`**, `n_neg = 23`, `n = 42`.
-- `gide_2019` (`sample_meta$treatment = "anti-PD1"`): `n = 41` alt kümesi yalnızca ENA `PD1_*_PRE` örnekleridir (**anti-PD1 monoterapi**). `ipiPD1_*_PRE` (anti-PD1 + anti-CTLA4 kombinasyon) dahil değildir; IMS `mel_gide19_cli_data.csv` pre satırları ile birebir örtüşür (`n_pos = 19`, `n_neg = 16`, `n_SD = 6`).
+- `van_allen_2015` (`sample_meta$treatment = "anti-CTLA4"`): Yanıt etiketleri `xmuyulab/ims_gene_signature` `mel_van_cli_data.csv` ikili `response` alanından gelir (`1`→PR/pozitif, `0`→PD/negatif; bu kohortta SD/`-1` yok). IMS paketlemesi Van Allen (Science 2015) **klinik yarar** (clinical benefit: CR/PR veya uzun sağkalımlı SD) sınıflamasına dayanır → **`n_pos = 19`**, `n_neg = 23`, `n = 42`. Bu tanım Hugo/Riaz/Gide RECIST CR/PR–PD ekseni ile birebir değildir.
+- `hugo_2016` / `riaz_2017` / `gide_2019`: anti-PD-1; RECIST CR/PR vs PD. `riaz_2017` **16 SD** içerir ve önceki anti-CTLA-4 maruziyeti heterojenliği taşır.
+- `gide_2019` (`sample_meta$treatment = "anti-PD1"`): `n = 41` alt kümesi yalnızca ENA `PD1_*_PRE` örnekleridir (**anti-PD1 monoterapi**); normalizasyon **normalized counts**. `ipiPD1_*_PRE` (anti-PD1 + anti-CTLA4 kombinasyon) dahil değildir; IMS `mel_gide19_cli_data.csv` pre satırları ile birebir örtüşür (`n_pos = 19`, `n_neg = 16`, `n_SD = 6`).
 
 **Ön işleme:** yalnızca pre-treatment; hasta başına tek örnek (pseudo-replication yok).  
 **Tarafsız null havuzu / paket boyutu:** her kohortta demo imza genleri + sıfır varyanslı olmayan genlerden **`seed = 42`** ile rastgele **~2.800 gen**; `compress = "xz"`; `data/` toplamı **&lt; 5 MB**. Ayrıntı ve yeniden üretim: `data-raw/prepare_ici_datasets.R`, `data-raw/ici_cohort_summary.csv`.  
-**Bağımsızlık:** `Cytokine-5$derived_from` bu kohort adlarını içerir (`independent = FALSE`); `IFNG6$derived_from` boştur (`independent = TRUE`).  
+**Bağımsızlık:** `Cytokine-5$derived_from` bu kohort adlarını içerir (`independent = FALSE`); `IFNG6` / `Random3` açıkça `derived_from = character(0)` taşır (`independent = TRUE`). Kökeni belirtilmemiş özel imzalar `independent = NA` alır ve varsayılan bağımsız özete girmez.  
 **Yazar:** `DESCRIPTION` içinde `Efe Kaan Şengönül <fperskaan@gmail.com>` (`aut`, `cre`); placeholder yok.
 
 ## SigBenchR v1 kapsam dışı
@@ -142,7 +143,7 @@ rsconnect::deployApp(
 )
 ```
 
-Not: `rsconnect` paket listesini doğru çıkarsın diye önce `SigBenchR`’ın Imports/Suggests bağımlılıklarının kurulabilir olduğundan emin olun. Canlı uygulamada kimliklendirilebilir hasta verisi yüklemeyin.
+Not: `rsconnect` paket listesini doğru çıkarsın diye önce `SigBenchR`’ın Imports/Suggests bağımlılıklarının kurulabilir olduğundan emin olun. Uygulama dahili halka açık melanoma ICI kohortları üzerinde çalışır; yalnızca gen sembolleri girin.
 
 ## Bilimsel yorum sınırı
 

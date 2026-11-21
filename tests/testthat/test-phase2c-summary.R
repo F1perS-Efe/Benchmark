@@ -34,11 +34,13 @@ test_that("summarize_auc n/IVW, var_zero ve independent kurallari", {
     "varyansi 0"
   )
   expect_equal(nrow(sm), 1)
-  # Yalniz A ve B (C non-indep, D var_zero)
-  expect_equal(sm$n_datasets, 2L)
+  # C non-indep dislandi; D var_zero n-agirlikliya dahil, IVW'den cikarildi
+  expect_equal(sm$n_datasets, 3L)
   expect_equal(sm$n_excluded_nonindependent, 1L)
   expect_equal(sm$n_excluded_var_zero, 1L)
-  expect_equal(sm$auc_n_weighted, (20 * 0.7 + 40 * 0.8) / 60)
+  expect_equal(sm$n_var_zero_excluded, 1L)
+  expect_equal(sm$n_cohorts_ivw, 2L)
+  expect_equal(sm$auc_n_weighted, (20 * 0.7 + 40 * 0.8 + 25 * 1.0) / 85)
   w <- c(1 / 0.01, 1 / 0.04)
   expect_equal(sm$auc_ivw, sum(w * c(0.7, 0.8)) / sum(w))
   expect_true(is.finite(sm$Q))

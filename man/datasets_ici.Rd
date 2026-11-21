@@ -18,10 +18,12 @@ Liu 2019 (cBioPortal) S3 403 nedeniyle dahil edilmedi.
 \details{
 Klinik etiket notlari:
 \itemize{
-\item \code{van_allen_2015}: \code{sample_meta$treatment = "anti-CTLA4"}; IMS
-\code{mel_van_cli_data.csv} ikili clinical-benefit yaniti (\code{n_pos = 19}).
-\item \code{gide_2019}: \code{sample_meta$treatment = "anti-PD1"}; yalniz \verb{PD1_*_PRE}
-monoterapi (\code{n = 41}); \verb{ipiPD1_*} kombinasyon dahil degil.
+\item \code{van_allen_2015}: anti-CTLA-4; IMS ikili \strong{klinik yarar} (clinical benefit)
+etiketi (\code{n_pos = 19}, \code{n_neg = 23}). RECIST CR/PR-PD ile birebir degildir.
+\item \code{hugo_2016} / \code{riaz_2017} / \code{gide_2019}: anti-PD-1; RECIST CR/PR vs PD.
+\code{riaz_2017} 16 SD + once anti-CTLA-4 maruziyeti tasir.
+\item \code{gide_2019}: yalniz \verb{PD1_*_PRE} monoterapi (\code{n = 41}); normalizasyon
+"normalized counts"; \verb{ipiPD1_*} kombinasyon dahil degil.
 }
 }
 \examples{

@@ -9,7 +9,7 @@
 ^README\.Rmd$
 ^\.github$
 ^.*\.tar\.gz$
-^\.DS_Store$
+\.DS_Store$
 ^\.socraticodeignore$
 ^LICENSE\.md$
 ^app\.R$
