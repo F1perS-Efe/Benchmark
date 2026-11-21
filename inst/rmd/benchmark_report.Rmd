@@ -177,7 +177,7 @@ if (!compute_null && is.data.frame(results) && "null_p" %in% names(results)) {
 
 # 1. Executive Summary & Run Parameters
 
-This report is for research use only and is not a clinical decision-support tool.
+This report is for research use only and is not for clinical decision making.
 AUC measures discrimination between response classes, not calibrated clinical prediction.
 Thresholds must not be changed after inspecting results.
 
