@@ -28,8 +28,10 @@ data-raw/*.rda
 # OS / IDE
 .DS_Store
 **/.DS_Store
+.cursor/
 *.swp
 *~
+sigbenchr_audit.zip
 
 # Secrets
 .env

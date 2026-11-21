@@ -247,7 +247,7 @@ ui <- shiny::fluidPage(
     ),
     shiny::div(
       class = "sb-header-meta",
-      shiny::span(class = "sb-badge", "v0.4.3"),
+      shiny::span(class = "sb-badge", "v0.4.5"),
       shiny::span(
         class = "sb-badge sb-badge-warn",
         "Research use only — not a clinical decision tool"

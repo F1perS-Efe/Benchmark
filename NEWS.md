@@ -6,6 +6,9 @@
   one-command HTML demo script (`inst/scripts/render_demo_report.R`).
 * Ignored `docs/` and demo HTML artifacts in `.Rbuildignore` / `.gitignore`
   to keep CRAN check size and notes clean.
+* P0 hygiene: ignore/untrack `.cursor/` and `sigbenchr_audit.zip`; align Shiny
+  version badge with `DESCRIPTION` (0.4.5); fix stale README claim that gene
+  alias rescue was absent.
 
 # SigBenchR 0.4.4
 

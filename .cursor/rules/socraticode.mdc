@@ -1,7 +1,0 @@
----
-description: SigBenchR projesinde SocratiCode ile token dostu kod arama kuralları
-alwaysApply: true
----
-- Kod tabanında bir fonksiyon, test veya Shiny modülü ararken önce `socraticode` MCP araçlarıyla arama yap; dosya yolunu ve satır aralığını bulmadan `read_file` ile tüm dosyayı okuma.
-- Düzenleme yaparken yalnızca ilgili fonksiyon bloğunu oku ve değiştir; tüm dosyayı yeniden yazdırma.
-- `renv/`, `data/`, `data-raw/` ve `*.rds` / `*.rda` dosyalarını hiçbir zaman bağlama dahil etme.

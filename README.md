@@ -115,12 +115,14 @@ Liu 2019 (cBioPortal) S3/LFS **403** verdiği için dahil edilmedi.
 **Bağımsızlık:** `Cytokine-5$derived_from` bu kohort adlarını içerir (`independent = FALSE`); `IFNG6` / `Random3` açıkça `derived_from = character(0)` taşır (`independent = TRUE`). Kökeni belirtilmemiş özel imzalar `independent = NA` alır ve varsayılan bağımsız özete girmez.  
 **Yazar:** `DESCRIPTION` içinde `Efe Kaan Şengönül <fperskaan@gmail.com>` (`aut`, `cre`); placeholder yok.
 
-## SigBenchR v0.4.1 notları / hâlâ kapsam dışı
+## SigBenchR v0.4.5 — mevcut / hâlâ kapsam dışı
 
-- **v0.4.1’de mevcut:** `ss_rank`, işaretli `+`/`-` imzalar, `stratify_by`, logit-AUC REML+HKSJ, `check_sd_sensitivity()`, `read_user_dataset()`, `load_cohort_bundle()`, yenilenmiş Shiny UI, vinyet
-- Takma ad (alias) eşleştirme **yok**
-- Bioconductor bağımlılığı (`singscore` / `GSVA` / `SummarizedExperiment`) **yok** (`ss_rank` saf base R)
+- **Mevcut (v0.4.2+):** 53 immuno-onkoloji gen takma adı kurtarma (`match_genes(use_aliases = TRUE)`); `coverage_status` (`ok` / `low_power` / `invalid`); `get_builtin_signatures()` literatür paneli
+- **Mevcut (v0.4.0–0.4.5):** `ss_rank`, işaretli `+`/`-` imzalar, `stratify_by`, logit-AUC REML+HKSJ, `check_sd_sensitivity()`, `read_user_dataset()`, `load_cohort_bundle()`, biyolojik eksenler, Hanley–McNeil power, isteğe bağlı Cox/KM sağkalım, Shiny UI, vinyet
+- Bioconductor **Imports yok** (`singscore` / `GSVA` zorunlu değil; `ss_rank` saf base R). `SummarizedExperiment` dönüşümü Suggests/opsiyonel adapter ile, sert bağımlılık değil
 - Klasik DerSimonian–Laird rastgele etkiler **yok** (yerine logit-AUC REML + kesilmiş HKSJ)
+- Shiny varsayılanı yalnız `signatures_demo` (3 imza); geniş panel CLI’da `get_builtin_signatures()` ile
+- Null permütasyon varsayılan **kapalı** (`compute_null = FALSE`); Shiny’de açıkça işaretlenmeli
 
 ## Veri yapısı
 
