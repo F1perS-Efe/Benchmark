@@ -9,14 +9,15 @@ null_permutation_test(
   response,
   n_genes,
   exclude_genes = character(0),
-  method = c("mean", "zscore", "median", "rank"),
+  method = c("mean", "zscore", "median", "rank", "ss_rank"),
   direction = c("<", ">"),
   n_perm = 1000L,
   seed = 42L,
   match_expression = FALSE,
   signature_genes = NULL,
   observed_scores = NULL,
-  min_genes = 3L
+  min_genes = 3L,
+  n_genes_down = 0L
 )
 }
 \arguments{
@@ -24,7 +25,7 @@ null_permutation_test(
 
 \item{response}{0/1 yanit (ornek sirasi \code{colnames(mat)} ile hizali veya isimli).}
 
-\item{n_genes}{Cekilecek rastgele gen sayisi (kapsama sonrasi bulunan).}
+\item{n_genes}{Cekilecek rastgele up / tek yonlu gen sayisi (kapsama sonrasi).}
 
 \item{exclude_genes}{Havuzdan cikarilacak genler (imza genleri).}
 
@@ -46,6 +47,8 @@ quantile-bin eslestirilmis ornekleme yapar.}
 Verilmezse \code{signature_genes} ile skorlanir.}
 
 \item{min_genes}{\code{score_signature} esigi.}
+
+\item{n_genes_down}{Isaretli null icin down kolu gen sayisi. Varsayilan 0.}
 }
 \value{
 Liste: \code{obs_auc}, \code{null_aucs}, \code{null_p}, \code{n_perm}, \code{n_genes},
@@ -59,8 +62,16 @@ ile null dagilimdan tek yonlu ampirik p hesaplanir:
 \details{
 Null AUC'ler \code{auc_mw()} ile hesaplanir (dongude \code{pROC} yok).
 \code{zscore} / \code{rank} icin havuz satirlari donguden once bir kez donusturulur;
-\code{mean} / \code{median} icin dongu ici \code{match_genes()} tekrari yoktur.
+\code{ss_rank} icin sutun bazli dikey sira matrisi (\code{rank_mat}) ve \code{N_j}
+donguden once bir kez hesaplanir; \code{mean} / \code{median} icin dongu ici
+\code{match_genes()} tekrari yoktur.
 
 Not: \code{rank} kohort-ici ornekler arasi goreli siralamadir (singscore degil);
-\code{zscore} basit ortalama gen z-skorudur (\code{sqrt(k)} olcekli GSVA degil).
+\code{ss_rank} kohorttan bagimsiz dikey tek-ornek siralamadir (singscore
+normalizasyonu ile uyumlu saf base R); \code{zscore} basit ortalama gen
+z-skorudur (\code{sqrt(k)} olcekli GSVA degil).
+
+Isaretli imzalar icin \code{n_genes_down > 0L} iken her permutasyonda birbirinden
+ayrik \code{n_genes} (up) + \code{n_genes_down} (down) rastgele gen cekilir;
+skor \code{up - down} (\code{ss_rank} icin \code{s_up + s_down}) olur.
 }

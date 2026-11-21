@@ -48,7 +48,7 @@ ui <- shiny::fluidPage(
       ),
       shiny::checkboxGroupInput(
         "methods", "Skorlama yöntemleri",
-        choices = c("mean", "zscore", "median", "rank"),
+        choices = c("mean", "zscore", "median", "rank", "ss_rank"),
         selected = c("mean", "zscore")
       ),
       shiny::radioButtons(

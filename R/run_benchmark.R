@@ -4,11 +4,14 @@
 #' Farkli normalizasyonlar yan yana gosterilirken uyari uretir.
 #'
 #' @param signatures Isimli liste; her eleman `list(genes = <chr>, direction = "<"|">",
-#'   derived_from = <chr>)`. `direction` ve `derived_from` istege bagli.
+#'   derived_from = <chr>)` veya isaretli `list(genes_up=..., genes_down=..., ...)`.
+#'   `genes` isimli sayisal isaret vektoru de olabilir. `direction` ve
+#'   `derived_from` istege bagli.
 #'   `derived_from = NULL` (belirtilmemis) -> `independent = NA` (fail-closed).
 #'   `derived_from = character(0)` -> bagimsiz (`TRUE`).
 #' @param datasets Isimli liste; her eleman `validate_dataset()` yapisinda.
-#' @param methods Skorlama yontemleri: `"mean"`, `"zscore"`, `"median"`, `"rank"`.
+#' @param methods Skorlama yontemleri: `"mean"`, `"zscore"`, `"median"`, `"rank"`,
+#'   `"ss_rank"`. Varsayilan dortlu liste geriye donuk uyumluluk icin korunur.
 #' @param direction Varsayilan imza yonu (imza duzeyinde yoksa).
 #' @param min_genes `score_signature()` esigi.
 #' @param coverage_threshold Kapsama uyari esigi (0-1). Varsayilan 0.70.
@@ -22,7 +25,8 @@
 #' @param seed Rastgelelik tohumu (PR bootstrap ve null); hucre basina turetilir.
 #' @param match_expression Null icin ifade-eslesmeli ornekleme.
 #'
-#' @return `data.frame` sonuc tablosu.
+#' @return `data.frame` sonuc tablosu (`signed`, `treatment`, `endpoint_type`,
+#'   `cancer_type` sutunlari dahil).
 #' @export
 run_benchmark <- function(signatures,
                           datasets,
@@ -46,7 +50,7 @@ run_benchmark <- function(signatures,
   if (is.null(names(datasets)) || any(!nzchar(names(datasets)))) {
     stop("`datasets` isimli bir liste olmalidir.", call. = FALSE)
   }
-  method_choices <- c("mean", "zscore", "median", "rank")
+  method_choices <- c("mean", "zscore", "median", "rank", "ss_rank")
   methods <- match.arg(methods, choices = method_choices, several.ok = TRUE)
 
   norms <- vapply(datasets, function(d) as.character(d$info$normalization), character(1))
@@ -87,19 +91,41 @@ run_benchmark <- function(signatures,
     } else {
       NA_character_
     }
-    treatment <- if (!is.null(ds$sample_meta$treatment)) {
+    treatment <- if (!is.null(ds$info$treatment) &&
+                     length(ds$info$treatment) > 0L &&
+                     !is.na(ds$info$treatment[1])) {
+      as.character(ds$info$treatment)[1]
+    } else if (!is.null(ds$sample_meta$treatment)) {
       paste(unique(as.character(ds$sample_meta$treatment)), collapse = ";")
+    } else {
+      NA_character_
+    }
+    endpoint_type <- if (!is.null(ds$info$endpoint_type) &&
+                         length(ds$info$endpoint_type) > 0L &&
+                         !is.na(ds$info$endpoint_type[1])) {
+      as.character(ds$info$endpoint_type)[1]
+    } else {
+      NA_character_
+    }
+    cancer_type <- if (!is.null(ds$info$cancer_type) &&
+                       length(ds$info$cancer_type) > 0L &&
+                       !is.na(ds$info$cancer_type[1])) {
+      as.character(ds$info$cancer_type)[1]
     } else {
       NA_character_
     }
 
     for (sig_name in names(signatures)) {
       sig <- signatures[[sig_name]]
-      if (is.character(sig)) {
+      if (is.character(sig) || is.numeric(sig)) {
         sig <- list(genes = sig)
       }
-      if (is.null(sig$genes)) {
-        stop("Imza '", sig_name, "' icin `genes` zorunludur.", call. = FALSE)
+      if (is.null(sig$genes) && is.null(sig$genes_up) && is.null(sig$genes_down)) {
+        stop(
+          "Imza '", sig_name,
+          "' icin `genes` veya `genes_up`/`genes_down` zorunludur.",
+          call. = FALSE
+        )
       }
       sig_dir <- if (!is.null(sig$direction)) sig$direction else direction
 
@@ -114,6 +140,8 @@ run_benchmark <- function(signatures,
         scored <- score_signature(
           expr_kept,
           genes = sig$genes,
+          genes_up = sig$genes_up,
+          genes_down = sig$genes_down,
           method = method,
           min_genes = min_genes
         )
@@ -159,6 +187,11 @@ run_benchmark <- function(signatures,
           scale = ds$info$scale,
           cancer = cancer,
           treatment = treatment,
+          endpoint_type = endpoint_type,
+          cancer_type = cancer_type,
+          signed = isTRUE(scored$signed),
+          n_up_found = scored$n_up_found,
+          n_down_found = scored$n_down_found,
           n_all_na_dropped = scored$n_all_na_dropped,
           n_excluded_sd = enc$n_excluded_sd,
           skipped = scored$skipped,
@@ -250,11 +283,22 @@ run_benchmark <- function(signatures,
         }
 
         if (isTRUE(compute_null)) {
+          if (isTRUE(scored$signed) && as.integer(scored$n_up_found) >= 1L) {
+            n_genes_null <- as.integer(scored$n_up_found)
+            n_genes_down_null <- as.integer(scored$n_down_found)
+          } else if (isTRUE(scored$signed) && as.integer(scored$n_down_found) >= 1L) {
+            n_genes_null <- as.integer(scored$n_down_found)
+            n_genes_down_null <- 0L
+          } else {
+            n_genes_null <- as.integer(scored$coverage$n_found)
+            n_genes_down_null <- 0L
+          }
           null_res <- tryCatch(
             null_permutation_test(
               mat = expr_kept,
               response = y_kept,
-              n_genes = scored$coverage$n_found,
+              n_genes = n_genes_null,
+              n_genes_down = n_genes_down_null,
               exclude_genes = scored$coverage$found,
               method = method,
               direction = sig_dir,

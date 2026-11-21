@@ -6,22 +6,30 @@
 \usage{
 score_signature(
   expr,
-  genes,
-  method = c("mean", "zscore", "median", "rank"),
-  min_genes = 3L
+  genes = NULL,
+  method = c("mean", "zscore", "median", "rank", "ss_rank"),
+  min_genes = 3L,
+  genes_up = NULL,
+  genes_down = NULL
 )
 }
 \arguments{
 \item{expr}{Gen x ornek matris (hazirlanmis / log olcekli).}
 
-\item{genes}{Imza genleri (karakter).}
+\item{genes}{Imza genleri (karakter) veya isimli sayisal isaret vektoru.
+\code{genes_up} / \code{genes_down} verildiyse \code{NULL} olmalidir.}
 
-\item{method}{\code{"mean"}, \code{"zscore"}, \code{"median"} veya \code{"rank"}.}
+\item{method}{\code{"mean"}, \code{"zscore"}, \code{"median"}, \code{"rank"} veya \code{"ss_rank"}.}
 
 \item{min_genes}{Kapsama sonrasi minimum gen sayisi. Varsayilan 3.}
+
+\item{genes_up}{Yukari yonlu (pozitif) imza genleri.}
+
+\item{genes_down}{Asagi yonlu (negatif) imza genleri.}
 }
 \value{
-Liste: \code{scores}, \code{coverage}, \code{n_all_na_dropped}, \code{skipped}, \code{skip_reason}.
+Liste: \code{scores}, \code{coverage}, \code{n_all_na_dropped}, \code{skipped},
+\code{skip_reason}, \code{signed}, \code{n_up_found}, \code{n_down_found}.
 }
 \description{
 Skorlama yanit etiketini (\code{response}) asla kullanmaz; tum ornekler
@@ -36,5 +44,21 @@ ortalanir. Basit ortalama gen z-skorudur; \code{sqrt(k)} olcekli GSVA degildir.
 \item \code{rank}: her gen ornekler arasi (kohort-ici) average-rank'e cevrilir, 0-1
 araligina olceklenir, sonra ornek basina ortalanir. Bu \code{singscore} degildir;
 kohortlar arasi ham skor birlestirilmez.
+\item \code{ss_rank}: her ornekte (sutunda) tum non-NA genler dikey siralanir
+(\code{rank(..., ties.method = "average", na.last = "keep")}; 1 = en dusuk ifade).
+Kohorta ornek eklenip cikarilsa bile tek bir hastanin skoru degismez.
+Tek yonlu skor \verb{[-0.5, +0.5]}, cift yonlu (\code{genes_up} + \code{genes_down}) skor
+\verb{[-1, +1]} araligindadir; formuller \code{singscore} tek/cift yonlu
+normalizasyonu ile uyumludur (saf base R).
 }
+
+Isaretli (\code{+}/\code{-}) imzalar:
+\itemize{
+\item \code{genes_up} / \code{genes_down} parametreleri, veya
+\item isimli sayisal \code{genes} (\code{c(IFNG = 1, VEGFA = -1)}), veya
+\item geriye donuk tek yonlu karakter \code{genes}.
+}
+
+\code{mean} / \code{median} / \code{zscore} / \code{rank} icin \code{genes_down} doluysa
+\code{score = score_up - score_down}. \code{ss_rank} icin \code{score = s_up + s_down}.
 }

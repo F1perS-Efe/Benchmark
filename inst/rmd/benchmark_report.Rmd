@@ -176,6 +176,42 @@ if (is.data.frame(summary_tbl) && nrow(summary_tbl) > 0) {
 }
 ```
 
+## Alt Grup Bazlı Özet (Tedavi / Klinik Sonlanım)
+
+Birden fazla `treatment` veya `endpoint_type` değeri varsa özet bu alt gruplar
+içinde ayrıca hesaplanır; tek alt grupta gereksiz tekrar yapılmaz.
+
+```{r subgroup-summary}
+if (is.data.frame(results) && nrow(results) > 0) {
+  strat_cols <- c("treatment", "endpoint_type")
+  strat_cols <- strat_cols[strat_cols %in% names(results)]
+  n_levels <- vapply(strat_cols, function(col) {
+    length(unique(stats::na.omit(as.character(results[[col]]))))
+  }, integer(1))
+  if (length(strat_cols) > 0L && any(n_levels > 1L)) {
+    sg <- tryCatch(
+      suppressWarnings(
+        SigBenchR::summarize_auc(
+          results,
+          method = hm,
+          stratify_by = strat_cols
+        )
+      ),
+      error = function(e) NULL
+    )
+    if (is.data.frame(sg) && nrow(sg) > 0) {
+      knitr::kable(sg, digits = 3)
+    } else {
+      cat("Alt grup ozeti uretilemedi.\n")
+    }
+  } else {
+    cat("Tek tedavi / sonlanim alt grubu; ayri tablo gerekmez.\n")
+  }
+} else {
+  cat("Sonuc tablosu bos.\n")
+}
+```
+
 ## Dayanıklılık (sensitivity)
 
 ```{r sensitivity-table}

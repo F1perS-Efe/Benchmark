@@ -17,11 +17,23 @@ jaccard_signatures <- function(signatures) {
   }
 
   gene_sets <- lapply(signatures, function(sig) {
-    genes <- if (is.character(sig)) sig else sig$genes
-    if (is.null(genes) || length(genes) == 0L) {
-      stop("Her imzada `genes` zorunludur.", call. = FALSE)
+    if (is.character(sig) || is.numeric(sig)) {
+      genes <- if (is.numeric(sig)) names(sig) else sig
+    } else {
+      genes <- sig$genes
+      if (is.numeric(genes)) {
+        genes <- names(genes)
+      }
+      if (is.null(genes) || length(genes) == 0L) {
+        genes <- c(sig$genes_up, sig$genes_down)
+      }
     }
-    unique(toupper(as.character(genes[!is.na(genes) & nzchar(genes)])))
+    genes <- as.character(genes)
+    genes <- genes[!is.na(genes) & nzchar(genes)]
+    if (length(genes) == 0L) {
+      stop("Her imzada `genes` veya `genes_up`/`genes_down` zorunludur.", call. = FALSE)
+    }
+    unique(toupper(genes))
   })
 
   nms <- names(gene_sets)

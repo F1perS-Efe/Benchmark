@@ -6,24 +6,28 @@
 \usage{
 score_for_dataset(
   dataset,
-  genes,
+  genes = NULL,
   method = "mean",
   direction = "<",
   apply_log2 = TRUE,
   sd_handling = "exclude",
-  min_genes = 3L
+  min_genes = 3L,
+  genes_up = NULL,
+  genes_down = NULL
 )
 }
 \arguments{
 \item{dataset}{Tek veri seti listesi.}
 
-\item{genes}{Imza genleri.}
+\item{genes}{Imza genleri (karakter veya isimli isaret vektoru).}
 
-\item{method}{Skorlama yontemi.}
+\item{method}{Skorlama yontemi (\code{"ss_rank"} dahil).}
 
 \item{direction}{Yon.}
 
 \item{apply_log2, sd_handling, min_genes}{Diger ayarlar.}
+
+\item{genes_up, genes_down}{Isaretli imza kollari (\code{genes} ile birlikte verilmez).}
 }
 \value{
 Liste: \code{scores} (isimli), \code{response} (isimli, 0/1, SD dislanmis NA),

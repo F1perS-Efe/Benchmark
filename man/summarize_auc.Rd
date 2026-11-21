@@ -10,7 +10,8 @@ summarize_auc(
   include_nonindependent = FALSE,
   independent_only = TRUE,
   exclude_var_zero = TRUE,
-  exclude_low_coverage = TRUE
+  exclude_low_coverage = TRUE,
+  stratify_by = NULL
 )
 }
 \arguments{
@@ -26,12 +27,15 @@ summarize_auc(
 \item{exclude_var_zero}{\code{TRUE} (varsayilan) ise varyansi 0/NA olanlar IVW'den cikarilir.}
 
 \item{exclude_low_coverage}{\code{TRUE} (varsayilan) ise dusuk kapsama satirlari ozetten cikarilir.}
+
+\item{stratify_by}{Opsiyonel karakter vektoru (orn. \code{c("treatment", "endpoint_type")});
+verildiginde ozet her alt grup icinde ayri hesaplanir.}
 }
 \value{
 \code{data.frame} ozet satirlari.
 }
 \description{
-Her \code{signature} x \code{method} icin:
+Her \code{signature} x \code{method} (ve istege bagli \code{stratify_by} alt gruplari) icin:
 \itemize{
 \item \strong{n-agirlikli} ortalama: \code{sum(n * auc) / sum(n)}
 \item \strong{ters-varyans (IVW)} ortalama: \code{sum(w * auc) / sum(w)}, \code{w = 1 / auc_var}
@@ -46,6 +50,10 @@ Varsayilan kurallar:
 \item \code{var_zero} / \code{auc_var <= 0} yalnizca IVW'den cikarilir; n-agirlikli ortalamaya girer
 \item \code{skipped} veya sonlu olmayan AUC satirlar yok sayilir
 }
+
+\code{stratify_by = NULL} (varsayilan) iken cikti geriye donuk uyumludur. Ayni ozet
+grubunda birden fazla farkli non-NA \code{endpoint_type} veya \code{treatment} degeri
+birlestiriliyorsa ASCII \code{warning()} uretilir ve \code{stratify_by} onerilir.
 
 DerSimonian-Laird rastgele etkili model bu fonksiyonda yoktur (opsiyonel genisleme).
 }

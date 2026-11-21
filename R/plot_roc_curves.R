@@ -30,10 +30,17 @@ plot_roc_curves <- function(datasets,
   curve_rows <- list()
   for (sig_name in names(signatures)) {
     sig <- signatures[[sig_name]]
-    if (is.character(sig)) sig <- list(genes = sig)
+    if (is.character(sig) || is.numeric(sig)) sig <- list(genes = sig)
     sig_dir <- if (!is.null(sig$direction)) sig$direction else direction
 
-    scored <- score_signature(expr, genes = sig$genes, method = method, min_genes = min_genes)
+    scored <- score_signature(
+      expr,
+      genes = sig$genes,
+      genes_up = sig$genes_up,
+      genes_down = sig$genes_down,
+      method = method,
+      min_genes = min_genes
+    )
     if (isTRUE(scored$skipped)) next
 
     sample_ids <- names(scored$scores)

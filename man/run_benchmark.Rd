@@ -24,13 +24,16 @@ run_benchmark(
 )
 }
 \arguments{
-\item{signatures}{Isimli liste; her eleman \verb{list(genes = <chr>, direction = "<"|">", derived_from = <chr>)}. \code{direction} ve \code{derived_from} istege bagli.
+\item{signatures}{Isimli liste; her eleman \verb{list(genes = <chr>, direction = "<"|">", derived_from = <chr>)} veya isaretli \code{list(genes_up=..., genes_down=..., ...)}.
+\code{genes} isimli sayisal isaret vektoru de olabilir. \code{direction} ve
+\code{derived_from} istege bagli.
 \code{derived_from = NULL} (belirtilmemis) -> \code{independent = NA} (fail-closed).
 \code{derived_from = character(0)} -> bagimsiz (\code{TRUE}).}
 
 \item{datasets}{Isimli liste; her eleman \code{validate_dataset()} yapisinda.}
 
-\item{methods}{Skorlama yontemleri: \code{"mean"}, \code{"zscore"}, \code{"median"}, \code{"rank"}.}
+\item{methods}{Skorlama yontemleri: \code{"mean"}, \code{"zscore"}, \code{"median"}, \code{"rank"},
+\code{"ss_rank"}. Varsayilan dortlu liste geriye donuk uyumluluk icin korunur.}
 
 \item{direction}{Varsayilan imza yonu (imza duzeyinde yoksa).}
 
@@ -57,7 +60,8 @@ run_benchmark(
 \item{match_expression}{Null icin ifade-eslesmeli ornekleme.}
 }
 \value{
-\code{data.frame} sonuc tablosu.
+\code{data.frame} sonuc tablosu (\code{signed}, \code{treatment}, \code{endpoint_type},
+\code{cancer_type} sutunlari dahil).
 }
 \description{
 Her veri seti icinde ayri AUC hesaplar; ham ifadeleri birlestirmez.

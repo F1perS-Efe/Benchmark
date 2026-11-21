@@ -6,14 +6,22 @@
 #'
 #' Null AUC'ler `auc_mw()` ile hesaplanir (dongude `pROC` yok).
 #' `zscore` / `rank` icin havuz satirlari donguden once bir kez donusturulur;
-#' `mean` / `median` icin dongu ici `match_genes()` tekrari yoktur.
+#' `ss_rank` icin sutun bazli dikey sira matrisi (`rank_mat`) ve `N_j`
+#' donguden once bir kez hesaplanir; `mean` / `median` icin dongu ici
+#' `match_genes()` tekrari yoktur.
 #'
 #' Not: `rank` kohort-ici ornekler arasi goreli siralamadir (singscore degil);
-#' `zscore` basit ortalama gen z-skorudur (`sqrt(k)` olcekli GSVA degil).
+#' `ss_rank` kohorttan bagimsiz dikey tek-ornek siralamadir (singscore
+#' normalizasyonu ile uyumlu saf base R); `zscore` basit ortalama gen
+#' z-skorudur (`sqrt(k)` olcekli GSVA degil).
+#'
+#' Isaretli imzalar icin `n_genes_down > 0L` iken her permutasyonda birbirinden
+#' ayrik `n_genes` (up) + `n_genes_down` (down) rastgele gen cekilir;
+#' skor `up - down` (`ss_rank` icin `s_up + s_down`) olur.
 #'
 #' @param mat Gen x ornek ifade matrisi (hazirlanmis).
 #' @param response 0/1 yanit (ornek sirasi `colnames(mat)` ile hizali veya isimli).
-#' @param n_genes Cekilecek rastgele gen sayisi (kapsama sonrasi bulunan).
+#' @param n_genes Cekilecek rastgele up / tek yonlu gen sayisi (kapsama sonrasi).
 #' @param exclude_genes Havuzdan cikarilacak genler (imza genleri).
 #' @param method Skorlama yontemi (`score_signature`).
 #' @param direction Imza yonu.
@@ -26,6 +34,7 @@
 #' @param observed_scores Opsiyonel: gozlenen imza skorlari (isimli).
 #'   Verilmezse `signature_genes` ile skorlanir.
 #' @param min_genes `score_signature` esigi.
+#' @param n_genes_down Isaretli null icin down kolu gen sayisi. Varsayilan 0.
 #'
 #' @return Liste: `obs_auc`, `null_aucs`, `null_p`, `n_perm`, `n_genes`,
 #'   `pool_size`, `seed`.
@@ -34,17 +43,26 @@ null_permutation_test <- function(mat,
                                   response,
                                   n_genes,
                                   exclude_genes = character(0),
-                                  method = c("mean", "zscore", "median", "rank"),
+                                  method = c("mean", "zscore", "median", "rank", "ss_rank"),
                                   direction = c("<", ">"),
                                   n_perm = 1000L,
                                   seed = 42L,
                                   match_expression = FALSE,
                                   signature_genes = NULL,
                                   observed_scores = NULL,
-                                  min_genes = 3L) {
+                                  min_genes = 3L,
+                                  n_genes_down = 0L) {
   method <- match.arg(method)
   direction <- match.arg(direction)
   mat <- as.matrix(mat)
+  n_genes <- as.integer(n_genes)
+  n_genes_down <- as.integer(n_genes_down)
+  if (length(n_genes) != 1L || is.na(n_genes) || n_genes < 1L) {
+    stop("`n_genes` must be a positive integer.", call. = FALSE)
+  }
+  if (length(n_genes_down) != 1L || is.na(n_genes_down) || n_genes_down < 0L) {
+    stop("`n_genes_down` must be a non-negative integer.", call. = FALSE)
+  }
   if (is.null(rownames(mat)) || is.null(colnames(mat))) {
     stop("`mat` satir/sutun adlari zorunludur.", call. = FALSE)
   }
@@ -68,6 +86,7 @@ null_permutation_test <- function(mat,
 
   exclude_up <- unique(toupper(as.character(exclude_genes)))
   rows_up <- toupper(rownames(mat))
+  need_genes <- n_genes + n_genes_down
 
   # P1-1: vektorlestirilmis satir SD (apply yerine)
   row_n <- rowSums(is.finite(mat))
@@ -80,10 +99,10 @@ null_permutation_test <- function(mat,
   pool_genes <- rownames(mat)[pool_idx]
   pool_size <- length(pool_genes)
 
-  if (pool_size < n_genes) {
+  if (pool_size < need_genes) {
     warning(
-      "Null havuz boyutu (", pool_size, ") n_genes (", n_genes,
-      ") altinda; null testi atlandi.",
+      "Null havuz boyutu (", pool_size, ") n_genes+n_genes_down (",
+      need_genes, ") altinda; null testi atlandi.",
       call. = FALSE
     )
     return(list(
@@ -164,11 +183,23 @@ null_permutation_test <- function(mat,
     }
   }
 
-  # Havuz matrisini donguden once hazirla (zscore/rank satir donusumu bir kez)
+  # Havuz / sira matrisi donguden once
   pool_mat <- mat[pool_idx, , drop = FALSE]
   rownames(pool_mat) <- pool_genes
-  if (method == "zscore") {
-    # P1-1: vektorlestirilmis z-score
+  rank_mat <- NULL
+  N_j <- NULL
+  if (method == "ss_rank") {
+    rank_mat <- apply(mat, 2L, function(x) {
+      rank(x, ties.method = "average", na.last = "keep")
+    })
+    if (is.null(dim(rank_mat))) {
+      rank_mat <- matrix(rank_mat, nrow = nrow(mat), ncol = ncol(mat))
+    }
+    rownames(rank_mat) <- rownames(mat)
+    colnames(rank_mat) <- colnames(mat)
+    N_j <- colSums(!is.na(mat))
+    score_mat <- NULL
+  } else if (method == "zscore") {
     pm_n <- rowSums(is.finite(pool_mat))
     pm_mean <- rowMeans(pool_mat, na.rm = TRUE)
     pm_sd <- sqrt(
@@ -191,54 +222,104 @@ null_permutation_test <- function(mat,
     score_mat <- pool_mat
   }
 
-  null_aucs <- withr::with_seed(seed, {
-    vapply(seq_len(n_perm), function(b) {
-      if (isTRUE(match_expression) && !is.null(sig_bins)) {
-        picked <- character(0)
-        for (bn in sig_bins) {
-          cand_idx <- which(!is.na(pool_bins) & pool_bins == bn & !(pool_genes %in% picked))
-          cand <- pool_genes[cand_idx]
-          if (length(cand) == 0L) {
-            cand <- setdiff(pool_genes, picked)
-          }
-          if (length(cand) == 0L) {
-            return(NA_real_)
-          }
-          picked <- c(picked, sample(cand, size = 1L))
+  .pick_null_genes <- function() {
+    if (isTRUE(match_expression) && !is.null(sig_bins)) {
+      picked <- character(0)
+      for (bn in sig_bins) {
+        cand_idx <- which(!is.na(pool_bins) & pool_bins == bn & !(pool_genes %in% picked))
+        cand <- pool_genes[cand_idx]
+        if (length(cand) == 0L) {
+          cand <- setdiff(pool_genes, picked)
         }
-        # Fazla/eksik uzunluk guvence
-        if (length(picked) < n_genes) {
-          extra <- setdiff(pool_genes, picked)
-          need <- n_genes - length(picked)
-          if (length(extra) < need) {
-            return(NA_real_)
-          }
-          picked <- c(picked, sample(extra, size = need))
+        if (length(cand) == 0L) {
+          return(NULL)
         }
-        picked <- picked[seq_len(n_genes)]
-      } else {
-        picked <- sample(pool_genes, size = n_genes, replace = FALSE)
+        picked <- c(picked, sample(cand, size = 1L))
       }
+      if (length(picked) < n_genes) {
+        extra <- setdiff(pool_genes, picked)
+        need <- n_genes - length(picked)
+        if (length(extra) < need) {
+          return(NULL)
+        }
+        picked <- c(picked, sample(extra, size = need))
+      }
+      picked_up <- picked[seq_len(n_genes)]
+    } else {
+      picked_up <- sample(pool_genes, size = n_genes, replace = FALSE)
+    }
 
-      row_idx <- match(picked, rownames(score_mat))
-      if (anyNA(row_idx)) {
-        return(NA_real_)
+    if (n_genes_down > 0L) {
+      rem <- setdiff(pool_genes, picked_up)
+      if (length(rem) < n_genes_down) {
+        return(NULL)
       }
-      sub <- score_mat[row_idx, , drop = FALSE]
+      picked_down <- sample(rem, size = n_genes_down, replace = FALSE)
+    } else {
+      picked_down <- character(0)
+    }
+    list(up = picked_up, down = picked_down)
+  }
+
+  .scores_from_pick <- function(picked) {
+    if (method == "ss_rank") {
+      s_up <- .ss_rank_arm(rank_mat, picked$up, N_j, reverse = FALSE)
+      if (length(picked$down) > 0L) {
+        s_down <- .ss_rank_arm(rank_mat, picked$down, N_j, reverse = TRUE)
+        scores <- s_up + s_down
+      } else {
+        scores <- s_up
+      }
+      names(scores) <- colnames(mat)
+      return(scores)
+    }
+
+    row_idx_up <- match(picked$up, rownames(score_mat))
+    if (anyNA(row_idx_up)) {
+      return(NULL)
+    }
+    sub_up <- score_mat[row_idx_up, , drop = FALSE]
+    if (method == "median") {
+      scores_up <- apply(sub_up, 2L, function(x) {
+        if (all(is.na(x))) NA_real_ else stats::median(x, na.rm = TRUE)
+      })
+    } else {
+      scores_up <- colMeans(sub_up, na.rm = TRUE)
+      scores_up[colSums(!is.na(sub_up)) == 0L] <- NA_real_
+    }
+
+    if (length(picked$down) == 0L) {
+      scores <- scores_up
+    } else {
+      row_idx_dn <- match(picked$down, rownames(score_mat))
+      if (anyNA(row_idx_dn)) {
+        return(NULL)
+      }
+      sub_dn <- score_mat[row_idx_dn, , drop = FALSE]
       if (method == "median") {
-        scores <- apply(sub, 2L, function(x) {
-          if (all(is.na(x))) {
-            NA_real_
-          } else {
-            stats::median(x, na.rm = TRUE)
-          }
+        scores_dn <- apply(sub_dn, 2L, function(x) {
+          if (all(is.na(x))) NA_real_ else stats::median(x, na.rm = TRUE)
         })
       } else {
-        scores <- colMeans(sub, na.rm = TRUE)
-        scores[colSums(!is.na(sub)) == 0L] <- NA_real_
+        scores_dn <- colMeans(sub_dn, na.rm = TRUE)
+        scores_dn[colSums(!is.na(sub_dn)) == 0L] <- NA_real_
       }
-      names(scores) <- colnames(score_mat)
+      scores <- scores_up - scores_dn
+    }
+    names(scores) <- colnames(score_mat)
+    scores
+  }
 
+  null_aucs <- withr::with_seed(seed, {
+    vapply(seq_len(n_perm), function(b) {
+      picked <- .pick_null_genes()
+      if (is.null(picked)) {
+        return(NA_real_)
+      }
+      scores <- .scores_from_pick(picked)
+      if (is.null(scores)) {
+        return(NA_real_)
+      }
       keep <- is.finite(scores) & !is.na(response)
       if (sum(keep) < 2L) {
         return(NA_real_)
