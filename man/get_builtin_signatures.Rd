@@ -7,16 +7,19 @@
 get_builtin_signatures(include_controls = TRUE)
 }
 \arguments{
-\item{include_controls}{If \code{TRUE} (default), include negative / random
-controls. If \code{FALSE}, return only literature ICI signatures.}
+\item{include_controls}{If \code{TRUE} (default), include real negative
+controls (housekeeping / ribosomal / geNorm). If \code{FALSE}, return only
+literature ICI signatures.}
 }
 \value{
 Named list of signature definitions.
 }
 \description{
 Returns an expanded immuno-oncology signature panel for benchmarking.
-Demo signatures Cytokine-5, IFNG6 and Random3 keep the same gene lists as
-\code{signatures_demo} (data object unchanged).
+Demo signatures Cytokine-5 and IFNG6 keep the same gene lists as
+\code{signatures_demo} (data object unchanged). Synthetic fake-gene controls
+(\code{Random3}, \code{NegCtrl_RandomA}, \code{NegCtrl_RandomB}) are omitted from the
+default panel so coverage counters reflect real gene absence only.
 }
 \details{
 Metadata per signature:

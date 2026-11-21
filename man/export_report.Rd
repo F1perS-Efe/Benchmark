@@ -22,8 +22,8 @@ export_report(
 
 \item{params_list}{Analiz parametreleri listesi. Beklenen alanlar:
 \code{methods}, \code{direction}, \code{coverage_threshold}, \code{sensitivity_threshold},
-\code{n_boot}, \code{n_perm}, \code{seed}; istege bagli \code{heatmap_method},
-\code{forest_signature}.}
+\code{n_boot}, \code{n_perm}, \code{seed}, \code{compute_null}; istege bagli
+\code{heatmap_method}, \code{forest_signature}.}
 
 \item{output_file}{Cikti HTML dosya yolu.}
 

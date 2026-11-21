@@ -1023,6 +1023,7 @@ server <- function(input, output, session) {
           n_boot = snap$params$n_boot,
           n_perm = snap$params$n_perm,
           seed = snap$params$seed,
+          compute_null = isTRUE(snap$params$compute_null),
           sd_handling = snap$params$sd_handling,
           match_expression = snap$params$match_expression,
           heatmap_method = hm_active,

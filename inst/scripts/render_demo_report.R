@@ -76,6 +76,8 @@ params_list <- list(
   n_boot = 0L,
   n_perm = 200L,
   seed = 42L,
+  compute_null = TRUE,
+  sd_handling = "exclude",
   heatmap_method = "mean",
   forest_signature = if ("IFNG6" %in% res$signature) {
     "IFNG6"

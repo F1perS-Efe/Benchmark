@@ -1,8 +1,10 @@
 #' Built-in literature ICI signature panel (+ optional negative controls)
 #'
 #' Returns an expanded immuno-oncology signature panel for benchmarking.
-#' Demo signatures Cytokine-5, IFNG6 and Random3 keep the same gene lists as
-#' `signatures_demo` (data object unchanged).
+#' Demo signatures Cytokine-5 and IFNG6 keep the same gene lists as
+#' `signatures_demo` (data object unchanged). Synthetic fake-gene controls
+#' (`Random3`, `NegCtrl_RandomA`, `NegCtrl_RandomB`) are omitted from the
+#' default panel so coverage counters reflect real gene absence only.
 #'
 #' Metadata per signature:
 #' - `direction`: `"positive"`, `"negative"`, or `"signed"` (ROC mapping via
@@ -11,8 +13,9 @@
 #' - `derived_from`: character vector of source cohorts, or `NULL` (fail-closed
 #'   `independent = NA`) / `character(0)` (independent)
 #'
-#' @param include_controls If `TRUE` (default), include negative / random
-#'   controls. If `FALSE`, return only literature ICI signatures.
+#' @param include_controls If `TRUE` (default), include real negative
+#'   controls (housekeeping / ribosomal / geNorm). If `FALSE`, return only
+#'   literature ICI signatures.
 #'
 #' @return Named list of signature definitions.
 #' @export
@@ -110,13 +113,6 @@ get_builtin_signatures <- function(include_controls = TRUE) {
   )
 
   ctrl <- list(
-    Random3 = list(
-      genes = c("GENA", "GENB", "GENC"),
-      direction = "positive",
-      category = "negative_control",
-      derived_from = character(0),
-      citation = "Synthetic negative control"
-    ),
     NegCtrl_Housekeeping = list(
       genes = c("ACTB", "GAPDH", "RPLP0", "B2M", "PPIA"),
       direction = "positive",
@@ -124,19 +120,25 @@ get_builtin_signatures <- function(include_controls = TRUE) {
       derived_from = character(0),
       citation = "Housekeeping negative control"
     ),
-    NegCtrl_RandomA = list(
-      genes = c("RNDA1", "RNDA2", "RNDA3", "RNDA4", "RNDA5"),
+    NegCtrl_Ribosomal = list(
+      genes = c(
+        "RPLP0", "RPL7", "RPL21", "RPL23A", "RPL24",
+        "RPL35", "RPL38", "RPS2", "RPS9", "RPLP1"
+      ),
       direction = "positive",
       category = "negative_control",
       derived_from = character(0),
-      citation = "Synthetic random negative control A"
+      citation = "Ribosomal protein negative control"
     ),
-    NegCtrl_RandomB = list(
-      genes = c("RNDB1", "RNDB2", "RNDB3", "RNDB4", "RNDB5"),
+    NegCtrl_Reference_geNorm = list(
+      genes = c(
+        "ACTB", "GAPDH", "B2M", "HPRT1", "TBP",
+        "YWHAZ", "SDHA", "UBC"
+      ),
       direction = "positive",
       category = "negative_control",
       derived_from = character(0),
-      citation = "Synthetic random negative control B"
+      citation = "geNorm-style reference gene negative control"
     )
   )
 

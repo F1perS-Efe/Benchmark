@@ -1,10 +1,14 @@
 ---
-title: "SigBenchR Benchmark Raporu"
+title: "SigBenchR Benchmark Report"
 output:
   html_document:
     toc: true
     toc_float: true
-    theme: flatly
+    toc_depth: 2
+    theme: default
+    highlight: tango
+    self_contained: true
+    css: report.css
 params:
   results: NULL
   summary_tbl: NULL
@@ -14,23 +18,50 @@ params:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, fig.width = 8, fig.height = 4.5)
+knitr::opts_chunk$set(
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 8,
+  fig.height = 4.5,
+  dpi = 120,
+  fig.align = "center"
+)
 results <- params$results
 summary_tbl <- params$summary_tbl
 sensitivity_tbl <- params$sensitivity_tbl
 surv_res <- params$surv_res
 pl <- params$params_list
 if (is.null(pl)) pl <- list()
+
 hm <- if (!is.null(pl$heatmap_method)) as.character(pl$heatmap_method)[1] else "mean"
 fsig <- if (!is.null(pl$forest_signature)) as.character(pl$forest_signature)[1] else NA_character_
 cov_thr <- if (!is.null(pl$coverage_threshold)) as.numeric(pl$coverage_threshold)[1] else 0.70
 sd_pol <- if (!is.null(pl$sd_handling)) as.character(pl$sd_handling)[1] else "exclude"
+compute_null <- isTRUE(pl$compute_null)
+if (!compute_null && is.data.frame(results) && "null_p" %in% names(results)) {
+  compute_null <- any(is.finite(results$null_p), na.rm = TRUE)
+}
+
+.fmt3 <- function(x) {
+  ifelse(is.finite(x), sprintf("%.3f", as.numeric(x)), "n/a")
+}
+.fmt_null <- function(x) {
+  if (!isTRUE(compute_null)) {
+    return(rep("n/a", length(x)))
+  }
+  .fmt3(x)
+}
+.kable_sci <- function(df, ...) {
+  knitr::kable(df, digits = 3, align = c("l", rep("r", max(0L, ncol(df) - 1L))), ...)
+}
 ```
 
-> **Bilimsel yorum sınırı:** Bu rapor araştırma amaçlıdır; klinik karar aracı değildir.
-> Sonuçlar küçük örneklemlerde belirsiz olabilir. "Kanıt yok" da geçerli bir bulgudur.
-> Eşikler ve varsayılanlar sonuçlara bakıldıktan sonra değiştirilmemelidir.
-> AUC, klinik tahmin modeli değil; yanıt sınıfları arası **ayırt edicilik (discrimination)** ölçüsüdür.
+# 1. Executive Summary & Run Parameters
+
+This report is for research use only and is not a clinical decision-support tool.
+AUC measures discrimination between response classes, not calibrated clinical prediction.
+Thresholds must not be changed after inspecting results.
 
 ```{r exploratory-notice, results='asis'}
 n_cohorts_report <- if (is.data.frame(results) && nrow(results) > 0 && "dataset" %in% names(results)) {
@@ -52,46 +83,47 @@ if (is.data.frame(results) && nrow(results) > 0) {
 }
 if (n_cohorts_report <= 4L || isTRUE(small_n_flag)) {
   cat(paste0(
-    "\n\n<div style='border:2px solid #F59E0B;background:#FFFBEB;padding:12px 14px;",
-    "border-radius:8px;margin:10px 0;'>\n",
-    "<strong>Exploratory Benchmark Notice</strong><br/>\n",
-    "Bu benchmark keşifseldir (doğrulayıcı değildir): kohort sayısı k &le; 4 ve/veya ",
-    "küçük-n kohortlar mevcut. Logit-AUC REML + HKSJ ve çapraz-kohort özetler ",
-    "hipotez üretmeye yöneliktir; bağımsız doğrulama gerektirir. ",
-    "AUC = 0.70 ayırt etme gücü (`power_auc70`) satır bazında raporlanır.\n",
-    "</div>\n\n"
+    "<div class='sb-notice'><strong>Exploratory Notice.</strong> ",
+    "This benchmark is exploratory (k &le; 4 and/or small-n cohorts). ",
+    "REML + HKSJ and cross-cohort summaries are hypothesis-generating and require ",
+    "independent validation. Per-row power for AUC = 0.70 is reported as ",
+    "<code>power_auc70</code>.</div>\n"
   ))
 }
 ```
-
-## Analiz parametreleri
 
 ```{r params-table}
 pick <- function(x, default = NA) {
   if (is.null(x) || length(x) == 0L) default else x
 }
+null_status <- if (isTRUE(compute_null)) {
+  n_perm_val <- pick(pl$n_perm, NA)
+  paste0("Run (n_perm = ", as.character(n_perm_val), ")")
+} else {
+  "Not run"
+}
 param_df <- data.frame(
-  parametre = c(
-    "methods",
-    "direction",
-    "sd_handling",
-    "coverage_threshold",
-    "sensitivity_threshold",
+  Parameter = c(
+    "Methods",
+    "Direction",
+    "SD handling",
+    "Coverage threshold",
+    "Sensitivity threshold",
     "n_boot",
-    "n_perm",
-    "seed",
-    "match_expression",
-    "heatmap_method",
-    "forest_signature"
+    "Null permutation",
+    "Seed",
+    "Match expression",
+    "Heatmap method",
+    "Forest signature"
   ),
-  deger = c(
+  Value = c(
     paste(pick(pl$methods, character(0)), collapse = ", "),
     as.character(pick(pl$direction, "<")),
     as.character(pick(pl$sd_handling, "exclude")),
     as.character(pick(pl$coverage_threshold, NA)),
     as.character(pick(pl$sensitivity_threshold, NA)),
     as.character(pick(pl$n_boot, NA)),
-    as.character(pick(pl$n_perm, NA)),
+    null_status,
     as.character(pick(pl$seed, NA)),
     as.character(pick(pl$match_expression, FALSE)),
     hm,
@@ -102,130 +134,131 @@ param_df <- data.frame(
 knitr::kable(param_df)
 ```
 
-## Kohort Klinik ve Teknik Özeti
+# 2. Cohort Overview
 
-Kohortlar heterojendir: Van Allen 2015 anti-CTLA-4 ve **klinik yarar** (clinical benefit) tanımı kullanır;
-Hugo / Riaz / Gide anti-PD-1 ve RECIST CR/PR–PD eksenine daha yakındır. Riaz 2017'de 16 SD ve önceki
-anti-CTLA-4 maruziyeti ek heterojenlik getirir. `gide_2019` normalizasyonu "normalized counts"tır.
-
-```{r cohort-clinical}
+```{r cohort-overview}
 if (is.data.frame(results) && nrow(results) > 0) {
-  outcome_map <- c(
-    van_allen_2015 = "Van Allen 2015 clinical benefit (anti-CTLA-4; CR/PR veya uzun sagkalimli SD siniflamasi; IMS ikili etiket)",
-    hugo_2016 = "RECIST CR/PR vs PD (anti-PD-1)",
-    riaz_2017 = "RECIST CR/PR vs PD; 16 SD + once anti-CTLA-4 maruziyeti (anti-PD-1)",
-    gide_2019 = "RECIST CR/PR vs PD; anti-PD-1 monoterapi PRE (normalized counts)"
+  use <- results[!(results$skipped %in% TRUE), , drop = FALSE]
+  if (nrow(use) == 0L) use <- results
+  keys <- intersect(
+    c("dataset", "normalization", "treatment", "endpoint_type",
+      "n", "n_pos", "n_neg", "n_excluded_sd"),
+    names(use)
   )
-  agg <- aggregate(
-    cbind(n = n, n_pos = n_pos, n_neg = n_neg, n_excluded_sd = n_excluded_sd) ~ dataset + normalization + treatment,
-    data = results[!(results$skipped %in% TRUE), , drop = FALSE],
-    FUN = function(x) as.integer(stats::median(x, na.rm = TRUE))
+  agg <- unique(use[, keys, drop = FALSE])
+  if ("n_excluded_sd" %in% names(agg)) {
+    names(agg)[names(agg) == "n_excluded_sd"] <- "n_sd"
+  } else {
+    agg$n_sd <- NA_integer_
+  }
+  label_map <- c(
+    dataset = "Cohort",
+    n = "n_total",
+    n_pos = "n_pos",
+    n_neg = "n_neg",
+    n_sd = "n_sd",
+    treatment = "Treatment",
+    endpoint_type = "Endpoint type",
+    normalization = "Normalization"
   )
-  if (nrow(agg) > 0) {
-    agg$yanit_tanimi <- unname(outcome_map[as.character(agg$dataset)])
-    agg$yanit_tanimi[is.na(agg$yanit_tanimi)] <- "Kohorta ozel / kullanici tanimli"
-    agg$sd_politikasi <- sd_pol
-    knitr::kable(
-      agg[, c(
-        "dataset", "treatment", "yanit_tanimi", "normalization",
-        "sd_politikasi", "n", "n_pos", "n_neg", "n_excluded_sd"
-      ), drop = FALSE],
-      col.names = c(
-        "Kohort", "Tedavi", "Orijinal yanit tanimi", "Normalizasyon",
-        "SD politikasi", "Efektif N", "Pozitif", "Negatif", "Dislanan SD"
-      ),
-      digits = 0
+  show <- intersect(names(label_map), names(agg))
+  knitr::kable(
+    agg[, show, drop = FALSE],
+    col.names = unname(label_map[show]),
+    digits = 0
+  )
+} else {
+  cat("No cohort rows available.\n")
+}
+```
+
+# 3. Signature Performance
+
+Signature x cohort discrimination metrics. When null permutation was not run,
+`Null p` is shown as `n/a`.
+
+```{r performance-table}
+if (is.data.frame(results) && nrow(results) > 0) {
+  perf <- results
+  ci <- if (all(c("auc_ci_low", "auc_ci_high") %in% names(perf))) {
+    ifelse(
+      is.finite(perf$auc_ci_low) & is.finite(perf$auc_ci_high),
+      paste0(.fmt3(perf$auc_ci_low), "--", .fmt3(perf$auc_ci_high)),
+      "n/a"
     )
   } else {
-    cat("Kohort ozeti icin uygun satir yok.\n")
+    rep("n/a", nrow(perf))
   }
-} else {
-  cat("Sonuc tablosu bos.\n")
-}
-```
-
-## Sonuç tablosu
-
-`low_coverage` satırlar ısı haritasında gri gösterilir ve varsayılan `summarize_auc(exclude_low_coverage = TRUE)`
-özetinden çıkarılır. `var_zero` (AUC varyansı 0/NA) kohortlar **n-ağırlıklı** ortalamaya dahil edilir;
-ters-varyans (IVW) özetinden güvenli biçimde çıkarılır (`n_var_zero_excluded`).
-
-```{r results-table}
-if (is.data.frame(results) && nrow(results) > 0) {
-  cols <- intersect(
-    c(
-      "dataset", "signature", "method", "n", "n_pos", "n_neg",
-      "coverage_label", "low_coverage", "auc", "auc_ci_low", "auc_ci_high",
-      "auc_var", "var_zero", "small_cohort",
-      "pr_auc", "pr_baseline", "pr_ci_low", "pr_ci_high",
-      "null_p", "null_p_adj_bh",
-      "independent", "skipped", "skip_reason"
-    ),
-    names(results)
-  )
-  knitr::kable(results[, cols, drop = FALSE], digits = 3)
-} else {
-  cat("Sonuç tablosu boş.\n")
-}
-```
-
-## Gen Kapsama ve Eksik Gen Detayı
-
-Her imza × kohort için bulunan/toplam gen sayısı, kapsama yüzdesi, eşik durumu ve
-eksik gen listesi (`missing_genes`). Eksik gen yoksa alan boştur.
-
-```{r gene-coverage-detail}
-if (is.data.frame(results) && nrow(results) > 0) {
-  cov_cols <- intersect(
-    c(
-      "dataset", "signature", "method",
-      "n_found", "n_total", "coverage_pct", "coverage_label",
-      "low_coverage", "found_genes", "missing_genes"
-    ),
-    names(results)
-  )
-  # Bir method satiri yeter; method bazinda ayni kapsama tekrarlanir
-  cov_df <- results[, cov_cols, drop = FALSE]
-  if ("method" %in% names(cov_df)) {
-    cov_df <- cov_df[!duplicated(cov_df[, intersect(c("dataset", "signature"), names(cov_df)), drop = FALSE]), , drop = FALSE]
+  status <- if ("coverage_status" %in% names(perf)) {
+    as.character(perf$coverage_status)
+  } else if ("coverage_label" %in% names(perf)) {
+    as.character(perf$coverage_label)
+  } else {
+    ifelse(isTRUE(perf$low_coverage), "low", "ok")
   }
-  knitr::kable(cov_df, digits = 1)
+  cov_pct <- if ("coverage_pct" %in% names(perf)) {
+    .fmt3(perf$coverage_pct)
+  } else {
+    rep("n/a", nrow(perf))
+  }
+  null_p_show <- if ("null_p" %in% names(perf)) {
+    .fmt_null(perf$null_p)
+  } else {
+    rep("n/a", nrow(perf))
+  }
+  power_show <- if ("power_auc70" %in% names(perf)) {
+    .fmt3(perf$power_auc70)
+  } else {
+    rep("n/a", nrow(perf))
+  }
+  pr_show <- if ("pr_auc" %in% names(perf)) {
+    .fmt3(perf$pr_auc)
+  } else {
+    rep("n/a", nrow(perf))
+  }
+  out <- data.frame(
+    Signature = as.character(perf$signature),
+    Cohort = as.character(perf$dataset),
+    Method = as.character(perf$method),
+    AUC = .fmt3(perf$auc),
+    `95% CI` = ci,
+    `PR-AUC` = pr_show,
+    Coverage = cov_pct,
+    Status = status,
+    `Power (AUC=0.70)` = power_show,
+    `Null p` = null_p_show,
+    check.names = FALSE,
+    stringsAsFactors = FALSE
+  )
+  knitr::kable(out)
 } else {
-  cat("Kapsama detayi icin sonuc yok.\n")
+  cat("No performance rows available.\n")
 }
 ```
 
-## Ağırlıklı Özet (n-ağırlıklı + ters-varyans, Q, I2 + logit-AUC REML)
+# 4. Meta-Analysis & Clinical Stratification
 
-**Metodoloji notu:** Sabit etkiler IVW, 4 heterojen kohortta keşifseldir.
-`auc_re` ve `%95` HKSJ aralığı logit-AUC ölçeğinde REML + kesilmiş Hartung–Knapp–Sidik–Jonkman
-ile hesaplanır; küçük kohort sayısında (`k <= 4`) ve klinik olarak heterojen kohortlarda
-keşifseldir — mümkünse `stratify_by` kullanın.
-`independent = NA` (kökeni bilinmeyen) veya `FALSE` (türetilmiş) imzalar varsayılan bağımsız özete girmez.
-`rank` ve `zscore` kohort-içi göreli skorlardır (`singscore` / `sqrt(k)` GSVA değildir); kohortlar arası
-ham skor birleştirilmez. AUC ayırt edicilik ölçer; klinik yanıtı “tahmin eden” kalibre model değildir.
+Overall REML + truncated HKSJ summary (unstratified), followed by treatment and
+endpoint-type strata. Forest and heatmap use the selected scoring method;
+normalization labels are retained in cohort axes where available.
 
-```{r summary-table}
+```{r meta-overall}
 if (is.data.frame(summary_tbl) && nrow(summary_tbl) > 0) {
   show_cols <- intersect(
     c(
-      "signature", "method", "treatment", "endpoint_type",
-      "n_cohorts", "auc_n_weighted", "auc_ivw", "Q", "I2",
-      "auc_re", "auc_re_ci_low", "auc_re_ci_high", "tau2_reml", "i2_logit",
-      "n_var_zero_excluded", "n_low_coverage_excluded", "note"
+      "signature", "method", "n_cohorts", "auc_n_weighted", "auc_ivw",
+      "Q", "I2", "auc_re", "auc_re_ci_low", "auc_re_ci_high",
+      "tau2_reml", "i2_logit", "n_low_coverage_excluded", "note"
     ),
     names(summary_tbl)
   )
-  knitr::kable(summary_tbl[, show_cols, drop = FALSE], digits = 3)
+  .kable_sci(summary_tbl[, show_cols, drop = FALSE])
 } else {
-  cat("Özet tablosu boş.\n")
+  cat("Summary table is empty.\n")
 }
 ```
 
-## Varsayılan Katmanlı Özet: treatment
-
-`summarize_auc(..., stratify_by = "treatment")` — örn. anti-PD-1 vs anti-CTLA-4.
-Forest grafiği tabakasız özeti kullanmaya devam eder.
+### Treatment strata
 
 ```{r summary-by-treatment}
 if (is.data.frame(results) && nrow(results) > 0 && "treatment" %in% names(results)) {
@@ -236,19 +269,23 @@ if (is.data.frame(results) && nrow(results) > 0 && "treatment" %in% names(result
     error = function(e) NULL
   )
   if (is.data.frame(sg_tx) && nrow(sg_tx) > 0) {
-    knitr::kable(sg_tx, digits = 3)
+    show_cols <- intersect(
+      c(
+        "signature", "method", "treatment", "n_cohorts",
+        "auc_n_weighted", "auc_ivw", "auc_re", "auc_re_ci_low", "auc_re_ci_high", "I2"
+      ),
+      names(sg_tx)
+    )
+    .kable_sci(sg_tx[, show_cols, drop = FALSE])
   } else {
-    cat("treatment katmanli ozet uretilemedi.\n")
+    cat("Treatment-stratified summary unavailable.\n")
   }
 } else {
-  cat("treatment sutunu yok veya sonuc bos.\n")
+  cat("No treatment column in results.\n")
 }
 ```
 
-## Varsayılan Katmanlı Özet: endpoint_type
-
-`summarize_auc(..., stratify_by = "endpoint_type")` — örn. RECIST vs clinical_benefit
-(`van_allen_2015` farkını görünür kılar).
+### Endpoint type strata
 
 ```{r summary-by-endpoint}
 if (is.data.frame(results) && nrow(results) > 0 && "endpoint_type" %in% names(results)) {
@@ -259,19 +296,71 @@ if (is.data.frame(results) && nrow(results) > 0 && "endpoint_type" %in% names(re
     error = function(e) NULL
   )
   if (is.data.frame(sg_ep) && nrow(sg_ep) > 0) {
-    knitr::kable(sg_ep, digits = 3)
+    show_cols <- intersect(
+      c(
+        "signature", "method", "endpoint_type", "n_cohorts",
+        "auc_n_weighted", "auc_ivw", "auc_re", "auc_re_ci_low", "auc_re_ci_high", "I2"
+      ),
+      names(sg_ep)
+    )
+    .kable_sci(sg_ep[, show_cols, drop = FALSE])
   } else {
-    cat("endpoint_type katmanli ozet uretilemedi.\n")
+    cat("Endpoint-type stratified summary unavailable.\n")
   }
 } else {
-  cat("endpoint_type sutunu yok veya sonuc bos.\n")
+  cat("No endpoint_type column in results.\n")
 }
 ```
 
-## Biological Context: Reference Immune Axes
+```{r heatmap, fig.cap="AUC heatmap (low coverage shaded)"}
+ok_hm <- is.data.frame(results) &&
+  nrow(results) > 0 &&
+  any(results$method == hm & !(results$skipped %in% TRUE))
+if (ok_hm) {
+  print(SigBenchR::plot_auc_heatmap(results, method = hm, coverage_threshold = cov_thr))
+} else {
+  cat("No rows available for heatmap.\n")
+}
+```
 
-Kullanıcı imzalarının IFN_Gamma / Cytotoxicity / T_Cell_Infiltration eksenleriyle
-Spearman korelasyonu (`correlate_reference_axes`). SD dışlama (`enc$kept`) uygulanır.
+```{r forest, fig.cap="AUC forest plot (DeLong 95% CI)"}
+ok_fr <- is.data.frame(results) &&
+  nrow(results) > 0 &&
+  !is.na(fsig) &&
+  nzchar(fsig) &&
+  any(results$signature == fsig & results$method == hm & !(results$skipped %in% TRUE))
+if (ok_fr) {
+  forest_summary <- tryCatch(
+    suppressWarnings(
+      SigBenchR::summarize_auc(results, method = hm, stratify_by = NULL)
+    ),
+    error = function(e) summary_tbl
+  )
+  print(
+    SigBenchR::plot_auc_forest(
+      results,
+      signature = fsig,
+      method = hm,
+      summary = forest_summary
+    )
+  )
+} else {
+  cat("No rows available for forest plot.\n")
+}
+```
+
+```{r clinical-benefit, results='asis'}
+has_surv <- !is.null(surv_res) && is.data.frame(surv_res) && nrow(surv_res) > 0
+if (has_surv) {
+  cat("\n\n### Clinical benefit (survival)\n\n")
+  knitr::kable(surv_res, digits = 3)
+}
+```
+
+# 5. Biological Context
+
+Spearman correlations of user signatures with reference immune axes
+(`IFN_Gamma`, `Cytotoxicity`, `T_Cell_Infiltration`) after SD exclusion (`enc$kept`).
 
 ```{r biological-context}
 bio_tbl <- NULL
@@ -289,96 +378,22 @@ if (!is.null(pl$bio_context) && is.data.frame(pl$bio_context)) {
   )
 }
 if (is.data.frame(bio_tbl) && nrow(bio_tbl) > 0) {
-  knitr::kable(bio_tbl, digits = 3)
+  .kable_sci(bio_tbl)
 } else {
-  cat("Biological context tablosu yok (datasets/signatures veya bio_context verilmedi).\n")
+  cat("Biological context table unavailable (provide bio_context or datasets/signatures).\n")
 }
 ```
 
-## Dayanıklılık (sensitivity)
+# 6. Methods & Known Limitations
 
-```{r sensitivity-table}
-if (is.data.frame(sensitivity_tbl) && nrow(sensitivity_tbl) > 0) {
-  knitr::kable(sensitivity_tbl, digits = 3)
-} else {
-  cat("Dayanıklılık tablosu boş.\n")
-}
-```
-
-## AUC ısı haritası
-
-```{r heatmap, fig.cap="AUC ısı haritası (düşük kapsama gri)"}
-ok_hm <- is.data.frame(results) &&
-  nrow(results) > 0 &&
-  any(results$method == hm & !(results$skipped %in% TRUE))
-if (ok_hm) {
-  print(SigBenchR::plot_auc_heatmap(results, method = hm, coverage_threshold = cov_thr))
-} else {
-  cat("Isı haritası için uygun satır yok.\n")
-}
-```
-
-## AUC forest grafiği
-
-```{r forest, fig.cap="AUC forest (DeLong %95 GA)"}
-ok_fr <- is.data.frame(results) &&
-  nrow(results) > 0 &&
-  !is.na(fsig) &&
-  nzchar(fsig) &&
-  any(results$signature == fsig & results$method == hm & !(results$skipped %in% TRUE))
-if (ok_fr) {
-  # Forest her zaman tek-satirli tabakasiz ozet kullanir (stratify_by acik olsa bile)
-  forest_summary <- tryCatch(
-    suppressWarnings(
-      SigBenchR::summarize_auc(results, method = hm, stratify_by = NULL)
-    ),
-    error = function(e) summary_tbl
-  )
-  print(
-    SigBenchR::plot_auc_forest(
-      results,
-      signature = fsig,
-      method = hm,
-      summary = forest_summary
-    )
-  )
-} else {
-  cat("Forest grafiği için uygun satır yok.\n")
-}
-```
-
-```{r clinical-benefit, results='asis'}
-has_surv <- !is.null(surv_res) && is.data.frame(surv_res) && nrow(surv_res) > 0
-if (has_surv) {
-  cat("\n\n## Clinical Benefit: Survival Analysis (Cox PH & Kaplan-Meier)\n\n")
-  cat(
-    "Cox proportional hazards (continuous z-score) and Kaplan-Meier log-rank ",
-    "summaries for cohorts with survival columns. Combined with response ",
-    "discrimination (AUC) when available.\n\n"
-  )
-  knitr::kable(surv_res, digits = 3)
-  if (is.data.frame(results) && nrow(results) > 0) {
-    cat("\n\n### Response discrimination + clinical benefit\n\n")
-    combo <- tryCatch(
-      SigBenchR::combine_response_and_survival(results, surv_res),
-      error = function(e) NULL
-    )
-    if (is.data.frame(combo) && nrow(combo) > 0) {
-      keep_cols <- intersect(
-        c(
-          "cohort", "dataset", "signature", "method", "auc", "auc_ci_low",
-          "auc_ci_high", "hr", "cox_p", "logrank_p", "c_index", "n",
-          "n_samples", "n_events", "endpoint"
-        ),
-        names(combo)
-      )
-      knitr::kable(combo[, keep_cols, drop = FALSE], digits = 3)
-    }
-  }
-}
-```
-
-## Paket sürümleri ve oturum bilgisi
+<ul class="sb-limits">
+<li>Scores are oriented with <code>orient_score()</code>; ROC-AUC uses DeLong 95% CIs on kept samples only (<code>enc$kept</code>).</li>
+<li>Null permutation (when enabled) uses vectorized Mann-Whitney AUC with p = (k + 1) / (B + 1) and BH adjustment within method.</li>
+<li>Cross-cohort synthesis uses n-weighted and inverse-variance summaries plus logit-AUC REML with truncated HKSJ intervals.</li>
+<li>Bundled demo matrices use a ~2,800-gene pool; arbitrary signatures may show honest low coverage.</li>
+<li>Meta-analysis with k &le; 4 cohorts is exploratory; endpoint definitions differ (clinical benefit vs RECIST).</li>
+<li>Cohort normalizations remain heterogeneous; raw expression is never pooled across platforms.</li>
+</ul>
 
 ```{r session}
 pkgs <- c("SigBenchR", "pROC", "PRROC", "ggplot2", "withr", "rmarkdown", "knitr", "survival")
@@ -389,7 +404,7 @@ vers <- vapply(pkgs, function(p) {
     NA_character_
   }
 }, character(1))
-knitr::kable(data.frame(paket = pkgs, surum = unname(vers), stringsAsFactors = FALSE))
+knitr::kable(data.frame(Package = pkgs, Version = unname(vers), stringsAsFactors = FALSE))
 ```
 
 ```{r sessioninfo}

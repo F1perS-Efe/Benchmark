@@ -70,6 +70,7 @@ test_that("export_report gecici dizinde HTML uretir", {
       n_boot = 0L,
       n_perm = 0L,
       seed = 42L,
+      compute_null = FALSE,
       heatmap_method = "mean",
       forest_signature = "Cytokine-5"
     ),
@@ -78,7 +79,11 @@ test_that("export_report gecici dizinde HTML uretir", {
 
   expect_true(file.exists(path))
   html <- paste(readLines(path, warn = FALSE), collapse = "\n")
-  expect_true(grepl("klinik karar", html, ignore.case = TRUE))
+  expect_true(grepl("clinical decision", html, ignore.case = TRUE))
+  expect_true(grepl("Null permutation", html, fixed = TRUE))
+  expect_true(grepl("Not run", html, fixed = TRUE))
+  expect_true(grepl(">n/a<", html) || grepl("n/a", html, fixed = TRUE))
+  expect_false(grepl("n_perm = 1000", html, fixed = TRUE))
   expect_true(grepl("sessionInfo", html, fixed = TRUE) || grepl("R version", html))
 })
 

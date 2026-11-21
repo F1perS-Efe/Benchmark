@@ -1,4 +1,4 @@
-test_that("get_builtin_signatures has literature panel and negative controls", {
+test_that("get_builtin_signatures has literature panel and real negative controls", {
   sigs <- get_builtin_signatures(include_controls = TRUE)
   cats <- vapply(sigs, function(s) as.character(s$category)[1], character(1))
   lit <- sigs[cats == "literature_ici"]
@@ -7,8 +7,8 @@ test_that("get_builtin_signatures has literature panel and negative controls", {
   expect_gte(length(lit), 8L)
   expect_gte(length(ctrl), 3L)
 
-  # Existing demo signatures preserved by name and gene content
-  expect_true(all(c("IFNG6", "Cytokine-5", "Random3") %in% names(sigs)))
+  # Literature demo signatures preserved by name and gene content
+  expect_true(all(c("IFNG6", "Cytokine-5") %in% names(sigs)))
   expect_identical(
     sigs$IFNG6$genes,
     c("IDO1", "CXCL9", "CXCL10", "HLA-DRA", "STAT1", "IFNG")
@@ -17,7 +17,20 @@ test_that("get_builtin_signatures has literature panel and negative controls", {
     sigs[["Cytokine-5"]]$genes,
     c("IFNG", "CXCL9", "CXCL13", "IL21", "CCL5")
   )
-  expect_identical(sigs$Random3$genes, c("GENA", "GENB", "GENC"))
+
+  # Fake synthetic gene sets excluded from default panel
+  expect_false("Random3" %in% names(sigs))
+  expect_false("NegCtrl_RandomA" %in% names(sigs))
+  expect_false("NegCtrl_RandomB" %in% names(sigs))
+
+  # Real negative controls present
+  expect_true(all(
+    c(
+      "NegCtrl_Housekeeping",
+      "NegCtrl_Ribosomal",
+      "NegCtrl_Reference_geNorm"
+    ) %in% names(sigs)
+  ))
 
   # Neg controls should barely overlap literature (Jaccard < 0.1)
   jac <- jaccard_signatures(sigs)

@@ -1,0 +1,126 @@
+/* SigBenchR scientific HTML report — compact, table-first */
+:root {
+  --bg: #FFFFFF;
+  --ink: #1E293B;
+  --muted: #475569;
+  --border: #E2E8F0;
+  --accent: #0F3D5E;
+  --notice-bg: #F8FAFC;
+}
+
+html {
+  font-size: 15px;
+}
+
+body {
+  font-family: "Helvetica Neue", Helvetica, Arial, "Noto Sans", sans-serif;
+  color: var(--ink);
+  background: var(--bg);
+  line-height: 1.45;
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 1.25rem 1.5rem 2.5rem;
+}
+
+h1, h2, h3 {
+  color: var(--accent);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  margin-top: 1.6rem;
+  margin-bottom: 0.55rem;
+}
+
+h1 {
+  font-size: 1.55rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.45rem;
+}
+
+h2 {
+  font-size: 1.2rem;
+}
+
+h3 {
+  font-size: 1.05rem;
+  color: var(--ink);
+}
+
+p, li {
+  color: var(--ink);
+}
+
+.sb-notice {
+  border: 1px solid var(--border);
+  background: var(--notice-bg);
+  color: var(--ink);
+  padding: 0.65rem 0.85rem;
+  margin: 0.75rem 0 1rem;
+  font-size: 0.92rem;
+}
+
+.sb-notice strong {
+  color: var(--accent);
+}
+
+/* Compact knitr / pandoc tables */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  margin: 0.55rem 0 1.1rem;
+}
+
+thead th {
+  background: #F1F5F9;
+  color: var(--accent);
+  font-weight: 600;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  padding: 0.35rem 0.5rem;
+  white-space: nowrap;
+}
+
+tbody td {
+  border-bottom: 1px solid var(--border);
+  padding: 0.28rem 0.5rem;
+  vertical-align: top;
+}
+
+tbody tr:nth-child(even) td {
+  background: #FAFBFC;
+}
+
+/* Numeric columns: right-align via class or last-resort heuristic in Rmd */
+td.sb-num, th.sb-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.tocify {
+  border: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.list-group-item.active {
+  background-color: var(--accent) !important;
+  border-color: var(--accent) !important;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+ul.sb-limits {
+  margin: 0.4rem 0 1rem;
+  padding-left: 1.2rem;
+}
+
+ul.sb-limits li {
+  margin-bottom: 0.35rem;
+  color: var(--muted);
+}
+
+code, pre {
+  font-size: 0.86rem;
+}

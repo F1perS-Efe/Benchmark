@@ -17,6 +17,18 @@ test_that("dort kohort validate_dataset gecer; expr sutunlari = sample_id tekil 
   }
 })
 
+test_that("datasets_ici info endpoint_type and treatment are populated", {
+  data(datasets_ici, package = "SigBenchR")
+  expect_identical(datasets_ici$van_allen_2015$info$endpoint_type, "clinical_benefit")
+  expect_identical(datasets_ici$hugo_2016$info$endpoint_type, "RECIST")
+  expect_identical(datasets_ici$riaz_2017$info$endpoint_type, "RECIST")
+  expect_identical(datasets_ici$gide_2019$info$endpoint_type, "RECIST")
+  expect_identical(datasets_ici$van_allen_2015$info$treatment, "anti-CTLA4")
+  expect_identical(datasets_ici$hugo_2016$info$treatment, "anti-PD1")
+  expect_identical(datasets_ici$riaz_2017$info$treatment, "anti-PD1")
+  expect_identical(datasets_ici$gide_2019$info$treatment, "anti-PD1")
+})
+
 test_that("patient_id varsa hasta basina tek ornek (pseudo-replication = 0)", {
   data(datasets_ici, package = "SigBenchR")
   for (nm in names(datasets_ici)) {

@@ -8,8 +8,8 @@
 #' @param sensitivity_tbl `check_sensitivity()` tablosu.
 #' @param params_list Analiz parametreleri listesi. Beklenen alanlar:
 #'   `methods`, `direction`, `coverage_threshold`, `sensitivity_threshold`,
-#'   `n_boot`, `n_perm`, `seed`; istege bagli `heatmap_method`,
-#'   `forest_signature`.
+#'   `n_boot`, `n_perm`, `seed`, `compute_null`; istege bagli
+#'   `heatmap_method`, `forest_signature`.
 #' @param output_file Cikti HTML dosya yolu.
 #' @param surv_res Opsiyonel `run_survival_benchmark()` tablosu. `NULL`
 #'   (varsayilan) iken sagkalim bolumu render edilmez (geriye donuk uyum).
@@ -58,9 +58,17 @@ export_report <- function(results,
     n_boot = NA_integer_,
     n_perm = NA_integer_,
     seed = NA_integer_,
+    compute_null = FALSE,
     heatmap_method = NULL,
     forest_signature = NULL
   )
+  if (is.null(params_list$compute_null)) {
+    # Infer from results when callers omit the flag
+    if (is.data.frame(results) && "null_p" %in% names(results) &&
+        any(is.finite(results$null_p), na.rm = TRUE)) {
+      params_list$compute_null <- TRUE
+    }
+  }
   for (nm in names(defaults)) {
     if (is.null(params_list[[nm]])) {
       params_list[[nm]] <- defaults[[nm]]
