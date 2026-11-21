@@ -1,9 +1,9 @@
-# SigBenchR Shiny (Faz 2B) - tek dosya
+# SigBenchR Shiny (Faz 2C) - tek dosya
 
 options(shiny.maxRequestSize = 25 * 1024^2)
 
 ui <- shiny::fluidPage(
-  shiny::titlePanel("SigBenchR - Imza Dogrulama (Faz 2B)"),
+  shiny::titlePanel("SigBenchR - Imza Dogrulama (Faz 2C)"),
   shiny::tags$p(
     shiny::em(
       "Arastirma amaclidir; klinik karar araci degildir. ",
@@ -75,6 +75,21 @@ ui <- shiny::fluidPage(
           "DeLong",
           shiny::verbatimTextOutput("cmp_status"),
           if (requireNamespace("DT", quietly = TRUE)) DT::DTOutput("cmp_table") else shiny::tableOutput("cmp_fallback")
+        ),
+        shiny::tabPanel(
+          "Ozet",
+          shiny::selectInput(
+            "forest_sig", "Forest imzasi",
+            choices = c("Cytokine-5", "IFNG6", "Random3")
+          ),
+          shiny::h4("Agirlikli AUC ozeti (n + ters-varyans, Q, I2)"),
+          if (requireNamespace("DT", quietly = TRUE)) DT::DTOutput("summary_table") else shiny::tableOutput("summary_fallback"),
+          shiny::h4("AUC forest"),
+          shiny::plotOutput("forest_plot", height = "320px"),
+          shiny::h4("Jaccard (demo imzalar)"),
+          if (requireNamespace("DT", quietly = TRUE)) DT::DTOutput("jaccard_table") else shiny::tableOutput("jaccard_fallback"),
+          shiny::h4("AUC korelasyonu (veri setleri boyunca)"),
+          if (requireNamespace("DT", quietly = TRUE)) DT::DTOutput("corr_table") else shiny::tableOutput("corr_fallback")
         )
       )
     )
@@ -145,7 +160,8 @@ server <- function(input, output, session) {
         "dataset", "signature", "method", "n", "n_pos", "n_neg",
         "coverage_label", "missing_genes", "low_coverage",
         "auc", "auc_ci_low", "auc_ci_high", "auc_var", "var_zero", "small_cohort",
-        "pr_auc", "pr_baseline", "pr_ci_low", "pr_ci_high", "null_p",
+        "pr_auc", "pr_baseline", "pr_ci_low", "pr_ci_high",
+        "null_p", "null_p_adj_bh", "independent",
         "skipped", "skip_reason"
       )
       DT::datatable(df[, intersect(cols, names(df)), drop = FALSE], options = list(scrollX = TRUE, pageLength = 8))
@@ -223,6 +239,59 @@ server <- function(input, output, session) {
     DT::renderDT({ shiny::req(cmp_res()); DT::datatable(cmp_res()) })
   } else NULL
   output$cmp_fallback <- shiny::renderTable({ shiny::req(cmp_res()); cmp_res() })
+
+  summary_res <- shiny::reactive({
+    shiny::req(results())
+    suppressWarnings(
+      SigBenchR::summarize_auc(results(), method = input$heatmap_method)
+    )
+  })
+
+  output$summary_table <- if (requireNamespace("DT", quietly = TRUE)) {
+    DT::renderDT({ shiny::req(summary_res()); DT::datatable(summary_res()) })
+  } else NULL
+  output$summary_fallback <- shiny::renderTable({ shiny::req(summary_res()); summary_res() })
+
+  output$forest_plot <- shiny::renderPlot({
+    shiny::req(results())
+    shiny::validate(shiny::need(
+      any(results()$signature == input$forest_sig &
+            results()$method == input$heatmap_method &
+            !results()$skipped),
+      "Secilen imza/yontem icin AUC yok."
+    ))
+    SigBenchR::plot_auc_forest(
+      results(),
+      signature = input$forest_sig,
+      method = input$heatmap_method,
+      summary = summary_res()
+    )
+  })
+
+  output$jaccard_table <- if (requireNamespace("DT", quietly = TRUE)) {
+    DT::renderDT({
+      DT::datatable(SigBenchR::jaccard_signatures(signatures_demo))
+    })
+  } else NULL
+  output$jaccard_fallback <- shiny::renderTable({
+    SigBenchR::jaccard_signatures(signatures_demo)
+  })
+
+  output$corr_table <- if (requireNamespace("DT", quietly = TRUE)) {
+    DT::renderDT({
+      shiny::req(results())
+      shiny::validate(shiny::need(
+        length(unique(results()$signature[!results()$skipped])) >= 2,
+        "Korelasyon icin en az iki imza calistirin (ornek: hazir imzalari tek tek degil, coklu benchmark)."
+      ))
+      # Tek imza seciliyse demo imzalarinin hepsiyle yeniden degil; mevcut sonuclardan
+      DT::datatable(SigBenchR::auc_correlation(results(), method = input$heatmap_method))
+    })
+  } else NULL
+  output$corr_fallback <- shiny::renderTable({
+    shiny::req(results())
+    SigBenchR::auc_correlation(results(), method = input$heatmap_method)
+  })
 }
 
 shiny::shinyApp(ui, server)

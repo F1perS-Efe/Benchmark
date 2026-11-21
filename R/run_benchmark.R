@@ -260,5 +260,12 @@ run_benchmark <- function(signatures,
 
   out <- do.call(rbind.data.frame, lapply(rows, as.data.frame, stringsAsFactors = FALSE))
   rownames(out) <- NULL
+
+  # Faz 2C: null_p icin BH (aile = method icinde imza x veri seti)
+  out$null_p_adj_bh <- NA_real_
+  if (isTRUE(compute_null) && "null_p" %in% names(out)) {
+    out <- adjust_null_p(out, p_col = "null_p")
+  }
+
   out
 }

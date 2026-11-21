@@ -29,6 +29,11 @@ res <- run_benchmark(
 
 print(res)
 plot_auc_heatmap(res, method = "mean")
+
+summarize_auc(res, method = "mean")
+plot_auc_forest(res, signature = "Cytokine-5", method = "mean")
+jaccard_signatures(signatures_demo)
+auc_correlation(res, method = "mean")
 ```
 
 Shiny arayüzü:
@@ -37,18 +42,21 @@ Shiny arayüzü:
 SigBenchR::run_app()
 ```
 
-## Kapsam (Faz 1 + 2A + 2B)
+## Kapsam (Faz 1 + 2A + 2B + 2C)
 
 - Skorlama: `mean`, `zscore`, `median`, `rank`
 - ROC-AUC + DeLong %95 GA / varyans; küçük kohort uyarısı
 - PR-AUC + prevalans + tabakalı bootstrap GA (`PRROC`)
-- Null permütasyon (`auc_mw` vektörize; p = (k+1)/(B+1))
+- Null permütasyon (`auc_mw` vektörize; p = (k+1)/(B+1)); `null_p_adj_bh` (aile = method içi imza × veri seti)
 - Eşleştirilmiş DeLong iki imza karşılaştırması (`compare_signatures`, BH)
+- Ağırlıklı özet: `summarize_auc()` — n-ağırlıklı + ters-varyans, Cochran `Q`, `I²`; `var_zero` ve `derived_from` (bağımsız değil) varsayılan dışlanır
+- İmza örtüşmesi: `jaccard_signatures()`; veri setleri boyunca `auc_correlation()`
+- Forest grafik: `plot_auc_forest()`
 - Gen kapsama denetimi + gri düşük-kapsama ısı haritası
 - Skorlama dayanıklılığı: `check_sensitivity()` (eşik 0.10 keyfidir)
 - Sentetik demo veri + Shiny
 
-**v1 dışı:** Aynı imzada gen bazlı `+` / `-` işaretleri; takma ad eşleştirme.
+**v1 dışı:** Aynı imzada gen bazlı `+` / `-` işaretleri; takma ad eşleştirme; DerSimonian–Laird.
 
 ## Veri yapısı
 
