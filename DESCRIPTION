@@ -1,6 +1,6 @@
 Package: SigBenchR
 Title: Gene Signature Benchmarking for Immunotherapy Response
-Version: 0.4.3
+Version: 0.4.4
 Authors@R: 
     person(given = "Efe Kaan", family = "Şengönül",
            role = c("aut", "cre"),
@@ -29,6 +29,7 @@ Suggests:
     knitr,
     rmarkdown,
     shiny,
+    survival,
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
 Config/roxygen2/version: 8.1.1

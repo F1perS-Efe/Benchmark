@@ -82,7 +82,65 @@ validate_dataset <- function(dataset, name = NULL) {
     )
   }
 
+  # Opsiyonel sagkalim sutunlari (yoksa sessiz; varsa dogrula)
+  .validate_optional_survival_columns(dataset$sample_meta, label = label)
+
   invisible(dataset)
+}
+
+#' Opsiyonel OS/PFS sagkalim sutunlarini dogrula
+#'
+#' `os_time`/`os_event` ve/veya `pfs_time`/`pfs_event` varsa kurallari uygular.
+#' Sutun yoksa hata/uyari uretmez (geriye donuk uyum).
+#'
+#' @param sample_meta Metadata data.frame.
+#' @param label Hata mesaji etiketi.
+#' @return Gorunmez `TRUE`.
+#' @noRd
+.validate_optional_survival_columns <- function(sample_meta, label = "dataset") {
+  time_cols <- intersect(c("os_time", "pfs_time"), names(sample_meta))
+  event_cols <- intersect(c("os_event", "pfs_event"), names(sample_meta))
+
+  for (tc in time_cols) {
+    x <- sample_meta[[tc]]
+    if (!is.numeric(x)) {
+      stop(
+        "`", label, "$sample_meta$", tc, "` sayisal olmalidir.",
+        call. = FALSE
+      )
+    }
+    bad <- !is.na(x) & x < 0
+    if (any(bad)) {
+      stop(
+        "`", label, "$sample_meta$", tc,
+        "` negatif olamaz (>= 0; NA haric).",
+        call. = FALSE
+      )
+    }
+  }
+
+  for (ec in event_cols) {
+    x <- sample_meta[[ec]]
+    # Coerce factors/characters carefully: only 0/1/NA allowed after numeric
+    x_num <- suppressWarnings(as.numeric(as.character(x)))
+    if (length(x_num) != length(x) || any(!is.na(x) & is.na(x_num))) {
+      stop(
+        "`", label, "$sample_meta$", ec,
+        "` yalnizca 0, 1 veya NA icermelidir.",
+        call. = FALSE
+      )
+    }
+    ok <- is.na(x_num) | x_num %in% c(0, 1)
+    if (!all(ok)) {
+      stop(
+        "`", label, "$sample_meta$", ec,
+        "` yalnizca 0, 1 veya NA icermelidir.",
+        call. = FALSE
+      )
+    }
+  }
+
+  invisible(TRUE)
 }
 
 #' Yinelenen gen satirlarini birlestir

@@ -10,6 +10,7 @@ params:
   summary_tbl: NULL
   sensitivity_tbl: NULL
   params_list: NULL
+  surv_res: NULL
 ---
 
 ```{r setup, include=FALSE}
@@ -17,6 +18,7 @@ knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, fig.width 
 results <- params$results
 summary_tbl <- params$summary_tbl
 sensitivity_tbl <- params$sensitivity_tbl
+surv_res <- params$surv_res
 pl <- params$params_list
 if (is.null(pl)) pl <- list()
 hm <- if (!is.null(pl$heatmap_method)) as.character(pl$heatmap_method)[1] else "mean"
@@ -345,10 +347,41 @@ if (ok_fr) {
 }
 ```
 
+```{r clinical-benefit, results='asis'}
+has_surv <- !is.null(surv_res) && is.data.frame(surv_res) && nrow(surv_res) > 0
+if (has_surv) {
+  cat("\n\n## Clinical Benefit: Survival Analysis (Cox PH & Kaplan-Meier)\n\n")
+  cat(
+    "Cox proportional hazards (continuous z-score) and Kaplan-Meier log-rank ",
+    "summaries for cohorts with survival columns. Combined with response ",
+    "discrimination (AUC) when available.\n\n"
+  )
+  knitr::kable(surv_res, digits = 3)
+  if (is.data.frame(results) && nrow(results) > 0) {
+    cat("\n\n### Response discrimination + clinical benefit\n\n")
+    combo <- tryCatch(
+      SigBenchR::combine_response_and_survival(results, surv_res),
+      error = function(e) NULL
+    )
+    if (is.data.frame(combo) && nrow(combo) > 0) {
+      keep_cols <- intersect(
+        c(
+          "cohort", "dataset", "signature", "method", "auc", "auc_ci_low",
+          "auc_ci_high", "hr", "cox_p", "logrank_p", "c_index", "n",
+          "n_samples", "n_events", "endpoint"
+        ),
+        names(combo)
+      )
+      knitr::kable(combo[, keep_cols, drop = FALSE], digits = 3)
+    }
+  }
+}
+```
+
 ## Paket sürümleri ve oturum bilgisi
 
 ```{r session}
-pkgs <- c("SigBenchR", "pROC", "PRROC", "ggplot2", "withr", "rmarkdown", "knitr")
+pkgs <- c("SigBenchR", "pROC", "PRROC", "ggplot2", "withr", "rmarkdown", "knitr", "survival")
 vers <- vapply(pkgs, function(p) {
   if (requireNamespace(p, quietly = TRUE)) {
     as.character(utils::packageVersion(p))

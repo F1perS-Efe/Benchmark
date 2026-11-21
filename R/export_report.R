@@ -11,6 +11,8 @@
 #'   `n_boot`, `n_perm`, `seed`; istege bagli `heatmap_method`,
 #'   `forest_signature`.
 #' @param output_file Cikti HTML dosya yolu.
+#' @param surv_res Opsiyonel `run_survival_benchmark()` tablosu. `NULL`
+#'   (varsayilan) iken sagkalim bolumu render edilmez (geriye donuk uyum).
 #'
 #' @return `output_file` yolu (gorunmez).
 #' @export
@@ -18,7 +20,8 @@ export_report <- function(results,
                           summary_tbl,
                           sensitivity_tbl,
                           params_list,
-                          output_file) {
+                          output_file,
+                          surv_res = NULL) {
   if (!requireNamespace("rmarkdown", quietly = TRUE)) {
     stop(
       "HTML rapor icin 'rmarkdown' paketini kurun: install.packages(\"rmarkdown\")",
@@ -85,6 +88,10 @@ export_report <- function(results,
     dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
   }
 
+  if (!is.null(surv_res) && !is.data.frame(surv_res)) {
+    stop("`surv_res` NULL veya data.frame olmalidir.", call. = FALSE)
+  }
+
   rmarkdown::render(
     input = rmd,
     output_file = basename(output_file),
@@ -93,7 +100,8 @@ export_report <- function(results,
       results = results,
       summary_tbl = summary_tbl,
       sensitivity_tbl = sensitivity_tbl,
-      params_list = params_list
+      params_list = params_list,
+      surv_res = surv_res
     ),
     envir = new.env(parent = globalenv()),
     quiet = TRUE

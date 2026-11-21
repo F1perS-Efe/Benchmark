@@ -4,7 +4,14 @@
 \alias{export_report}
 \title{Benchmark sonuclarini HTML rapor olarak disa aktar}
 \usage{
-export_report(results, summary_tbl, sensitivity_tbl, params_list, output_file)
+export_report(
+  results,
+  summary_tbl,
+  sensitivity_tbl,
+  params_list,
+  output_file,
+  surv_res = NULL
+)
 }
 \arguments{
 \item{results}{\code{run_benchmark()} cikti tablosu.}
@@ -19,6 +26,9 @@ export_report(results, summary_tbl, sensitivity_tbl, params_list, output_file)
 \code{forest_signature}.}
 
 \item{output_file}{Cikti HTML dosya yolu.}
+
+\item{surv_res}{Opsiyonel \code{run_survival_benchmark()} tablosu. \code{NULL}
+(varsayilan) iken sagkalim bolumu render edilmez (geriye donuk uyum).}
 }
 \value{
 \code{output_file} yolu (gorunmez).
