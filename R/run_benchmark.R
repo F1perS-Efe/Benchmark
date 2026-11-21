@@ -12,8 +12,15 @@
 #' @param coverage_threshold Kapsama uyari esigi (0-1). Varsayilan 0.70.
 #' @param apply_log2 `scale = "linear"` iken log2 uygula.
 #' @param sd_handling `encode_response()` politikasi.
+#' @param min_n,min_per_class Kucuk kohort esikleri (`roc_auc`).
+#' @param compute_pr PR-AUC hesapla. Varsayilan TRUE.
+#' @param n_boot PR-AUC bootstrap tekrari. Varsayilan 1000; hizli onizleme icin dusurulebilir.
+#' @param compute_null Null permütasyon testi. Varsayilan FALSE.
+#' @param n_perm Null permütasyon sayisi. Varsayilan 200.
+#' @param seed Rastgelelik tohumu (PR bootstrap ve null).
+#' @param match_expression Null icin ifade-eslesmeli ornekleme.
 #'
-#' @return `data.frame` sonuc tablosu (`coverage_label`, `missing_genes` dahil).
+#' @return `data.frame` sonuc tablosu.
 #' @export
 run_benchmark <- function(signatures,
                           datasets,
@@ -22,7 +29,15 @@ run_benchmark <- function(signatures,
                           min_genes = 3L,
                           coverage_threshold = 0.70,
                           apply_log2 = TRUE,
-                          sd_handling = "exclude") {
+                          sd_handling = "exclude",
+                          min_n = 20L,
+                          min_per_class = 5L,
+                          compute_pr = TRUE,
+                          n_boot = 1000L,
+                          compute_null = FALSE,
+                          n_perm = 200L,
+                          seed = 42L,
+                          match_expression = FALSE) {
   if (is.null(names(signatures)) || any(!nzchar(names(signatures)))) {
     stop("`signatures` isimli bir liste olmalidir.", call. = FALSE)
   }
@@ -32,7 +47,6 @@ run_benchmark <- function(signatures,
   method_choices <- c("mean", "zscore", "median", "rank")
   methods <- match.arg(methods, choices = method_choices, several.ok = TRUE)
 
-  # Farkli normalizasyon uyarisi (birlestirme yok; yalnizca bilgilendirme).
   norms <- vapply(datasets, function(d) as.character(d$info$normalization), character(1))
   if (length(unique(norms)) > 1L) {
     warning(
@@ -111,6 +125,16 @@ run_benchmark <- function(signatures,
           missing_genes = paste(scored$coverage$missing, collapse = ","),
           low_coverage = low_cov,
           auc = NA_real_,
+          auc_ci_low = NA_real_,
+          auc_ci_high = NA_real_,
+          auc_var = NA_real_,
+          var_zero = NA,
+          small_cohort = NA,
+          pr_auc = NA_real_,
+          pr_baseline = NA_real_,
+          pr_ci_low = NA_real_,
+          pr_ci_high = NA_real_,
+          null_p = NA_real_,
           normalization = ds$info$normalization,
           scale = ds$info$scale,
           cancer = cancer,
@@ -128,7 +152,6 @@ run_benchmark <- function(signatures,
           next
         }
 
-        # Skorlar ile yaniti ornek id uzerinden hizala.
         sample_ids <- names(scored$scores)
         meta_idx <- match(sample_ids, ds$sample_meta$sample_id)
         resp <- enc$response[meta_idx]
@@ -137,7 +160,6 @@ run_benchmark <- function(signatures,
         scores_use <- scored$scores[keep]
         resp_use <- resp[keep]
 
-        # derived_from (Faz 1: alan tasinir; ozetten cikarma Faz 2)
         derived <- sig$derived_from
         if (is.null(derived)) {
           derived <- character(0)
@@ -153,7 +175,12 @@ run_benchmark <- function(signatures,
         }
 
         roc_res <- tryCatch(
-          roc_auc(scores_use, resp_use, direction = sig_dir),
+          roc_auc(
+            scores_use, resp_use,
+            direction = sig_dir,
+            min_n = min_n,
+            min_per_class = min_per_class
+          ),
           error = function(e) e
         )
 
@@ -169,8 +196,57 @@ run_benchmark <- function(signatures,
         base$n_pos <- roc_res$n_pos
         base$n_neg <- roc_res$n_neg
         base$auc <- roc_res$auc
+        base$auc_ci_low <- roc_res$auc_ci_low
+        base$auc_ci_high <- roc_res$auc_ci_high
+        base$auc_var <- roc_res$auc_var
+        base$var_zero <- roc_res$var_zero
+        base$small_cohort <- roc_res$small_cohort
         base$skipped <- FALSE
         base$skip_reason <- NA_character_
+
+        if (isTRUE(compute_pr)) {
+          pr_res <- tryCatch(
+            pr_auc(
+              scores_use, resp_use,
+              direction = sig_dir,
+              n_boot = n_boot,
+              seed = seed
+            ),
+            error = function(e) e
+          )
+          if (!inherits(pr_res, "error")) {
+            base$pr_auc <- pr_res$pr_auc
+            base$pr_baseline <- pr_res$pr_baseline
+            base$pr_ci_low <- pr_res$pr_ci_low
+            base$pr_ci_high <- pr_res$pr_ci_high
+          }
+        }
+
+        if (isTRUE(compute_null)) {
+          # Null icin yaniti mat sutun sirasina cevir
+          resp_full <- enc$response
+          names(resp_full) <- ds$sample_meta$sample_id
+          null_res <- tryCatch(
+            null_permutation_test(
+              mat = expr,
+              response = resp_full,
+              n_genes = scored$coverage$n_found,
+              exclude_genes = scored$coverage$found,
+              method = method,
+              direction = sig_dir,
+              n_perm = n_perm,
+              seed = seed,
+              match_expression = match_expression,
+              signature_genes = scored$coverage$found,
+              observed_scores = scores_use,
+              min_genes = min_genes
+            ),
+            error = function(e) e
+          )
+          if (!inherits(null_res, "error")) {
+            base$null_p <- null_res$null_p
+          }
+        }
 
         row_i <- row_i + 1L
         rows[[row_i]] <- base

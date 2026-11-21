@@ -37,15 +37,16 @@ Shiny arayüzü:
 SigBenchR::run_app()
 ```
 
-## Kapsam (Faz 1 + Faz 2A)
+## Kapsam (Faz 1 + 2A + 2B)
 
 - Skorlama: `mean`, `zscore`, `median`, `rank`
-- ROC-AUC (sabit yön; `orient_score` sonrası her zaman `pROC` `direction = "<"`)
-- Gen kapsama denetimi + ısı haritasında düşük kapsama gri uyarısı
-- Skorlama dayanıklılığı: `check_sensitivity()` (eşik varsayılanı 0.10, keyfidir)
-- Sentetik 2 demo veri seti + Cytokine-5 / IFNG6 / Random3
-- Gen eşleştirme: büyük harfe çevrilmiş **tam eşleşme** (alias yok)
-- Shiny (`inst/shiny/app.R`)
+- ROC-AUC + DeLong %95 GA / varyans; küçük kohort uyarısı
+- PR-AUC + prevalans + tabakalı bootstrap GA (`PRROC`)
+- Null permütasyon (`auc_mw` vektörize; p = (k+1)/(B+1))
+- Eşleştirilmiş DeLong iki imza karşılaştırması (`compare_signatures`, BH)
+- Gen kapsama denetimi + gri düşük-kapsama ısı haritası
+- Skorlama dayanıklılığı: `check_sensitivity()` (eşik 0.10 keyfidir)
+- Sentetik demo veri + Shiny
 
 **v1 dışı:** Aynı imzada gen bazlı `+` / `-` işaretleri; takma ad eşleştirme.
 

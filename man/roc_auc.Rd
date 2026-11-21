@@ -4,7 +4,13 @@
 \alias{roc_auc}
 \title{ROC-AUC hesapla (sabit yon, cift ters cevirme yok)}
 \usage{
-roc_auc(scores, response, direction = c("<", ">"))
+roc_auc(
+  scores,
+  response,
+  direction = c("<", ">"),
+  min_n = 20L,
+  min_per_class = 5L
+)
 }
 \arguments{
 \item{scores}{Ornek skorlari (isimli vektor olabilir).}
@@ -12,12 +18,20 @@ roc_auc(scores, response, direction = c("<", ">"))
 \item{response}{0/1 yanit vektoru (ayni uzunluk / hizali isimler).}
 
 \item{direction}{Imza yonu: \code{"<"} veya \code{">"}. Yalnizca \code{orient_score}'a gider.}
+
+\item{min_n}{Kucuk kohort icin toplam n esigi. Varsayilan 20.}
+
+\item{min_per_class}{Kucuk kohort icin sinif basi minimum. Varsayilan 5.}
 }
 \value{
-Liste: \code{auc}, \code{n}, \code{n_pos}, \code{n_neg}, \code{roc} (pROC nesnesi).
+Liste: \code{auc}, \code{auc_ci_low}, \code{auc_ci_high}, \code{auc_var}, \code{var_zero},
+\code{small_cohort}, \code{n}, \code{n_pos}, \code{n_neg}, \code{roc}, \code{scores_oriented}.
 }
 \description{
 Akis: \code{orient_score()} ile skorlari "yuksek = yanitli" yap, ardindan
 \code{pROC::roc()} cagrisini her zaman \code{direction = "<"} ile yap.
 AUC < 0.5 ise ters cevirmeden durustce raporlanir.
+}
+\details{
+DeLong yontemiyle \%95 GA (\code{ci.auc}) ve AUC varyansi (\code{var}) eklenir.
 }

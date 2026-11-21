@@ -12,7 +12,15 @@ run_benchmark(
   min_genes = 3L,
   coverage_threshold = 0.7,
   apply_log2 = TRUE,
-  sd_handling = "exclude"
+  sd_handling = "exclude",
+  min_n = 20L,
+  min_per_class = 5L,
+  compute_pr = TRUE,
+  n_boot = 1000L,
+  compute_null = FALSE,
+  n_perm = 200L,
+  seed = 42L,
+  match_expression = FALSE
 )
 }
 \arguments{
@@ -31,9 +39,23 @@ run_benchmark(
 \item{apply_log2}{\code{scale = "linear"} iken log2 uygula.}
 
 \item{sd_handling}{\code{encode_response()} politikasi.}
+
+\item{min_n, min_per_class}{Kucuk kohort esikleri (\code{roc_auc}).}
+
+\item{compute_pr}{PR-AUC hesapla. Varsayilan TRUE.}
+
+\item{n_boot}{PR-AUC bootstrap tekrari. Varsayilan 1000; hizli onizleme icin dusurulebilir.}
+
+\item{compute_null}{Null permütasyon testi. Varsayilan FALSE.}
+
+\item{n_perm}{Null permütasyon sayisi. Varsayilan 200.}
+
+\item{seed}{Rastgelelik tohumu (PR bootstrap ve null).}
+
+\item{match_expression}{Null icin ifade-eslesmeli ornekleme.}
 }
 \value{
-\code{data.frame} sonuc tablosu (\code{coverage_label}, \code{missing_genes} dahil).
+\code{data.frame} sonuc tablosu.
 }
 \description{
 Her veri seti icinde ayri AUC hesaplar; ham ifadeleri birlestirmez.
