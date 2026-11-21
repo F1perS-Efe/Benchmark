@@ -35,5 +35,7 @@ export_report(
 }
 \description{
 \code{inst/rmd/benchmark_report.Rmd} sablonunu \code{rmarkdown::render()} ile
-isler. \code{rmarkdown} Suggests bagimliligidir; yoksa anlasilir hata verir.
+isler. Rapor "research use only / not a clinical decision support tool"
+uyarisini icerir. \code{rmarkdown} Suggests bagimliligidir; yoksa anlasilir
+hata verir.
 }

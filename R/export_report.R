@@ -1,7 +1,9 @@
 #' Benchmark sonuclarini HTML rapor olarak disa aktar
 #'
 #' `inst/rmd/benchmark_report.Rmd` sablonunu `rmarkdown::render()` ile
-#' isler. `rmarkdown` Suggests bagimliligidir; yoksa anlasilir hata verir.
+#' isler. Rapor "research use only / not a clinical decision support tool"
+#' uyarisini icerir. `rmarkdown` Suggests bagimliligidir; yoksa anlasilir
+#' hata verir.
 #'
 #' @param results `run_benchmark()` cikti tablosu.
 #' @param summary_tbl `summarize_auc()` ozet tablosu.

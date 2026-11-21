@@ -2,28 +2,22 @@
 
 [![R-CMD-check](https://github.com/F1perS-Efe/Benchmark/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/F1perS-Efe/Benchmark/actions/workflows/R-CMD-check.yaml)
 
-Bir gen imzasının (gen listesi) immünoterapi yanıt sınıfları arasında **ayırt edici** (discrimination) olup olmadığını birden fazla veri setinde istatistiksel olarak sınayan, tekrarlanabilir doğrulama aracı. AUC klinik tahmin / kalibrasyon modeli değildir.
+SigBenchR, bir gen imzasının immünoterapi yanıt sınıflarını birden fazla kohortta ayırt edip etmediğini (discrimination) sınayan bir R paketidir. AUC burada klinik tahmin veya kalibrasyon modeli değildir.
 
-> **Önemli:** Bu araç klinik karar desteği değildir. Sonuçlar araştırma amaçlıdır; küçük örneklemlerde belirsizdir. “Kanıt yok” sonucu da netçe raporlanır. Eşikler ve varsayılanlar sonuçlara bakıldıktan sonra değiştirilmemelidir.
+Araç klinik karar desteği için değildir. Sonuçlar araştırma amaçlıdır; küçük örneklemlerde belirsizlik yüksektir. “Kanıt yok” da geçerli bir sonuçtur. Eşikleri sonuçlara baktıktan sonra değiştirmeyin.
 
-## Overview (English)
-
-SigBenchR is a pure CRAN / zero-Bioconductor R package for reproducible gene-signature benchmarking in immuno-oncology. Datasets follow a lightweight `list(expr, sample_meta, info)` contract, with optional GMT and `SummarizedExperiment` adapters for interoperability. Five scoring methods are supported (`mean`, `zscore`, `median`, `rank`, `ss_rank`), including signed `+`/`-` signatures; 53 immuno-oncology gene aliases are rescued automatically; and gene coverage is reported as `coverage_status` (`ok` / `low_power` / `invalid`). Evaluation is leakage-free (`enc$kept` filtering before scoring and permutation), with an 8-signature literature ICI panel plus 3 negative controls, biological-context correlations (`correlate_reference_axes()`), Hanley–McNeil power (`estimate_auc_power()`), REML + truncated HKSJ meta-analysis, and optional Cox PH / Kaplan–Meier survival via `evaluate_survival()`.
-
-## Methods (Publication-Ready Summary)
-
-For each cohort, linear-scale expression (`scale == "linear"`) is transformed with `log2(x + 1)`; SD/NA response samples are removed via `enc$kept` before scoring and null permutation. Signature scores are oriented with `orient_score()` and evaluated with unidirectional ROC-AUC (`direction = "<"`) under DeLong 95% confidence intervals, alongside stratified bootstrap PR-AUC. Empirical nulls use a vectorized Mann–Whitney U statistic with p = (k + 1) / (B + 1) (`B = 1000` by default) and Benjamini–Hochberg adjustment across the signature × cohort family. Independent, adequately covered cohorts are summarized on the logit-AUC scale with REML random-effects meta-analysis and truncated HKSJ intervals; small-n discrimination power for a target AUC of 0.70 is reported with the Hanley–McNeil (1982) approximation. Optional clinical-benefit endpoints are assessed with 1-SD continuous Cox proportional hazards models and median-split Kaplan–Meier log-rank tests. Known limits are stated transparently: the bundled demo expression pool contains ~2,800 genes, meta-analysis with `k <= 4` cohorts is exploratory, and normalization schemes remain heterogeneous across cohorts.
+Paket Bioconductor `Imports` kullanmaz. Veri setleri `list(expr, sample_meta, info)` sözleşmesini izler; isteğe bağlı GMT ve `SummarizedExperiment` adapter’ları vardır.
 
 ## Kurulum
 
 ```r
-# Geliştirme (paket kökünden):
+# Paket kökünden:
 devtools::install(".")
 # veya
 # remotes::install_local(".")
 ```
 
-HTML rapor indirme için Suggests bağımlılığı:
+HTML rapor için Suggests bağımlılığı:
 
 ```r
 install.packages("rmarkdown")
@@ -31,7 +25,7 @@ install.packages("rmarkdown")
 
 ## Hızlı başlangıç
 
-### CLI (gerçek ICI kohortları)
+### CLI
 
 ```r
 library(SigBenchR)
@@ -54,7 +48,6 @@ plot_auc_forest(res, signature = "IFNG6", method = "mean", summary = sm)
 jaccard_signatures(signatures_demo)
 auc_correlation(res, method = "mean")
 
-# Tekrarlanabilir R kodu / HTML rapor
 cat(generate_r_code(
   signature_name = "IFNG6",
   methods = c("mean", "zscore"),
@@ -63,70 +56,31 @@ cat(generate_r_code(
 ))
 ```
 
-Sentetik `datasets_demo` (`demo_A`, `demo_B`) birim testleri ve hızlı denemeler için durur.
+Sentetik `datasets_demo` (`demo_A`, `demo_B`) birim testleri ve hızlı denemeler içindir. Geniş literatür paneli için CLI’da `get_builtin_signatures()` kullanın.
 
-### Shiny arayüzü
+### Shiny
 
 ```r
 SigBenchR::run_app()
 ```
 
-Shiny varsayılanı gerçek ICI kohortlarıdır (`van_allen_2015`, `hugo_2016`, `riaz_2017`, `gide_2019`). Arayüzde sonuç tablosu, ısı haritası, ROC, DeLong, ağırlıklı özet, forest, Jaccard, AUC korelasyonu, **HTML rapor indirme** ve **“Bu analizin R kodunu kopyala”** bulunur.
+Shiny varsayılan kohortları `van_allen_2015`, `hugo_2016`, `riaz_2017`, `gide_2019`’dur. İmza seçimi varsayılan olarak `signatures_demo` (Cytokine-5, IFNG6, Random3) ile sınırlıdır. Null permütasyon kapalıdır; açıkça işaretlenmelidir.
 
-## Özellik özeti
+Arayüzde sonuç tablosu, ısı haritası, ROC, DeLong, özet, forest, Jaccard, AUC korelasyonu, HTML rapor indirme ve “Bu analizin R kodunu kopyala” vardır.
 
-- Skorlama: `mean`, `zscore` (basit ortalama gen z-skoru; GSVA değil), `median`, `rank` (kohort-içi göreli sıralama; singscore değil), **`ss_rank`** (kohorttan bağımsız dikey tek-örnek sıralama; singscore tek/çift yönlü normalizasyonla uyumlu saf base R)
-- İşaretli (`+`/`-`) imzalar: `genes_up` / `genes_down` veya isimli sayısal `genes` (`c(IFNG = 1, VEGFA = -1)`)
-- ROC-AUC (ayırt edicilik) + DeLong %95 GA / varyans; küçük kohort uyarısı
-- PR-AUC + prevalans + tabakalı bootstrap GA (`PRROC`)
-- Null permütasyon (`auc_mw` vektörize; p = (k+1)/(B+1); işaretli null için `n_genes_down`); `null_p_adj_bh`
-- Eşleştirilmiş DeLong iki imza karşılaştırması (`compare_signatures`, BH)
-- Ağırlıklı özet: `summarize_auc()` — n-ağırlıklı + ters-varyans, Cochran `Q`, `I²`, **logit-AUC REML + kesilmiş HKSJ**; isteğe bağlı **`stratify_by`** (tedavi / klinik sonlanım alt grupları)
-- SD politika duyarlılığı: `check_sd_sensitivity()` (`exclude` / `as_0` / `as_1`)
-- Yerel kohort: `read_user_dataset()`, `load_cohort_bundle()`
-- İmza örtüşmesi: `jaccard_signatures()`; veri setleri boyunca `auc_correlation()`
-- Forest grafik: `plot_auc_forest()` (IVW + REML+HKSJ satırı)
-- Gen kapsama denetimi + gri düşük-kapsama ısı haritası
-- Skorlama dayanıklılığı: `check_sensitivity()` (eşik 0.10 keyfidir)
-- HTML rapor: `export_report()` (`inst/rmd/benchmark_report.Rmd`)
-- Tekrarlanabilir betik: `generate_r_code()` (`sd_handling`, `match_expression`, `n_perm = 1000`)
-- Gerçek melanoma ICI kohortları (`datasets_ici`) + sentetik demo + yenilenmiş Shiny UI + vinyet
+## Özellikler
 
-## Faz 3B Paket A — gerçek kohortlar
+**Skorlama:** `mean`, `zscore` (ortalama gen z-skoru; GSVA değil), `median`, `rank` (kohort-içi sıralama; singscore değil), `ss_rank` (örnek-içi dikey sıralama; singscore normalizasyonuyla uyumlu, saf base R). İşaretli `+`/`-` imzalar `genes_up` / `genes_down` veya isimli sayısal `genes` (`c(IFNG = 1, VEGFA = -1)`) ile verilir.
 
-| Kohort | n | n_pos | n_neg | n_SD | Normalizasyon | Ölçek | Kaynak |
-|--------|--:|------:|------:|----:|---------------|-------|--------|
-| `van_allen_2015` | 42 | 19 | 23 | 0 | TPM | linear | GitHub vanallenlab TPM |
-| `hugo_2016` | 26 | 14 | 12 | 0 | FPKM | linear | GEO GSE78220 |
-| `riaz_2017` | 49 | 10 | 23 | 16 | FPKM | linear | GEO GSE91061 (`PRCR`→`PR`, `UNK` dışlandı) |
-| `gide_2019` | 41 | 19 | 16 | 6 | normalized counts | linear | GitHub Gide/Quek |
+**Değerlendirme:** ROC-AUC (DeLong %95 GA), PR-AUC (tabakalı bootstrap), isteğe bağlı null permütasyon (`compute_null = FALSE`; `B = 1000`; p = (k+1)/(B+1); BH: `null_p_adj_bh`), eşleştirilmiş DeLong (`compare_signatures`). Skorlama ve permütasyon yalnızca `enc$kept` örneklerinde çalışır.
 
-Liu 2019 (cBioPortal) S3/LFS **403** verdiği için dahil edilmedi.
+**Özet ve yardımcıları:** `summarize_auc()` — n-ağırlıklı + ters-varyans, Cochran Q, I², logit-AUC REML + kesilmiş HKSJ; isteğe bağlı `stratify_by`. Forest: `plot_auc_forest()`. SD duyarlılığı: `check_sd_sensitivity()`. Dayanıklılık: `check_sensitivity()` (eşik 0.10 keyfidir). Hanley–McNeil güç: `estimate_auc_power()` / `power_auc70`. Biyolojik eksenler: `correlate_reference_axes()`. İsteğe bağlı Cox PH / Kaplan–Meier: `evaluate_survival()` (`survival` Suggests).
 
-**Klinik etiket şeffaflığı**
+**Veri ve kapsama:** `read_user_dataset()`, `load_cohort_bundle()`, `read_gmt()`. Gen takma adı kurtarma (~53 immuno-onkoloji alias; `match_genes(use_aliases = TRUE)`). `coverage_status`: `ok` / `low_power` / `invalid`. İmza örtüşmesi: `jaccard_signatures()`; kohortlar arası: `auc_correlation()`.
 
-- `van_allen_2015` (`sample_meta$treatment = "anti-CTLA4"`): Yanıt etiketleri `xmuyulab/ims_gene_signature` `mel_van_cli_data.csv` ikili `response` alanından gelir (`1`→PR/pozitif, `0`→PD/negatif; bu kohortta SD/`-1` yok). IMS paketlemesi Van Allen (Science 2015) **klinik yarar** (clinical benefit: CR/PR veya uzun sağkalımlı SD) sınıflamasına dayanır → **`n_pos = 19`**, `n_neg = 23`, `n = 42`. Bu tanım Hugo/Riaz/Gide RECIST CR/PR–PD ekseni ile birebir değildir.
-- `hugo_2016` / `riaz_2017` / `gide_2019`: anti-PD-1; RECIST CR/PR vs PD. `riaz_2017` **16 SD** içerir ve önceki anti-CTLA-4 maruziyeti heterojenliği taşır.
-- `gide_2019` (`sample_meta$treatment = "anti-PD1"`): `n = 41` alt kümesi yalnızca ENA `PD1_*_PRE` örnekleridir (**anti-PD1 monoterapi**); normalizasyon **normalized counts**. `ipiPD1_*_PRE` (anti-PD1 + anti-CTLA4 kombinasyon) dahil değildir; IMS `mel_gide19_cli_data.csv` pre satırları ile birebir örtüşür (`n_pos = 19`, `n_neg = 16`, `n_SD = 6`).
-
-**Ön işleme:** yalnızca pre-treatment; hasta başına tek örnek (pseudo-replication yok).  
-**Tarafsız null havuzu / paket boyutu:** her kohortta demo imza genleri + sıfır varyanslı olmayan genlerden **`seed = 42`** ile rastgele **~2.800 gen**; `compress = "xz"`; `data/` toplamı **&lt; 5 MB**. Ayrıntı, kaynak URL’leri ve dışlama kuralları: [`data-raw/PROVENANCE.md`](data-raw/PROVENANCE.md); yeniden üretim: `data-raw/prepare_ici_datasets.R`, `data-raw/ici_cohort_summary.csv`.  
-**Dürüst sınırlama:** ~2.800 genlik havuz nedeniyle özel (arbitrary) imzalarda gen kapsaması tipik olarak ~%14–15 ile sınırlıdır; bu sürüm **keşifsel bir prototiptir**, tam-genom ICI yeniden analizi değildir.  
-**Bağımsızlık:** `Cytokine-5$derived_from` bu kohort adlarını içerir (`independent = FALSE`); `IFNG6` / `Random3` açıkça `derived_from = character(0)` taşır (`independent = TRUE`). Kökeni belirtilmemiş özel imzalar `independent = NA` alır ve varsayılan bağımsız özete girmez.  
-**Yazar:** `DESCRIPTION` içinde `Efe Kaan Şengönül <fperskaan@gmail.com>` (`aut`, `cre`); placeholder yok.
-
-## SigBenchR v0.4.5 — mevcut / hâlâ kapsam dışı
-
-- **Mevcut (v0.4.2+):** 53 immuno-onkoloji gen takma adı kurtarma (`match_genes(use_aliases = TRUE)`); `coverage_status` (`ok` / `low_power` / `invalid`); `get_builtin_signatures()` literatür paneli
-- **Mevcut (v0.4.0–0.4.5):** `ss_rank`, işaretli `+`/`-` imzalar, `stratify_by`, logit-AUC REML+HKSJ, `check_sd_sensitivity()`, `read_user_dataset()`, `load_cohort_bundle()`, biyolojik eksenler, Hanley–McNeil power, isteğe bağlı Cox/KM sağkalım, Shiny UI, vinyet
-- Bioconductor **Imports yok** (`singscore` / `GSVA` zorunlu değil; `ss_rank` saf base R). `SummarizedExperiment` dönüşümü Suggests/opsiyonel adapter ile, sert bağımlılık değil
-- Klasik DerSimonian–Laird rastgele etkiler **yok** (yerine logit-AUC REML + kesilmiş HKSJ)
-- Shiny varsayılanı yalnız `signatures_demo` (3 imza); geniş panel CLI’da `get_builtin_signatures()` ile
-- Null permütasyon varsayılan **kapalı** (`compute_null = FALSE`); Shiny’de açıkça işaretlenmeli
+**Rapor:** `export_report()`, `generate_r_code()`. Literatür paneli: `get_builtin_signatures()` (≥8 ICI imzası + 3 negatif kontrol).
 
 ## Veri yapısı
-
-Bioconductor nesnesi kullanılmaz. Her veri seti sade bir listedir:
 
 ```r
 list(
@@ -136,18 +90,46 @@ list(
 )
 ```
 
+`scale == "linear"` ise skorlamadan önce `log2(x + 1)` uygulanır.
+
 ## Yanıt kodlama
 
 - Varsayılan: `CR` / `PR` = 1, `PD` = 0
-- Stabil hastalık (`SD`): varsayılan **dışlanır** (`sd_handling = "exclude"`)
+- Stabil hastalık (`SD`): varsayılan olarak dışlanır (`sd_handling = "exclude"`)
+- Alternatifler: `"as_0"` (ORR: CR/PR vs SD/PD), `"as_1"` (DCR: CR/PR/SD vs PD)
+
+## ICI kohortları
+
+| Kohort | n | n_pos | n_neg | n_SD | Normalizasyon | Ölçek | Kaynak |
+|--------|--:|------:|------:|----:|---------------|-------|--------|
+| `van_allen_2015` | 42 | 19 | 23 | 0 | TPM | linear | GitHub vanallenlab TPM |
+| `hugo_2016` | 26 | 14 | 12 | 0 | FPKM | linear | GEO GSE78220 |
+| `riaz_2017` | 49 | 10 | 23 | 16 | FPKM | linear | GEO GSE91061 (`PRCR`→`PR`, `UNK` dışlandı) |
+| `gide_2019` | 41 | 19 | 16 | 6 | normalized counts | linear | GitHub Gide/Quek |
+
+Liu 2019 (cBioPortal) S3/LFS 403 verdiği için dahil edilmedi.
+
+**Klinik etiketler**
+
+- `van_allen_2015` (`treatment = "anti-CTLA4"`): Etiketler IMS `mel_van_cli_data.csv` ikili `response` alanından gelir (`1`→PR/pozitif, `0`→PD/negatif; SD yok). Bu, Van Allen (Science 2015) klinik yarar tanımına dayanır (`n_pos = 19`, `n_neg = 23`, `n = 42`) ve Hugo/Riaz/Gide RECIST CR/PR–PD ekseniyle birebir aynı değildir.
+- `hugo_2016` / `riaz_2017` / `gide_2019`: anti-PD-1; RECIST CR/PR vs PD. `riaz_2017` 16 SD içerir ve önceki anti-CTLA-4 maruziyeti taşır.
+- `gide_2019` (`treatment = "anti-PD1"`): Yalnızca ENA `PD1_*_PRE` (anti-PD1 monoterapi; `n = 41`). `ipiPD1_*_PRE` kombinasyon dahil değildir (`n_pos = 19`, `n_neg = 16`, `n_SD = 6`).
+
+**Ön işleme:** yalnızca pre-treatment; hasta başına tek örnek.
+
+**Paket boyutu:** Her kohortta demo imza genleri + sıfır varyanslı olmayan genlerden `seed = 42` ile ~2.800 gen örneklenir (`compress = "xz"`; `data/` &lt; 5 MB). Kaynak URL’leri ve dışlama kuralları: [`data-raw/PROVENANCE.md`](data-raw/PROVENANCE.md). Yeniden üretim: `data-raw/prepare_ici_datasets.R`, `data-raw/ici_cohort_summary.csv`.
+
+**Sınırlar:** ~2.800 genlik havuzda özel imzalarda kapsama tipik olarak ~%14–15’tir; bu sürüm keşifsel bir prototiptir, tam-genom ICI yeniden analizi değildir. `k ≤ 4` meta-analiz keşifseldir. Kohort normalizasyonları heterojendir; ham ifadeler birleştirilmez. Tam matris için `read_user_dataset()` / `load_cohort_bundle()` kullanın.
+
+**Bağımsızlık:** `Cytokine-5$derived_from` bu kohort adlarını içerir (`independent = FALSE`). `IFNG6` / `Random3` için `derived_from = character(0)` (`independent = TRUE`). Kökeni belirtilmemiş özel imzalar `independent = NA` alır ve varsayılan bağımsız özete girmez.
 
 ## Dağıtım (shinyapps.io)
 
-Henüz otomatik deploy yoktur. `rsconnect` ile yayınlamak için:
+Otomatik deploy yoktur. `rsconnect` ile:
 
 1. Paketi kurun (`devtools::install(".")` veya uzak depodan).
-2. Repo kökündeki ince sarmalayıcı `app.R` yalnızca `SigBenchR::run_app()` çağırır (`R CMD check` için `.Rbuildignore` içinde `^app\.R$`).
-3. Suggests paketlerini (özellikle `shiny`, `DT`, `rmarkdown`, `knitr`) hedef ortamda kurun; aksi halde UI özellikleri sessizce düşer veya rapor indirme hata verir.
+2. Repo kökündeki `app.R` yalnızca `SigBenchR::run_app()` çağırır (`.Rbuildignore` içinde `^app\.R$`).
+3. Suggests paketlerini (`shiny`, `DT`, `rmarkdown`, `knitr`) hedef ortamda kurun; aksi halde UI özellikleri sessizce düşer veya rapor indirme hata verir.
 4. Örnek:
 
 ```r
@@ -160,11 +142,7 @@ rsconnect::deployApp(
 )
 ```
 
-Not: `rsconnect` paket listesini doğru çıkarsın diye önce `SigBenchR`’ın Imports/Suggests bağımlılıklarının kurulabilir olduğundan emin olun. Uygulama dahili halka açık melanoma ICI kohortları üzerinde çalışır; yalnızca gen sembolleri girin.
-
-## Bilimsel yorum sınırı
-
-Sonuçlar araştırma bağlamındadır; klinik karar aracı değildir. Küçük kohortlarda güven aralıkları geniştir. Eşikler (kapsama, dayanıklılık) sonuçlara bakıldıktan sonra değiştirilmemelidir.
+`rsconnect` bağımlılık listesini doğru çıkarsın diye önce Imports/Suggests paketlerinin kurulabilir olduğundan emin olun. Uygulama dahili melanoma ICI kohortları üzerinde çalışır; yalnızca gen sembolleri girin.
 
 ## Atıflar
 

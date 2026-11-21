@@ -177,9 +177,17 @@ if (!compute_null && is.data.frame(results) && "null_p" %in% names(results)) {
 
 # 1. Executive Summary & Run Parameters
 
-This report is for research use only and is not a clinical decision-support tool.
-AUC measures discrimination between response classes, not calibrated clinical prediction.
-Thresholds must not be changed after inspecting results.
+```{r clinical-decision-disclaimer, results='asis'}
+# Emit as a single-line HTML notice so pandoc wrap cannot split
+# "clinical decision" across lines (breaks grepl in tests).
+cat(paste0(
+  "<div class='sb-notice'><strong>Research use only.</strong> ",
+  "This report is not a clinical decision support tool. ",
+  "AUC measures discrimination between response classes, not calibrated ",
+  "clinical prediction. Thresholds must not be changed after inspecting ",
+  "results.</div>\n"
+))
+```
 
 ```{r exploratory-notice, results='asis'}
 n_cohorts_report <- if (is.data.frame(results) && nrow(results) > 0 && "dataset" %in% names(results)) {

@@ -79,7 +79,12 @@ test_that("export_report gecici dizinde HTML uretir", {
 
   expect_true(file.exists(path))
   html <- paste(readLines(path, warn = FALSE), collapse = "\n")
-  expect_true(grepl("clinical decision", html, ignore.case = TRUE))
+  # Collapse whitespace so pandoc line-wrap cannot hide the disclaimer.
+  html_flat <- gsub("\\s+", " ", html, perl = TRUE)
+  expect_true(
+    grepl("clinical decision support", html_flat, ignore.case = TRUE),
+    info = "HTML report must state it is not a clinical decision support tool"
+  )
   expect_true(grepl("Null permutation", html, fixed = TRUE))
   expect_true(grepl("Not run", html, fixed = TRUE))
   # Missing values render as em-dash (U+2014) or HTML entity in presentation layer
