@@ -4,7 +4,12 @@
 \alias{plot_auc_heatmap}
 \title{Imza x veri seti AUC isi haritasi}
 \usage{
-plot_auc_heatmap(results, method = NULL, coverage_threshold = 0.7)
+plot_auc_heatmap(
+  results,
+  method = NULL,
+  coverage_threshold = 0.7,
+  show_normalization = TRUE
+)
 }
 \arguments{
 \item{results}{\code{run_benchmark()} ciktisi.}
@@ -12,6 +17,10 @@ plot_auc_heatmap(results, method = NULL, coverage_threshold = 0.7)
 \item{method}{Belirli bir skorlama yontemi suz. \code{NULL} ise ilk yontem.}
 
 \item{coverage_threshold}{0-1. Varsayilan 0.70.}
+
+\item{show_normalization}{If \code{TRUE} (default) and a \code{normalization} column
+is present, cohort axis labels become \code{"cohort [TPM]"} style and a
+heterogeneous-scale caption note is appended.}
 }
 \value{
 \code{ggplot} nesnesi.

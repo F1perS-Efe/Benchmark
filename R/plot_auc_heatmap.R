@@ -6,12 +6,16 @@
 #' @param results `run_benchmark()` ciktisi.
 #' @param method Belirli bir skorlama yontemi suz. `NULL` ise ilk yontem.
 #' @param coverage_threshold 0-1. Varsayilan 0.70.
+#' @param show_normalization If `TRUE` (default) and a `normalization` column
+#'   is present, cohort axis labels become `"cohort [TPM]"` style and a
+#'   heterogeneous-scale caption note is appended.
 #'
 #' @return `ggplot` nesnesi.
 #' @export
 plot_auc_heatmap <- function(results,
                              method = NULL,
-                             coverage_threshold = 0.70) {
+                             coverage_threshold = 0.70,
+                             show_normalization = TRUE) {
   if (!is.data.frame(results) || nrow(results) == 0L) {
     stop("`results` bos olamaz.", call. = FALSE)
   }
@@ -46,10 +50,32 @@ plot_auc_heatmap <- function(results,
     sprintf("%.2f", df$auc)
   )
 
+  use_norm <- isTRUE(show_normalization) && "normalization" %in% names(df)
+  if (use_norm) {
+    norm_lab <- as.character(df$normalization)
+    norm_lab[is.na(norm_lab) | !nzchar(norm_lab)] <- "unknown"
+    df$dataset_label <- paste0(as.character(df$dataset), " [", norm_lab, "]")
+  } else {
+    df$dataset_label <- as.character(df$dataset)
+  }
+
+  caption <- paste0(
+    "Gri hucreler = dusuk gen kapsama (kapsama < %",
+    round(100 * coverage_threshold),
+    "). Gri, eksik kanit uyarisidir; sessizce yok sayilmamalidir."
+  )
+  if (use_norm) {
+    caption <- paste0(
+      caption,
+      " Note: Cohorts use heterogeneous expression scales; ",
+      "direct cross-cohort expression pooling is not performed."
+    )
+  }
+
   ggplot2::ggplot(
     df,
     ggplot2::aes(
-      x = .data$dataset,
+      x = .data$dataset_label,
       y = .data$signature,
       fill = .data$auc_plot
     )
@@ -70,11 +96,7 @@ plot_auc_heatmap <- function(results,
       title = paste0("AUC isi haritasi (", method, ")"),
       x = "Veri seti",
       y = "Imza",
-      caption = paste0(
-        "Gri hucreler = dusuk gen kapsama (kapsama < %",
-        round(100 * coverage_threshold),
-        "). Gri, eksik kanit uyarisidir; sessizce yok sayilmamalidir."
-      )
+      caption = caption
     ) +
     ggplot2::theme_minimal(base_size = 12) +
     ggplot2::theme(

@@ -30,6 +30,38 @@ sd_pol <- if (!is.null(pl$sd_handling)) as.character(pl$sd_handling)[1] else "ex
 > Eşikler ve varsayılanlar sonuçlara bakıldıktan sonra değiştirilmemelidir.
 > AUC, klinik tahmin modeli değil; yanıt sınıfları arası **ayırt edicilik (discrimination)** ölçüsüdür.
 
+```{r exploratory-notice, results='asis'}
+n_cohorts_report <- if (is.data.frame(results) && nrow(results) > 0 && "dataset" %in% names(results)) {
+  length(unique(as.character(results$dataset[!(results$skipped %in% TRUE)])))
+} else {
+  0L
+}
+small_n_flag <- FALSE
+if (is.data.frame(results) && nrow(results) > 0) {
+  if ("power_auc70" %in% names(results)) {
+    small_n_flag <- any(is.finite(results$power_auc70) & results$power_auc70 < 0.80, na.rm = TRUE)
+  }
+  if ("small_cohort" %in% names(results)) {
+    small_n_flag <- small_n_flag || any(results$small_cohort %in% TRUE, na.rm = TRUE)
+  }
+  if ("n" %in% names(results)) {
+    small_n_flag <- small_n_flag || any(is.finite(results$n) & results$n < 40, na.rm = TRUE)
+  }
+}
+if (n_cohorts_report <= 4L || isTRUE(small_n_flag)) {
+  cat(paste0(
+    "\n\n<div style='border:2px solid #F59E0B;background:#FFFBEB;padding:12px 14px;",
+    "border-radius:8px;margin:10px 0;'>\n",
+    "<strong>Exploratory Benchmark Notice</strong><br/>\n",
+    "Bu benchmark keşifseldir (doğrulayıcı değildir): kohort sayısı k &le; 4 ve/veya ",
+    "küçük-n kohortlar mevcut. Logit-AUC REML + HKSJ ve çapraz-kohort özetler ",
+    "hipotez üretmeye yöneliktir; bağımsız doğrulama gerektirir. ",
+    "AUC = 0.70 ayırt etme gücü (`power_auc70`) satır bazında raporlanır.\n",
+    "</div>\n\n"
+  ))
+}
+```
+
 ## Analiz parametreleri
 
 ```{r params-table}
@@ -188,39 +220,76 @@ if (is.data.frame(summary_tbl) && nrow(summary_tbl) > 0) {
 }
 ```
 
-## Alt Grup Bazlı Özet (Tedavi / Klinik Sonlanım)
+## Varsayılan Katmanlı Özet: treatment
 
-Birden fazla `treatment` veya `endpoint_type` değeri varsa özet bu alt gruplar
-içinde ayrıca hesaplanır; tek alt grupta gereksiz tekrar yapılmaz.
+`summarize_auc(..., stratify_by = "treatment")` — örn. anti-PD-1 vs anti-CTLA-4.
+Forest grafiği tabakasız özeti kullanmaya devam eder.
 
-```{r subgroup-summary}
-if (is.data.frame(results) && nrow(results) > 0) {
-  strat_cols <- c("treatment", "endpoint_type")
-  strat_cols <- strat_cols[strat_cols %in% names(results)]
-  n_levels <- vapply(strat_cols, function(col) {
-    length(unique(stats::na.omit(as.character(results[[col]]))))
-  }, integer(1))
-  if (length(strat_cols) > 0L && any(n_levels > 1L)) {
-    sg <- tryCatch(
-      suppressWarnings(
-        SigBenchR::summarize_auc(
-          results,
-          method = hm,
-          stratify_by = strat_cols
-        )
-      ),
-      error = function(e) NULL
-    )
-    if (is.data.frame(sg) && nrow(sg) > 0) {
-      knitr::kable(sg, digits = 3)
-    } else {
-      cat("Alt grup ozeti uretilemedi.\n")
-    }
+```{r summary-by-treatment}
+if (is.data.frame(results) && nrow(results) > 0 && "treatment" %in% names(results)) {
+  sg_tx <- tryCatch(
+    suppressWarnings(
+      SigBenchR::summarize_auc(results, method = hm, stratify_by = "treatment")
+    ),
+    error = function(e) NULL
+  )
+  if (is.data.frame(sg_tx) && nrow(sg_tx) > 0) {
+    knitr::kable(sg_tx, digits = 3)
   } else {
-    cat("Tek tedavi / sonlanim alt grubu; ayri tablo gerekmez.\n")
+    cat("treatment katmanli ozet uretilemedi.\n")
   }
 } else {
-  cat("Sonuc tablosu bos.\n")
+  cat("treatment sutunu yok veya sonuc bos.\n")
+}
+```
+
+## Varsayılan Katmanlı Özet: endpoint_type
+
+`summarize_auc(..., stratify_by = "endpoint_type")` — örn. RECIST vs clinical_benefit
+(`van_allen_2015` farkını görünür kılar).
+
+```{r summary-by-endpoint}
+if (is.data.frame(results) && nrow(results) > 0 && "endpoint_type" %in% names(results)) {
+  sg_ep <- tryCatch(
+    suppressWarnings(
+      SigBenchR::summarize_auc(results, method = hm, stratify_by = "endpoint_type")
+    ),
+    error = function(e) NULL
+  )
+  if (is.data.frame(sg_ep) && nrow(sg_ep) > 0) {
+    knitr::kable(sg_ep, digits = 3)
+  } else {
+    cat("endpoint_type katmanli ozet uretilemedi.\n")
+  }
+} else {
+  cat("endpoint_type sutunu yok veya sonuc bos.\n")
+}
+```
+
+## Biological Context: Reference Immune Axes
+
+Kullanıcı imzalarının IFN_Gamma / Cytotoxicity / T_Cell_Infiltration eksenleriyle
+Spearman korelasyonu (`correlate_reference_axes`). SD dışlama (`enc$kept`) uygulanır.
+
+```{r biological-context}
+bio_tbl <- NULL
+if (!is.null(pl$bio_context) && is.data.frame(pl$bio_context)) {
+  bio_tbl <- pl$bio_context
+} else if (!is.null(pl$datasets) && !is.null(pl$signatures)) {
+  bio_tbl <- tryCatch(
+    SigBenchR::correlate_reference_axes(
+      datasets = pl$datasets,
+      signatures = pl$signatures,
+      method = hm,
+      sd_handling = sd_pol
+    ),
+    error = function(e) NULL
+  )
+}
+if (is.data.frame(bio_tbl) && nrow(bio_tbl) > 0) {
+  knitr::kable(bio_tbl, digits = 3)
+} else {
+  cat("Biological context tablosu yok (datasets/signatures veya bio_context verilmedi).\n")
 }
 ```
 

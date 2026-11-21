@@ -4,7 +4,13 @@
 \alias{plot_auc_forest}
 \title{AUC orman (forest) grafigi}
 \usage{
-plot_auc_forest(results, signature = NULL, method = NULL, summary = NULL)
+plot_auc_forest(
+  results,
+  signature = NULL,
+  method = NULL,
+  summary = NULL,
+  show_normalization = TRUE
+)
 }
 \arguments{
 \item{results}{\code{run_benchmark()} cikti.}
@@ -14,6 +20,10 @@ plot_auc_forest(results, signature = NULL, method = NULL, summary = NULL)
 \item{method}{Skorlama yontemi; \code{NULL} ise ilk yontem.}
 
 \item{summary}{Opsiyonel \code{summarize_auc()} satiri / tablosu (ayni imza+method).}
+
+\item{show_normalization}{If \code{TRUE} (default) and a \code{normalization} column
+is present, cohort labels become \code{"cohort [TPM]"} style and a
+heterogeneous-scale caption note is appended.}
 }
 \value{
 \code{ggplot} nesnesi.

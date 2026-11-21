@@ -1,6 +1,6 @@
 Package: SigBenchR
 Title: Gene Signature Benchmarking for Immunotherapy Response
-Version: 0.4.2
+Version: 0.4.3
 Authors@R: 
     person(given = "Efe Kaan", family = "Şengönül",
            role = c("aut", "cre"),

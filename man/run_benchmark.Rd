@@ -67,7 +67,7 @@ run_benchmark(
 }
 \value{
 \code{data.frame} sonuc tablosu (\code{signed}, \code{treatment}, \code{endpoint_type},
-\code{cancer_type} sutunlari dahil).
+\code{cancer_type}, \code{normalization}, \code{power_auc70} sutunlari dahil).
 }
 \description{
 Her veri seti icinde ayri AUC hesaplar; ham ifadeleri birlestirmez.

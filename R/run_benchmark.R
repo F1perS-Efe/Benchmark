@@ -28,7 +28,7 @@
 #' @param match_expression Null icin ifade-eslesmeli ornekleme.
 #'
 #' @return `data.frame` sonuc tablosu (`signed`, `treatment`, `endpoint_type`,
-#'   `cancer_type` sutunlari dahil).
+#'   `cancer_type`, `normalization`, `power_auc70` sutunlari dahil).
 #' @export
 run_benchmark <- function(signatures,
                           datasets,
@@ -212,7 +212,15 @@ run_benchmark <- function(signatures,
           pr_ci_low = NA_real_,
           pr_ci_high = NA_real_,
           null_p = NA_real_,
-          normalization = ds$info$normalization,
+          power_auc70 = NA_real_,
+          normalization = if (!is.null(ds$info$normalization) &&
+                              length(ds$info$normalization) > 0L &&
+                              !is.na(ds$info$normalization[1]) &&
+                              nzchar(as.character(ds$info$normalization)[1])) {
+            as.character(ds$info$normalization)[1]
+          } else {
+            "unknown"
+          },
           scale = ds$info$scale,
           cancer = cancer,
           treatment = treatment,
@@ -286,6 +294,15 @@ run_benchmark <- function(signatures,
         base$small_cohort <- roc_res$small_cohort
         base$skipped <- FALSE
         base$skip_reason <- NA_character_
+        base$power_auc70 <- suppressWarnings(
+          estimate_auc_power(
+            n_pos = roc_res$n_pos,
+            n_neg = roc_res$n_neg,
+            target_auc = 0.70,
+            null_auc = 0.50,
+            alpha = 0.05
+          )$power
+        )
 
         if (isTRUE(compute_pr)) {
           pr_res <- tryCatch(

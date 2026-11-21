@@ -20,6 +20,9 @@
 #' `stratify_by = NULL` (varsayilan) iken cikti geriye donuk uyumludur. Ayni ozet
 #' grubunda birden fazla farkli non-NA `endpoint_type` veya `treatment` degeri
 #' birlestiriliyorsa ASCII `warning()` uretilir ve `stratify_by` onerilir.
+#' Varsayilan HTML rapor, tabakasiz ozetten hemen sonra
+#' `stratify_by = "treatment"` ve `stratify_by = "endpoint_type"` tablolarini
+#' ayri ayri render eder; forest grafigi tabakasiz ozeti korur.
 #'
 #' Logit-AUC REML + HKSJ ozeti kucuk kohort sayisinda (`k <= 4`) **kesifseldir**.
 #' Farkli klinik sonlanimli kohortlarda `stratify_by` kullanin; havuzlama

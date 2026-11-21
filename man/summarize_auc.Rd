@@ -61,6 +61,9 @@ Varsayilan kurallar:
 \code{stratify_by = NULL} (varsayilan) iken cikti geriye donuk uyumludur. Ayni ozet
 grubunda birden fazla farkli non-NA \code{endpoint_type} veya \code{treatment} degeri
 birlestiriliyorsa ASCII \code{warning()} uretilir ve \code{stratify_by} onerilir.
+Varsayilan HTML rapor, tabakasiz ozetten hemen sonra
+\code{stratify_by = "treatment"} ve \code{stratify_by = "endpoint_type"} tablolarini
+ayri ayri render eder; forest grafigi tabakasiz ozeti korur.
 
 Logit-AUC REML + HKSJ ozeti kucuk kohort sayisinda (\code{k <= 4}) \strong{kesifseldir}.
 Farkli klinik sonlanimli kohortlarda \code{stratify_by} kullanin; havuzlama

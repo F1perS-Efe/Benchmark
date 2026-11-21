@@ -10,13 +10,17 @@
 #' @param signature Tek imza adi; `NULL` ise ilk imza.
 #' @param method Skorlama yontemi; `NULL` ise ilk yontem.
 #' @param summary Opsiyonel `summarize_auc()` satiri / tablosu (ayni imza+method).
+#' @param show_normalization If `TRUE` (default) and a `normalization` column
+#'   is present, cohort labels become `"cohort [TPM]"` style and a
+#'   heterogeneous-scale caption note is appended.
 #'
 #' @return `ggplot` nesnesi.
 #' @export
 plot_auc_forest <- function(results,
                             signature = NULL,
                             method = NULL,
-                            summary = NULL) {
+                            summary = NULL,
+                            show_normalization = TRUE) {
   if (!is.data.frame(results) || nrow(results) == 0L) {
     stop("`results` bos olamaz.", call. = FALSE)
   }
@@ -36,13 +40,27 @@ plot_auc_forest <- function(results,
   } else {
     rep(TRUE, nrow(df))
   }
+  use_norm <- isTRUE(show_normalization) && "normalization" %in% names(df)
+  cohort_base <- as.character(df$dataset)
+  if (use_norm) {
+    norm_lab <- as.character(df$normalization)
+    norm_lab[is.na(norm_lab) | !nzchar(norm_lab)] <- "unknown"
+    cohort_base <- paste0(cohort_base, " [", norm_lab, "]")
+  }
   df$lab <- ifelse(
     indep_ok,
-    as.character(df$dataset),
-    paste0(df$dataset, " (bagimsiz degil)")
+    cohort_base,
+    paste0(cohort_base, " (bagimsiz degil)")
   )
 
   caption <- "Kesikli cizgi: sans duzeyi (0.5). var_zero satirlarda GA dar/eksik olabilir."
+  if (use_norm) {
+    caption <- paste0(
+      caption,
+      " Note: Cohorts use heterogeneous expression scales; ",
+      "direct cross-cohort expression pooling is not performed."
+    )
+  }
   has_hksj <- FALSE
   sm <- NULL
   if (!is.null(summary) && is.data.frame(summary) && nrow(summary) > 0L) {
@@ -119,6 +137,13 @@ plot_auc_forest <- function(results,
         cap_extra <- paste0(
           cap_extra,
           " Alt satir: logit-AUC REML + HKSJ 95 pct GA."
+        )
+      }
+      if (use_norm) {
+        cap_extra <- paste0(
+          cap_extra,
+          " Note: Cohorts use heterogeneous expression scales; ",
+          "direct cross-cohort expression pooling is not performed."
         )
       }
       p <- p + ggplot2::geom_vline(

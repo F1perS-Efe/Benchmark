@@ -246,7 +246,7 @@ ui <- shiny::fluidPage(
     ),
     shiny::div(
       class = "sb-header-meta",
-      shiny::span(class = "sb-badge", "v0.4.1"),
+      shiny::span(class = "sb-badge", "v0.4.3"),
       shiny::span(
         class = "sb-badge sb-badge-warn",
         "Araştırma Amaçlıdır — Klinik Karar Aracı Değildir"
@@ -354,6 +354,15 @@ ui <- shiny::fluidPage(
             "DCR [CR/PR/SD vs PD]" = "as_1"
           ),
           selected = "exclude"
+        ),
+        shiny::checkboxInput(
+          "compute_null",
+          "Null permütasyon (önerilen: rastgele gen seti kontrolü)",
+          FALSE
+        ),
+        shiny::tags$p(
+          class = "sb-hint",
+          "Önerilen: rastgele gen seti kontrolü — imza AUC'sini aynı boyutta rastgele gen setleriyle karşılaştırır (compute_null)."
         )
       ),
       shiny::tags$details(
@@ -363,7 +372,6 @@ ui <- shiny::fluidPage(
         shiny::sliderInput("sensitivity_threshold", "Dayanıklılık eşiği (keyfi)", 0.05, 0.3, 0.10, 0.01),
         shiny::checkboxInput("compute_pr", "PR-AUC + bootstrap GA", TRUE),
         shiny::numericInput("n_boot", "PR bootstrap (n_boot)", value = 200, min = 0, max = 2000, step = 50),
-        shiny::checkboxInput("compute_null", "Null permütasyon", FALSE),
         shiny::numericInput("n_perm", "Null B", value = 1000, min = 10, max = 2000, step = 50),
         shiny::checkboxInput(
           "match_expression",
@@ -994,6 +1002,15 @@ server <- function(input, output, session) {
       summary_unstrat <- suppressWarnings(
         SigBenchR::summarize_auc(snap$res, method = hm_active, stratify_by = NULL)
       )
+      bio_ctx <- tryCatch(
+        SigBenchR::correlate_reference_axes(
+          datasets = snap$datasets,
+          signatures = snap$sigs,
+          method = hm_active,
+          sd_handling = snap$params$sd_handling
+        ),
+        error = function(e) NULL
+      )
       SigBenchR::export_report(
         results = snap$res,
         summary_tbl = summary_unstrat,
@@ -1009,7 +1026,8 @@ server <- function(input, output, session) {
           sd_handling = snap$params$sd_handling,
           match_expression = snap$params$match_expression,
           heatmap_method = hm_active,
-          forest_signature = snap$params$forest_signature
+          forest_signature = snap$params$forest_signature,
+          bio_context = bio_ctx
         ),
         output_file = file
       )
