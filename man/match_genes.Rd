@@ -4,16 +4,23 @@
 \alias{match_genes}
 \title{Imza genlerini ifade matrisinde eslestir}
 \usage{
-match_genes(expr, genes)
+match_genes(expr, genes, use_aliases = TRUE, alias_map = NULL)
 }
 \arguments{
 \item{expr}{Gen x ornek matris (satir adlari gen sembolleri).}
 
 \item{genes}{Karakter vektoru; imza genleri.}
+
+\item{use_aliases}{\code{TRUE} (varsayilan) ise eslesmeyen genler alias ile aranir.}
+
+\item{alias_map}{Opsiyonel isimli karakter vektoru (\code{ALIAS = "OFFICIAL"}).
+\code{NULL} ise dahili immuno-onkoloji haritasi kullanilir.}
 }
 \value{
-Liste: \code{found}, \code{missing}, \code{n_found}, \code{n_total}, \code{coverage_pct}.
+Liste: \code{found}, \code{missing}, \code{n_found}, \code{n_total}, \code{coverage_pct},
+\code{alias_rescued} (\code{"OLD->NEW"}), \code{n_alias_rescued}.
 }
 \description{
-Faz 1: buyuk harfe cevrilmis tam eslesme. Takma ad (alias) eslestirmesi yok.
+Once buyuk harfe cevrilmis tam eslesme; eslesmeyenler icin istege bagli
+alias kurtarma (dahili \code{.ici_gene_alias_map()} veya ozel \code{alias_map}).
 }

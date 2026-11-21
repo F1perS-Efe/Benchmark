@@ -12,7 +12,8 @@
 #'
 #' Varsayilan kurallar:
 #' - `independent_only = TRUE`: yalniz `independent == TRUE` (NA / FALSE dislanir)
-#' - `exclude_low_coverage = TRUE`: `low_coverage == TRUE` satirlar dislanir
+#' - `exclude_low_coverage = TRUE`: `coverage_status != "ok"` (varsa) veya
+#'   `low_coverage == TRUE` satirlar dislanir; `n_excluded_coverage` raporlanir
 #' - `var_zero` / `auc_var <= 0` yalnizca IVW / REML'den cikarilir; n-agirlikli ortalamaya girer
 #' - `skipped` veya sonlu olmayan AUC satirlar yok sayilir
 #'
@@ -160,11 +161,18 @@ summarize_auc <- function(results,
   }
 
   n_low_cov <- 0L
-  if (isTRUE(exclude_low_coverage) && nrow(use_n) > 0L && "low_coverage" %in% names(use_n)) {
-    low_flag <- as.logical(use_n$low_coverage)
-    keep_cov <- is.na(low_flag) | !low_flag
-    n_low_cov <- sum(!keep_cov, na.rm = TRUE)
-    use_n <- use_n[keep_cov, , drop = FALSE]
+  if (isTRUE(exclude_low_coverage) && nrow(use_n) > 0L) {
+    if ("coverage_status" %in% names(use_n)) {
+      st <- as.character(use_n$coverage_status)
+      keep_cov <- is.na(st) | st == "ok"
+      n_low_cov <- sum(!keep_cov, na.rm = TRUE)
+      use_n <- use_n[keep_cov, , drop = FALSE]
+    } else if ("low_coverage" %in% names(use_n)) {
+      low_flag <- as.logical(use_n$low_coverage)
+      keep_cov <- is.na(low_flag) | !low_flag
+      n_low_cov <- sum(!keep_cov, na.rm = TRUE)
+      use_n <- use_n[keep_cov, , drop = FALSE]
+    }
   }
 
   notes <- character(0)
@@ -204,6 +212,7 @@ summarize_auc <- function(results,
       n_excluded_var_zero = 0L,
       n_var_zero_excluded = 0L,
       n_low_coverage_excluded = as.integer(n_low_cov),
+      n_excluded_coverage = as.integer(n_low_cov),
       n_small_cohort = as.integer(n_small),
       note = paste(notes, collapse = "; "),
       stringsAsFactors = FALSE
@@ -296,6 +305,7 @@ summarize_auc <- function(results,
     n_excluded_var_zero = as.integer(n_var_zero),
     n_var_zero_excluded = as.integer(n_var_zero),
     n_low_coverage_excluded = as.integer(n_low_cov),
+    n_excluded_coverage = as.integer(n_low_cov),
     n_small_cohort = as.integer(n_small),
     note = if (length(notes) == 0L) NA_character_ else paste(notes, collapse = "; "),
     stringsAsFactors = FALSE
@@ -425,6 +435,7 @@ summarize_auc <- function(results,
     n_excluded_var_zero = integer(),
     n_var_zero_excluded = integer(),
     n_low_coverage_excluded = integer(),
+    n_excluded_coverage = integer(),
     n_small_cohort = integer(),
     note = character(),
     stringsAsFactors = FALSE

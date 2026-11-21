@@ -58,16 +58,18 @@ score_signature <- function(expr,
 
   n_up_found <- cov_up$n_found
   n_down_found <- cov_down$n_found
+  alias_rescued <- c(cov_up$alias_rescued, cov_down$alias_rescued)
+  n_total <- cov_up$n_total + cov_down$n_total
+  miss_all <- c(cov_up$missing, cov_down$missing)
+  n_matched <- n_total - length(miss_all)
   coverage <- list(
     found = c(cov_up$found, cov_down$found),
-    missing = c(cov_up$missing, cov_down$missing),
+    missing = miss_all,
     n_found = n_up_found + n_down_found,
-    n_total = cov_up$n_total + cov_down$n_total,
-    coverage_pct = if ((cov_up$n_total + cov_down$n_total) == 0L) {
-      0
-    } else {
-      100 * (n_up_found + n_down_found) / (cov_up$n_total + cov_down$n_total)
-    }
+    n_total = n_total,
+    coverage_pct = if (n_total == 0L) 0 else 100 * n_matched / n_total,
+    alias_rescued = alias_rescued,
+    n_alias_rescued = as.integer(length(alias_rescued))
   )
 
   if (isTRUE(parsed$signed) && (n_up_found == 0L || n_down_found == 0L)) {
@@ -198,7 +200,9 @@ score_signature <- function(expr,
     missing = character(0),
     n_found = 0L,
     n_total = 0L,
-    coverage_pct = 0
+    coverage_pct = 0,
+    alias_rescued = character(0),
+    n_alias_rescued = 0L
   )
 }
 

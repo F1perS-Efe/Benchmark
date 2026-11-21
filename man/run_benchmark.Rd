@@ -11,6 +11,8 @@ run_benchmark(
   direction = "<",
   min_genes = 3L,
   coverage_threshold = 0.7,
+  min_coverage = 0.5,
+  invalid_coverage = 0.2,
   apply_log2 = TRUE,
   sd_handling = "exclude",
   min_n = 20L,
@@ -40,6 +42,10 @@ run_benchmark(
 \item{min_genes}{\code{score_signature()} esigi.}
 
 \item{coverage_threshold}{Kapsama uyari esigi (0-1). Varsayilan 0.70.}
+
+\item{min_coverage}{\code{coverage_status = "ok"} alt esigi (0-1). Varsayilan 0.50.}
+
+\item{invalid_coverage}{\code{coverage_status = "invalid"} ust esigi (0-1). Varsayilan 0.20.}
 
 \item{apply_log2}{\code{scale = "linear"} iken log2 uygula.}
 

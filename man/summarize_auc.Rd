@@ -52,7 +52,8 @@ Ayrica logit olcekli \code{i2_logit} raporlanir.
 Varsayilan kurallar:
 \itemize{
 \item \code{independent_only = TRUE}: yalniz \code{independent == TRUE} (NA / FALSE dislanir)
-\item \code{exclude_low_coverage = TRUE}: \code{low_coverage == TRUE} satirlar dislanir
+\item \code{exclude_low_coverage = TRUE}: \code{coverage_status != "ok"} (varsa) veya
+\code{low_coverage == TRUE} satirlar dislanir; \code{n_excluded_coverage} raporlanir
 \item \code{var_zero} / \code{auc_var <= 0} yalnizca IVW / REML'den cikarilir; n-agirlikli ortalamaya girer
 \item \code{skipped} veya sonlu olmayan AUC satirlar yok sayilir
 }

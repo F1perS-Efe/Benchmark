@@ -15,6 +15,8 @@
 #' @param direction Varsayilan imza yonu (imza duzeyinde yoksa).
 #' @param min_genes `score_signature()` esigi.
 #' @param coverage_threshold Kapsama uyari esigi (0-1). Varsayilan 0.70.
+#' @param min_coverage `coverage_status = "ok"` alt esigi (0-1). Varsayilan 0.50.
+#' @param invalid_coverage `coverage_status = "invalid"` ust esigi (0-1). Varsayilan 0.20.
 #' @param apply_log2 `scale = "linear"` iken log2 uygula.
 #' @param sd_handling `encode_response()` politikasi.
 #' @param min_n,min_per_class Kucuk kohort esikleri (`roc_auc`).
@@ -34,6 +36,8 @@ run_benchmark <- function(signatures,
                           direction = "<",
                           min_genes = 3L,
                           coverage_threshold = 0.70,
+                          min_coverage = 0.50,
+                          invalid_coverage = 0.20,
                           apply_log2 = TRUE,
                           sd_handling = "exclude",
                           min_n = 20L,
@@ -127,7 +131,7 @@ run_benchmark <- function(signatures,
           call. = FALSE
         )
       }
-      sig_dir <- if (!is.null(sig$direction)) sig$direction else direction
+      sig_dir <- .normalize_roc_direction(sig$direction, default = direction)
 
       for (method in methods) {
         cell_idx <- cell_idx + 1L
@@ -148,6 +152,29 @@ run_benchmark <- function(signatures,
 
         cov_frac <- scored$coverage$coverage_pct / 100
         low_cov <- cov_frac < coverage_threshold
+        if (cov_frac < invalid_coverage) {
+          cov_status <- "invalid"
+        } else if (cov_frac < min_coverage) {
+          cov_status <- "low_power"
+        } else {
+          cov_status <- "ok"
+        }
+        n_alias <- as.integer(scored$coverage$n_alias_rescued)
+        if (length(n_alias) != 1L || is.na(n_alias)) {
+          n_alias <- 0L
+        }
+
+        if (identical(cov_status, "invalid")) {
+          warning(
+            "Invalid gene coverage for cohort '", ds_name, "' / signature '",
+            sig_name, "': coverage=",
+            sprintf("%.1f%%", 100 * cov_frac),
+            " (< ", sprintf("%.0f%%", 100 * invalid_coverage),
+            "). For a full gene matrix use read_user_dataset() or ",
+            "load_cohort_bundle().",
+            call. = FALSE
+          )
+        }
 
         base <- list(
           dataset = ds_name,
@@ -172,6 +199,8 @@ run_benchmark <- function(signatures,
             paste(scored$coverage$missing, collapse = ",")
           },
           low_coverage = low_cov,
+          coverage_status = cov_status,
+          n_alias_rescued = n_alias,
           auc = NA_real_,
           auc_ci_low = NA_real_,
           auc_ci_high = NA_real_,
@@ -346,4 +375,28 @@ run_benchmark <- function(signatures,
   }
 
   out
+}
+
+#' Map signature direction metadata to ROC direction
+#'
+#' Accepts legacy ROC codes (`"<"`, `">"`) and panel metadata
+#' (`"positive"`, `"negative"`, `"signed"`).
+#'
+#' @noRd
+.normalize_roc_direction <- function(sig_direction, default = "<") {
+  if (is.null(sig_direction) || length(sig_direction) == 0L ||
+      is.na(sig_direction[1]) || !nzchar(as.character(sig_direction[1]))) {
+    return(as.character(default)[1])
+  }
+  d <- as.character(sig_direction)[1]
+  if (d %in% c("<", ">")) {
+    return(d)
+  }
+  if (identical(d, "negative")) {
+    return(">")
+  }
+  if (d %in% c("positive", "signed")) {
+    return("<")
+  }
+  as.character(default)[1]
 }
