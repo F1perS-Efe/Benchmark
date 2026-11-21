@@ -13,6 +13,7 @@
 ^\.socraticodeignore$
 ^LICENSE\.md$
 ^app\.R$
+^setup\.R$
 ^sigbenchr_audit\.zip$
 ^docs$
 ^sigbenchr_demo_report\.html$
