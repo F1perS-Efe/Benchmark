@@ -3,7 +3,7 @@ title: "SigBenchR Benchmark Report"
 output:
   html_document:
     toc: true
-    toc_float: true
+    toc_float: false
     toc_depth: 2
     theme: default
     highlight: tango
@@ -43,17 +43,135 @@ if (!compute_null && is.data.frame(results) && "null_p" %in% names(results)) {
   compute_null <- any(is.finite(results$null_p), na.rm = TRUE)
 }
 
+.em <- "\u2014"
+.en <- "\u2013"
+
 .fmt3 <- function(x) {
-  ifelse(is.finite(x), sprintf("%.3f", as.numeric(x)), "n/a")
+  x <- as.numeric(x)
+  ifelse(is.finite(x), sprintf("%.3f", x), .em)
 }
+
+.fmt_pct <- function(x) {
+  # coverage_pct is stored on the 0-100 scale
+  x <- as.numeric(x)
+  ifelse(is.finite(x), sprintf("%.1f%%", x), .em)
+}
+
+.fmt_i2 <- function(x) {
+  x <- as.numeric(x)
+  ifelse(is.finite(x), sprintf("%.1f", x), .em)
+}
+
+.fmt_p <- function(x) {
+  x <- as.numeric(x)
+  out <- rep(.em, length(x))
+  ok <- is.finite(x)
+  out[ok & x < 0.001] <- "<0.001"
+  out[ok & x >= 0.001] <- sprintf("%.3f", x[ok & x >= 0.001])
+  out
+}
+
 .fmt_null <- function(x) {
   if (!isTRUE(compute_null)) {
-    return(rep("n/a", length(x)))
+    return(rep("Not run", length(x)))
   }
-  .fmt3(x)
+  .fmt_p(x)
 }
-.kable_sci <- function(df, ...) {
-  knitr::kable(df, digits = 3, align = c("l", rep("r", max(0L, ncol(df) - 1L))), ...)
+
+.fmt_auc_ci <- function(est, lo, hi) {
+  est <- as.numeric(est)
+  lo <- as.numeric(lo)
+  hi <- as.numeric(hi)
+  n <- length(est)
+  out <- rep(.em, n)
+  full <- is.finite(est) & is.finite(lo) & is.finite(hi)
+  out[full] <- sprintf(
+    "%.3f (%.3f%s%.3f)",
+    est[full], lo[full], .en, hi[full]
+  )
+  point_only <- is.finite(est) & !full
+  out[point_only] <- sprintf("%.3f", est[point_only])
+  out
+}
+
+.translate_note <- function(x) {
+  x <- as.character(x)
+  miss <- is.na(x) | !nzchar(x)
+  x[miss] <- .em
+  x <- gsub(
+    "([0-9]+) bagimsiz-olmayan/NA satir ozetten cikarildi",
+    "\\1 non-independent/NA cohorts excluded",
+    x
+  )
+  x <- gsub(
+    "([0-9]+) dusuk kapsama satir ozetten cikarildi",
+    "\\1 low-coverage cohorts excluded",
+    x
+  )
+  x <- gsub(
+    "([0-9]+) kucuk kohort uyarisi",
+    "\\1 small-cohort warning(s)",
+    x
+  )
+  x <- gsub(
+    "([0-9]+) var_zero/NA varyans satir IVW'den cikarildi",
+    "\\1 zero/NA-variance rows excluded from IVW",
+    x
+  )
+  x
+}
+
+.kable_wrap <- function(df, align = NULL, note_wrap = FALSE, ...) {
+  if (is.null(align)) {
+    align <- rep("l", ncol(df))
+  }
+  wrap_class <- if (isTRUE(note_wrap)) {
+    "table-wrap allow-note-wrap"
+  } else {
+    "table-wrap"
+  }
+  k <- knitr::kable(
+    df,
+    format = "html",
+    align = align,
+    escape = TRUE,
+    ...
+  )
+  cat(sprintf('<div class="%s">\n', wrap_class))
+  cat(as.character(k), sep = "\n")
+  cat("\n</div>\n")
+  invisible(NULL)
+}
+
+.format_meta_overall <- function(sm) {
+  k_col <- if ("n_cohorts" %in% names(sm)) sm$n_cohorts else sm$n_datasets
+  data.frame(
+    Signature = as.character(sm$signature),
+    Method = as.character(sm$method),
+    k = as.integer(k_col),
+    `N-Weighted AUC` = .fmt3(sm$auc_n_weighted),
+    `IVW AUC` = .fmt3(sm$auc_ivw),
+    `REML AUC (95% CI)` = .fmt_auc_ci(sm$auc_re, sm$auc_re_ci_low, sm$auc_re_ci_high),
+    `I2 (%)` = .fmt_i2(sm$I2),
+    Note = if ("note" %in% names(sm)) .translate_note(sm$note) else rep(.em, nrow(sm)),
+    check.names = FALSE,
+    stringsAsFactors = FALSE
+  )
+}
+
+.format_meta_strata <- function(sm, stratum_col) {
+  k_col <- if ("n_cohorts" %in% names(sm)) sm$n_cohorts else sm$n_datasets
+  data.frame(
+    Signature = as.character(sm$signature),
+    Method = as.character(sm$method),
+    Stratum = as.character(sm[[stratum_col]]),
+    k = as.integer(k_col),
+    `N-Weighted AUC` = .fmt3(sm$auc_n_weighted),
+    `REML AUC (95% CI)` = .fmt_auc_ci(sm$auc_re, sm$auc_re_ci_low, sm$auc_re_ci_high),
+    `I2 (%)` = .fmt_i2(sm$I2),
+    check.names = FALSE,
+    stringsAsFactors = FALSE
+  )
 }
 ```
 
@@ -92,7 +210,7 @@ if (n_cohorts_report <= 4L || isTRUE(small_n_flag)) {
 }
 ```
 
-```{r params-table}
+```{r params-table, results='asis'}
 pick <- function(x, default = NA) {
   if (is.null(x) || length(x) == 0L) default else x
 }
@@ -131,12 +249,12 @@ param_df <- data.frame(
   ),
   stringsAsFactors = FALSE
 )
-knitr::kable(param_df)
+.kable_wrap(param_df, align = c("l", "l"))
 ```
 
 # 2. Cohort Overview
 
-```{r cohort-overview}
+```{r cohort-overview, results='asis'}
 if (is.data.frame(results) && nrow(results) > 0) {
   use <- results[!(results$skipped %in% TRUE), , drop = FALSE]
   if (nrow(use) == 0L) use <- results
@@ -162,11 +280,17 @@ if (is.data.frame(results) && nrow(results) > 0) {
     normalization = "Normalization"
   )
   show <- intersect(names(label_map), names(agg))
-  knitr::kable(
-    agg[, show, drop = FALSE],
-    col.names = unname(label_map[show]),
-    digits = 0
-  )
+  out <- agg[, show, drop = FALSE]
+  names(out) <- unname(label_map[show])
+  for (nm in names(out)) {
+    if (is.numeric(out[[nm]])) {
+      out[[nm]] <- ifelse(is.finite(out[[nm]]), as.character(as.integer(out[[nm]])), .em)
+    } else {
+      out[[nm]] <- ifelse(is.na(out[[nm]]) | !nzchar(as.character(out[[nm]])), .em, as.character(out[[nm]]))
+    }
+  }
+  align <- ifelse(names(out) %in% c("n_total", "n_pos", "n_neg", "n_sd"), "r", "l")
+  .kable_wrap(out, align = align)
 } else {
   cat("No cohort rows available.\n")
 }
@@ -175,62 +299,60 @@ if (is.data.frame(results) && nrow(results) > 0) {
 # 3. Signature Performance
 
 Signature x cohort discrimination metrics. When null permutation was not run,
-`Null p` is shown as `n/a`.
+`Null p` is shown as `Not run`.
 
-```{r performance-table}
+```{r performance-table, results='asis'}
 if (is.data.frame(results) && nrow(results) > 0) {
   perf <- results
-  ci <- if (all(c("auc_ci_low", "auc_ci_high") %in% names(perf))) {
-    ifelse(
-      is.finite(perf$auc_ci_low) & is.finite(perf$auc_ci_high),
-      paste0(.fmt3(perf$auc_ci_low), "--", .fmt3(perf$auc_ci_high)),
-      "n/a"
-    )
+  auc_ci <- if (all(c("auc", "auc_ci_low", "auc_ci_high") %in% names(perf))) {
+    .fmt_auc_ci(perf$auc, perf$auc_ci_low, perf$auc_ci_high)
+  } else if ("auc" %in% names(perf)) {
+    .fmt3(perf$auc)
   } else {
-    rep("n/a", nrow(perf))
+    rep(.em, nrow(perf))
   }
   status <- if ("coverage_status" %in% names(perf)) {
-    as.character(perf$coverage_status)
-  } else if ("coverage_label" %in% names(perf)) {
-    as.character(perf$coverage_label)
+    ifelse(is.na(perf$coverage_status) | !nzchar(as.character(perf$coverage_status)),
+           .em, as.character(perf$coverage_status))
+  } else if ("low_coverage" %in% names(perf)) {
+    ifelse(perf$low_coverage %in% TRUE, "low_power", "ok")
   } else {
-    ifelse(isTRUE(perf$low_coverage), "low", "ok")
+    rep(.em, nrow(perf))
   }
   cov_pct <- if ("coverage_pct" %in% names(perf)) {
-    .fmt3(perf$coverage_pct)
+    .fmt_pct(perf$coverage_pct)
   } else {
-    rep("n/a", nrow(perf))
+    rep(.em, nrow(perf))
   }
   null_p_show <- if ("null_p" %in% names(perf)) {
     .fmt_null(perf$null_p)
   } else {
-    rep("n/a", nrow(perf))
+    rep(if (isTRUE(compute_null)) .em else "Not run", nrow(perf))
   }
   power_show <- if ("power_auc70" %in% names(perf)) {
     .fmt3(perf$power_auc70)
   } else {
-    rep("n/a", nrow(perf))
+    rep(.em, nrow(perf))
   }
   pr_show <- if ("pr_auc" %in% names(perf)) {
     .fmt3(perf$pr_auc)
   } else {
-    rep("n/a", nrow(perf))
+    rep(.em, nrow(perf))
   }
   out <- data.frame(
     Signature = as.character(perf$signature),
     Cohort = as.character(perf$dataset),
     Method = as.character(perf$method),
-    AUC = .fmt3(perf$auc),
-    `95% CI` = ci,
+    `AUC (95% CI)` = auc_ci,
     `PR-AUC` = pr_show,
     Coverage = cov_pct,
     Status = status,
-    `Power (AUC=0.70)` = power_show,
+    `Power (0.70)` = power_show,
     `Null p` = null_p_show,
     check.names = FALSE,
     stringsAsFactors = FALSE
   )
-  knitr::kable(out)
+  .kable_wrap(out, align = c("l", "l", "l", "r", "r", "r", "l", "r", "r"))
 } else {
   cat("No performance rows available.\n")
 }
@@ -242,17 +364,14 @@ Overall REML + truncated HKSJ summary (unstratified), followed by treatment and
 endpoint-type strata. Forest and heatmap use the selected scoring method;
 normalization labels are retained in cohort axes where available.
 
-```{r meta-overall}
+```{r meta-overall, results='asis'}
 if (is.data.frame(summary_tbl) && nrow(summary_tbl) > 0) {
-  show_cols <- intersect(
-    c(
-      "signature", "method", "n_cohorts", "auc_n_weighted", "auc_ivw",
-      "Q", "I2", "auc_re", "auc_re_ci_low", "auc_re_ci_high",
-      "tau2_reml", "i2_logit", "n_low_coverage_excluded", "note"
-    ),
-    names(summary_tbl)
+  out <- .format_meta_overall(summary_tbl)
+  .kable_wrap(
+    out,
+    align = c("l", "l", "r", "r", "r", "r", "r", "l"),
+    note_wrap = TRUE
   )
-  .kable_sci(summary_tbl[, show_cols, drop = FALSE])
 } else {
   cat("Summary table is empty.\n")
 }
@@ -260,7 +379,7 @@ if (is.data.frame(summary_tbl) && nrow(summary_tbl) > 0) {
 
 ### Treatment strata
 
-```{r summary-by-treatment}
+```{r summary-by-treatment, results='asis'}
 if (is.data.frame(results) && nrow(results) > 0 && "treatment" %in% names(results)) {
   sg_tx <- tryCatch(
     suppressWarnings(
@@ -269,14 +388,8 @@ if (is.data.frame(results) && nrow(results) > 0 && "treatment" %in% names(result
     error = function(e) NULL
   )
   if (is.data.frame(sg_tx) && nrow(sg_tx) > 0) {
-    show_cols <- intersect(
-      c(
-        "signature", "method", "treatment", "n_cohorts",
-        "auc_n_weighted", "auc_ivw", "auc_re", "auc_re_ci_low", "auc_re_ci_high", "I2"
-      ),
-      names(sg_tx)
-    )
-    .kable_sci(sg_tx[, show_cols, drop = FALSE])
+    out <- .format_meta_strata(sg_tx, "treatment")
+    .kable_wrap(out, align = c("l", "l", "l", "r", "r", "r", "r"))
   } else {
     cat("Treatment-stratified summary unavailable.\n")
   }
@@ -287,7 +400,7 @@ if (is.data.frame(results) && nrow(results) > 0 && "treatment" %in% names(result
 
 ### Endpoint type strata
 
-```{r summary-by-endpoint}
+```{r summary-by-endpoint, results='asis'}
 if (is.data.frame(results) && nrow(results) > 0 && "endpoint_type" %in% names(results)) {
   sg_ep <- tryCatch(
     suppressWarnings(
@@ -296,14 +409,8 @@ if (is.data.frame(results) && nrow(results) > 0 && "endpoint_type" %in% names(re
     error = function(e) NULL
   )
   if (is.data.frame(sg_ep) && nrow(sg_ep) > 0) {
-    show_cols <- intersect(
-      c(
-        "signature", "method", "endpoint_type", "n_cohorts",
-        "auc_n_weighted", "auc_ivw", "auc_re", "auc_re_ci_low", "auc_re_ci_high", "I2"
-      ),
-      names(sg_ep)
-    )
-    .kable_sci(sg_ep[, show_cols, drop = FALSE])
+    out <- .format_meta_strata(sg_ep, "endpoint_type")
+    .kable_wrap(out, align = c("l", "l", "l", "r", "r", "r", "r"))
   } else {
     cat("Endpoint-type stratified summary unavailable.\n")
   }
@@ -353,7 +460,30 @@ if (ok_fr) {
 has_surv <- !is.null(surv_res) && is.data.frame(surv_res) && nrow(surv_res) > 0
 if (has_surv) {
   cat("\n\n### Clinical benefit (survival)\n\n")
-  knitr::kable(surv_res, digits = 3)
+  surv_show <- surv_res
+  for (nm in names(surv_show)) {
+    if (is.numeric(surv_show[[nm]])) {
+      if (nm %in% c("cox_p", "logrank_p")) {
+        surv_show[[nm]] <- .fmt_p(surv_show[[nm]])
+      } else if (nm %in% c("hr", "hr_ci_low", "hr_ci_high", "c_index",
+                           "median_surv_high", "median_surv_low")) {
+        surv_show[[nm]] <- .fmt3(surv_show[[nm]])
+      } else {
+        surv_show[[nm]] <- ifelse(
+          is.finite(as.numeric(surv_show[[nm]])),
+          as.character(surv_show[[nm]]),
+          .em
+        )
+      }
+    } else {
+      surv_show[[nm]] <- ifelse(
+        is.na(surv_show[[nm]]) | !nzchar(as.character(surv_show[[nm]])),
+        .em,
+        as.character(surv_show[[nm]])
+      )
+    }
+  }
+  .kable_wrap(surv_show)
 }
 ```
 
@@ -362,7 +492,7 @@ if (has_surv) {
 Spearman correlations of user signatures with reference immune axes
 (`IFN_Gamma`, `Cytotoxicity`, `T_Cell_Infiltration`) after SD exclusion (`enc$kept`).
 
-```{r biological-context}
+```{r biological-context, results='asis'}
 bio_tbl <- NULL
 if (!is.null(pl$bio_context) && is.data.frame(pl$bio_context)) {
   bio_tbl <- pl$bio_context
@@ -378,7 +508,23 @@ if (!is.null(pl$bio_context) && is.data.frame(pl$bio_context)) {
   )
 }
 if (is.data.frame(bio_tbl) && nrow(bio_tbl) > 0) {
-  .kable_sci(bio_tbl)
+  bio_show <- bio_tbl
+  for (nm in names(bio_show)) {
+    if (is.numeric(bio_show[[nm]])) {
+      if (grepl("p(_|$)|pval|p_value", nm, ignore.case = TRUE)) {
+        bio_show[[nm]] <- .fmt_p(bio_show[[nm]])
+      } else {
+        bio_show[[nm]] <- .fmt3(bio_show[[nm]])
+      }
+    } else {
+      bio_show[[nm]] <- ifelse(
+        is.na(bio_show[[nm]]) | !nzchar(as.character(bio_show[[nm]])),
+        .em,
+        as.character(bio_show[[nm]])
+      )
+    }
+  }
+  .kable_wrap(bio_show)
 } else {
   cat("Biological context table unavailable (provide bio_context or datasets/signatures).\n")
 }
@@ -395,16 +541,19 @@ if (is.data.frame(bio_tbl) && nrow(bio_tbl) > 0) {
 <li>Cohort normalizations remain heterogeneous; raw expression is never pooled across platforms.</li>
 </ul>
 
-```{r session}
+```{r session, results='asis'}
 pkgs <- c("SigBenchR", "pROC", "PRROC", "ggplot2", "withr", "rmarkdown", "knitr", "survival")
 vers <- vapply(pkgs, function(p) {
   if (requireNamespace(p, quietly = TRUE)) {
     as.character(utils::packageVersion(p))
   } else {
-    NA_character_
+    .em
   }
 }, character(1))
-knitr::kable(data.frame(Package = pkgs, Version = unname(vers), stringsAsFactors = FALSE))
+.kable_wrap(
+  data.frame(Package = pkgs, Version = unname(vers), stringsAsFactors = FALSE),
+  align = c("l", "l")
+)
 ```
 
 ```{r sessioninfo}

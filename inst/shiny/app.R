@@ -27,17 +27,18 @@ ui <- shiny::fluidPage(
     )),
     shiny::tags$style(shiny::HTML("
       :root {
-        --sb-bg: #F8FAFC;
-        --sb-panel: #FFFFFF;
+        --sb-bg: #FFFFFF;
+        --sb-panel: #F8FAFC;
+        --sb-surface: #FFFFFF;
         --sb-border: #E2E8F0;
-        --sb-teal: #0F766E;
-        --sb-teal-hover: #115E59;
-        --sb-text: #0F172A;
-        --sb-muted: #334155;
+        --sb-accent: #0F3D5E;
+        --sb-accent-hover: #0A2F49;
+        --sb-text: #1E293B;
+        --sb-muted: #475569;
         --sb-amber-bg: #FFFBEB;
         --sb-amber-border: #F59E0B;
         --sb-amber-text: #92400E;
-        --sb-radius: 10px;
+        --sb-radius: 6px;
       }
       body, .container-fluid {
         background: var(--sb-bg) !important;
@@ -50,7 +51,7 @@ ui <- shiny::fluidPage(
         gap: 16px;
         padding: 14px 18px;
         margin: 0 0 12px 0;
-        background: var(--sb-panel);
+        background: var(--sb-surface);
         border: 1px solid var(--sb-border);
         border-radius: var(--sb-radius);
       }
@@ -58,7 +59,7 @@ ui <- shiny::fluidPage(
         margin: 0;
         font-size: 1.55rem;
         font-weight: 700;
-        color: var(--sb-text);
+        color: var(--sb-accent);
         letter-spacing: -0.02em;
       }
       .sb-brand-sub {
@@ -76,18 +77,18 @@ ui <- shiny::fluidPage(
       .sb-badge {
         display: inline-block;
         padding: 4px 10px;
-        border-radius: 999px;
+        border-radius: 4px;
         font-size: 0.78rem;
         font-weight: 600;
         border: 1px solid var(--sb-border);
-        background: #F1F5F9;
+        background: var(--sb-panel);
         color: var(--sb-muted);
         white-space: nowrap;
       }
       .sb-badge-warn {
-        background: #FEF3C7;
-        border-color: #FCD34D;
-        color: #92400E;
+        background: var(--sb-panel);
+        border-color: var(--sb-border);
+        color: var(--sb-accent);
       }
       .sb-stale {
         margin: 0 0 12px 0;
@@ -112,7 +113,7 @@ ui <- shiny::fluidPage(
         .sb-header { flex-direction: column; }
       }
       .sb-kpi {
-        background: var(--sb-panel);
+        background: var(--sb-surface);
         border: 1px solid var(--sb-border);
         border-radius: var(--sb-radius);
         padding: 12px 14px;
@@ -132,16 +133,16 @@ ui <- shiny::fluidPage(
         word-break: break-word;
       }
       .sb-welcome {
-        background: var(--sb-panel);
+        background: var(--sb-surface);
         border: 1px solid var(--sb-border);
         border-radius: var(--sb-radius);
         padding: 16px 18px;
         margin: 0 0 14px 0;
       }
-      .sb-welcome h4 { margin-top: 0; color: var(--sb-teal); }
+      .sb-welcome h4 { margin-top: 0; color: var(--sb-accent); }
       .sb-welcome ol { margin-bottom: 0; color: var(--sb-muted); }
       .well, .sidebarPanel, .mainPanel > .tabbable {
-        background: var(--sb-panel) !important;
+        background: var(--sb-surface) !important;
         border: 1px solid var(--sb-border) !important;
         border-radius: var(--sb-radius) !important;
         box-shadow: none !important;
@@ -159,20 +160,20 @@ ui <- shiny::fluidPage(
       }
       .sb-actions .btn-primary,
       .sb-actions .btn-primary:focus {
-        background-color: var(--sb-teal) !important;
-        border-color: var(--sb-teal) !important;
+        background-color: var(--sb-accent) !important;
+        border-color: var(--sb-accent) !important;
       }
       .sb-actions .btn-primary:hover {
-        background-color: var(--sb-teal-hover) !important;
-        border-color: var(--sb-teal-hover) !important;
+        background-color: var(--sb-accent-hover) !important;
+        border-color: var(--sb-accent-hover) !important;
       }
       .sb-actions .shiny-download-link {
         text-align: center;
       }
       details.sb-acc {
-        background: #F8FAFC;
+        background: var(--sb-panel);
         border: 1px solid var(--sb-border);
-        border-radius: 8px;
+        border-radius: var(--sb-radius);
         padding: 8px 10px;
         margin-bottom: 10px;
       }
@@ -199,7 +200,7 @@ ui <- shiny::fluidPage(
         margin: 6px 0 0 0;
       }
       .sb-panel-block {
-        background: var(--sb-panel);
+        background: var(--sb-surface);
         border: 1px solid var(--sb-border);
         border-radius: var(--sb-radius);
         padding: 12px 14px;
@@ -220,8 +221,8 @@ ui <- shiny::fluidPage(
       .nav-tabs > li.active > a,
       .nav-tabs > li.active > a:hover,
       .nav-tabs > li.active > a:focus {
-        color: var(--sb-teal) !important;
-        border-top-color: var(--sb-teal) !important;
+        color: var(--sb-accent) !important;
+        border-top-color: var(--sb-accent) !important;
         font-weight: 600;
       }
       h4.sb-section {
@@ -231,7 +232,7 @@ ui <- shiny::fluidPage(
         color: var(--sb-text);
       }
       input[type='checkbox'], input[type='radio'] {
-        accent-color: #0F766E;
+        accent-color: #0F3D5E;
       }
     "))
   ),
@@ -241,7 +242,7 @@ ui <- shiny::fluidPage(
       shiny::tags$h1(class = "sb-brand-title", "SigBenchR"),
       shiny::tags$p(
         class = "sb-brand-sub",
-        "İmmünoterapi Gen İmzası Doğrulama Aracı"
+        "Immunotherapy Gene Signature Benchmarking"
       )
     ),
     shiny::div(
@@ -249,7 +250,7 @@ ui <- shiny::fluidPage(
       shiny::span(class = "sb-badge", "v0.4.3"),
       shiny::span(
         class = "sb-badge sb-badge-warn",
-        "Araştırma Amaçlıdır — Klinik Karar Aracı Değildir"
+        "Research use only — not a clinical decision tool"
       )
     )
   ),
@@ -260,40 +261,40 @@ ui <- shiny::fluidPage(
       shiny::div(
         class = "sb-actions",
         shiny::actionButton(
-          "run", "Analizi Çalıştır",
+          "run", "Run analysis",
           class = "btn-primary btn-block",
           width = "100%"
         ),
         shiny::downloadButton(
-          "download_report", "HTML Rapor İndir",
+          "download_report", "Download HTML report",
           class = "btn-default btn-block"
         )
       ),
       shiny::tags$details(
         class = "sb-acc",
         open = NA,
-        shiny::tags$summary("1. İmzalar ve Kohortlar"),
+        shiny::tags$summary("1. Signatures and cohorts"),
         shiny::checkboxGroupInput(
-          "sig_choice", "Hazır imzalar",
+          "sig_choice", "Built-in signatures",
           choices = c("Cytokine-5", "IFNG6", "Random3"),
           selected = c("Cytokine-5", "IFNG6", "Random3")
         ),
         shiny::textAreaInput(
           "custom_genes",
-          "Özel imza (opsiyonel)",
+          "Custom signature (optional)",
           rows = 3,
-          placeholder = "Genleri virgül, boşluk veya satırla ayırın"
+          placeholder = "Separate genes by comma, space, or newline"
         ),
         shiny::tags$p(
           class = "sb-hint",
-          "Özel imza Jaccard ve DeLong seçicilerinde \"Custom\" olarak görünür; derived_from belirtilmez (independent = NA)."
+          "Custom signatures appear as \"Custom\" in Jaccard and DeLong selectors; derived_from is omitted (independent = NA)."
         ),
         shiny::tags$p(
           class = "sb-hint",
-          "Not: Dahili ICI kohortları ~2.800 gen içerir (dış imzalarda ~%14–15 kapsama beklenir); tam gen kapsamı için yerelde CSV/TSV yükleyin."
+          "Note: Bundled ICI cohorts contain ~2,800 genes (~14-15% coverage for external signatures). Load local CSV/TSV for full gene coverage."
         ),
         shiny::checkboxGroupInput(
-          "datasets", "Kohortlar (ICI)",
+          "datasets", "Cohorts (ICI)",
           choices = c(
             "van_allen_2015", "hugo_2016", "riaz_2017", "gide_2019"
           ),
@@ -302,54 +303,54 @@ ui <- shiny::fluidPage(
         if (isTRUE(.sigbenchr_allow_upload)) {
           shiny::tags$details(
             class = "sb-acc",
-            shiny::tags$summary("Yerel Kohort Yükle (CSV/TSV)"),
-            shiny::fileInput("upload_expr", "Ifade matrisi (CSV/TSV)", accept = c(".csv", ".tsv", ".txt")),
-            shiny::fileInput("upload_meta", "Klinik metadata (CSV/TSV)", accept = c(".csv", ".tsv", ".txt")),
-            shiny::checkboxInput("upload_genes_in_rows", "Genler satırlarda", TRUE),
+            shiny::tags$summary("Upload local cohort (CSV/TSV)"),
+            shiny::fileInput("upload_expr", "Expression matrix (CSV/TSV)", accept = c(".csv", ".tsv", ".txt")),
+            shiny::fileInput("upload_meta", "Clinical metadata (CSV/TSV)", accept = c(".csv", ".tsv", ".txt")),
+            shiny::checkboxInput("upload_genes_in_rows", "Genes in rows", TRUE),
             shiny::selectInput(
-              "upload_gene_id_type", "Gen ID tipi",
+              "upload_gene_id_type", "Gene ID type",
               choices = c("HGNC", "Ensembl", "other"), selected = "HGNC"
             ),
             shiny::selectInput(
-              "upload_normalization", "Normalizasyon",
+              "upload_normalization", "Normalization",
               choices = c("TPM", "FPKM", "normalized_counts", "log_normalized", "other"),
               selected = "TPM"
             ),
             shiny::selectInput(
-              "upload_scale", "Ölçek",
+              "upload_scale", "Scale",
               choices = c("linear", "log2"), selected = "log2"
             ),
-            shiny::textInput("upload_sample_id_col", "sample_id sütunu", value = "sample_id"),
-            shiny::textInput("upload_response_col", "response sütunu", value = "response_label"),
-            shiny::textInput("upload_dataset_name", "Kohort adı", value = "user_cohort"),
-            shiny::actionButton("upload_add", "Kohortu Doğrula ve Ekle", class = "btn-info"),
+            shiny::textInput("upload_sample_id_col", "sample_id column", value = "sample_id"),
+            shiny::textInput("upload_response_col", "response column", value = "response_label"),
+            shiny::textInput("upload_dataset_name", "Cohort name", value = "user_cohort"),
+            shiny::actionButton("upload_add", "Validate and add cohort", class = "btn-info"),
             shiny::verbatimTextOutput("upload_status")
           )
         } else {
           shiny::tags$p(
             class = "sb-note",
-            "Yerel kohort yükleme yalnızca SigBenchR::run_app(allow_upload = TRUE) ile açılır."
+            "Local cohort upload is enabled only via SigBenchR::run_app(allow_upload = TRUE)."
           )
         }
       ),
       shiny::tags$details(
         class = "sb-acc",
         open = NA,
-        shiny::tags$summary("2. Yöntem ve Klinik Politika"),
+        shiny::tags$summary("2. Method and clinical policy"),
         shiny::checkboxGroupInput(
-          "methods", "Skorlama yöntemleri",
+          "methods", "Scoring methods",
           choices = c("mean", "zscore", "median", "rank", "ss_rank"),
           selected = c("mean", "zscore")
         ),
         shiny::radioButtons(
-          "direction", "İmza yönü",
-          choices = c("Yüksek=yanıtlı (<)" = "<", "Düşük=yanıtlı (>)" = ">"),
+          "direction", "Signature direction",
+          choices = c("High = responder (<)" = "<", "Low = responder (>)" = ">"),
           selected = "<"
         ),
         shiny::radioButtons(
-          "sd_handling", "SD politikası",
+          "sd_handling", "SD policy",
           choices = c(
-            "SD dışla [CR/PR vs PD]" = "exclude",
+            "Exclude SD [CR/PR vs PD]" = "exclude",
             "ORR [CR/PR vs SD/PD]" = "as_0",
             "DCR [CR/PR/SD vs PD]" = "as_1"
           ),
@@ -357,25 +358,25 @@ ui <- shiny::fluidPage(
         ),
         shiny::checkboxInput(
           "compute_null",
-          "Null permütasyon (önerilen: rastgele gen seti kontrolü)",
+          "Null permutation (recommended random gene-set control)",
           FALSE
         ),
         shiny::tags$p(
           class = "sb-hint",
-          "Önerilen: rastgele gen seti kontrolü — imza AUC'sini aynı boyutta rastgele gen setleriyle karşılaştırır (compute_null)."
+          "Recommended: compare signature AUC against same-sized random gene sets (compute_null)."
         )
       ),
       shiny::tags$details(
         class = "sb-acc",
-        shiny::tags$summary("3. İleri İstatistiksel Ayarlar"),
-        shiny::sliderInput("coverage_threshold", "Kapsama eşiği", 0.5, 1, 0.70, 0.05),
-        shiny::sliderInput("sensitivity_threshold", "Dayanıklılık eşiği (keyfi)", 0.05, 0.3, 0.10, 0.01),
-        shiny::checkboxInput("compute_pr", "PR-AUC + bootstrap GA", TRUE),
+        shiny::tags$summary("3. Advanced statistical settings"),
+        shiny::sliderInput("coverage_threshold", "Coverage threshold", 0.5, 1, 0.70, 0.05),
+        shiny::sliderInput("sensitivity_threshold", "Robustness threshold (arbitrary)", 0.05, 0.3, 0.10, 0.01),
+        shiny::checkboxInput("compute_pr", "PR-AUC + bootstrap CI", TRUE),
         shiny::numericInput("n_boot", "PR bootstrap (n_boot)", value = 200, min = 0, max = 2000, step = 50),
         shiny::numericInput("n_perm", "Null B", value = 1000, min = 10, max = 2000, step = 50),
         shiny::checkboxInput(
           "match_expression",
-          "Null: ifade düzeyine eşleştirilmiş örnekleme",
+          "Null: expression-matched sampling",
           FALSE
         ),
         shiny::numericInput("seed", "Seed", value = 42, min = 1, step = 1)
@@ -387,17 +388,17 @@ ui <- shiny::fluidPage(
       shiny::tabsetPanel(
         id = "main_tabs",
         shiny::tabPanel(
-          "Genel Bakış",
+          "Overview",
           shiny::div(
             class = "sb-panel-block",
             shiny::radioButtons(
-              "heatmap_method", "Aktif Görünüm Yöntemi",
+              "heatmap_method", "Active view method",
               choices = c("mean", "zscore"), selected = "mean",
               inline = TRUE
             ),
-            shiny::tags$h4(class = "sb-section", "AUC ısı haritası"),
+            shiny::tags$h4(class = "sb-section", "AUC heatmap"),
             shiny::plotOutput("heatmap", height = "320px"),
-            shiny::tags$h4(class = "sb-section", "Sonuç tablosu"),
+            shiny::tags$h4(class = "sb-section", "Results table"),
             if (requireNamespace("DT", quietly = TRUE)) {
               DT::DTOutput("table")
             } else {
@@ -406,17 +407,17 @@ ui <- shiny::fluidPage(
           )
         ),
         shiny::tabPanel(
-          "ROC ve Forest",
+          "ROC and Forest",
           shiny::div(
             class = "sb-panel-block",
             shiny::div(
               class = "sb-inline-controls",
               shiny::selectInput(
-                "roc_dataset", "Kohort",
+                "roc_dataset", "Cohort",
                 choices = c("van_allen_2015", "hugo_2016", "riaz_2017", "gide_2019")
               )
             ),
-            shiny::tags$h4(class = "sb-section", "ROC eğrileri"),
+            shiny::tags$h4(class = "sb-section", "ROC curves"),
             shiny::plotOutput("roc_plot", height = "420px")
           ),
           shiny::div(
@@ -424,7 +425,7 @@ ui <- shiny::fluidPage(
             shiny::div(
               class = "sb-inline-controls",
               shiny::selectInput(
-                "forest_sig", "Forest imzası",
+                "forest_sig", "Forest signature",
                 choices = c("Cytokine-5", "IFNG6", "Random3")
               )
             ),
@@ -433,19 +434,19 @@ ui <- shiny::fluidPage(
           )
         ),
         shiny::tabPanel(
-          "Özet ve Alt Gruplar",
+          "Summary and subgroups",
           shiny::div(
             class = "sb-panel-block",
             shiny::checkboxInput(
               "stratify_by",
-              "Tedavi / Sonlanım Alt Grubuna Göre Ayır (stratify_by)",
+              "Stratify by treatment / endpoint (stratify_by)",
               FALSE
             ),
             shiny::tags$p(
               class = "sb-hint",
-              "İşaretliyken özet stratify_by = c(\"treatment\", \"endpoint_type\") ile ayrılır (ör. anti-CTLA4 klinik yarar vs anti-PD1 RECIST)."
+              "When checked, summary uses stratify_by = c(\"treatment\", \"endpoint_type\") (e.g. anti-CTLA4 clinical benefit vs anti-PD1 RECIST)."
             ),
-            shiny::tags$h4(class = "sb-section", "Ağırlıklı özet (n + ters-varyans, Q, I²)"),
+            shiny::tags$h4(class = "sb-section", "Weighted summary (n + inverse-variance, Q, I2)"),
             if (requireNamespace("DT", quietly = TRUE)) {
               DT::DTOutput("summary_table")
             } else {
@@ -454,7 +455,7 @@ ui <- shiny::fluidPage(
           ),
           shiny::div(
             class = "sb-panel-block",
-            shiny::tags$h4(class = "sb-section", "Skorlama dayanıklılığı (check_sensitivity)"),
+            shiny::tags$h4(class = "sb-section", "Scoring robustness (check_sensitivity)"),
             if (requireNamespace("DT", quietly = TRUE)) {
               DT::DTOutput("sensitivity_table")
             } else {
@@ -463,30 +464,30 @@ ui <- shiny::fluidPage(
           )
         ),
         shiny::tabPanel(
-          "Karşılaştırma",
+          "Comparison",
           shiny::div(
             class = "sb-panel-block",
-            shiny::tags$h4(class = "sb-section", "Eşleştirilmiş DeLong"),
+            shiny::tags$h4(class = "sb-section", "Paired DeLong"),
             shiny::div(
               class = "sb-inline-controls",
               shiny::selectInput(
-                "cmp_dataset", "Veri seti",
+                "cmp_dataset", "Dataset",
                 choices = c("van_allen_2015", "hugo_2016", "riaz_2017", "gide_2019")
               ),
               shiny::selectInput(
-                "cmp_sig1", "İmza 1",
+                "cmp_sig1", "Signature 1",
                 choices = c("Cytokine-5", "IFNG6", "Random3")
               ),
               shiny::selectInput(
-                "cmp_sig2", "İmza 2",
+                "cmp_sig2", "Signature 2",
                 choices = c("IFNG6", "Cytokine-5", "Random3")
               ),
-              shiny::actionButton("run_cmp", "Karşılaştır", class = "btn-primary")
+              shiny::actionButton("run_cmp", "Compare", class = "btn-primary")
             ),
             shiny::verbatimTextOutput("cmp_status"),
             shiny::tags$p(
               class = "sb-hint",
-              "Tek karşılaştırmada p_adj_bh ham p değerine eşittir (p_adj_bh == p_value)."
+              "For a single comparison, p_adj_bh equals the raw p-value (p_adj_bh == p_value)."
             ),
             if (requireNamespace("DT", quietly = TRUE)) {
               DT::DTOutput("cmp_table")
@@ -496,7 +497,7 @@ ui <- shiny::fluidPage(
           ),
           shiny::div(
             class = "sb-panel-block",
-            shiny::tags$h4(class = "sb-section", "Jaccard örtüşme (Custom dahil)"),
+            shiny::tags$h4(class = "sb-section", "Jaccard overlap (including Custom)"),
             if (requireNamespace("DT", quietly = TRUE)) {
               DT::DTOutput("jaccard_table")
             } else {
@@ -505,7 +506,7 @@ ui <- shiny::fluidPage(
           ),
           shiny::div(
             class = "sb-panel-block",
-            shiny::tags$h4(class = "sb-section", "AUC korelasyonu (veri setleri boyunca)"),
+            shiny::tags$h4(class = "sb-section", "AUC correlation (across datasets)"),
             if (requireNamespace("DT", quietly = TRUE)) {
               DT::DTOutput("corr_table")
             } else {
@@ -514,13 +515,13 @@ ui <- shiny::fluidPage(
           )
         ),
         shiny::tabPanel(
-          "Kapsama ve Tekrarlanabilirlik",
+          "Coverage and reproducibility",
           shiny::div(
             class = "sb-panel-block",
-            shiny::tags$h4(class = "sb-section", "Gen kapsama ve eksik gen detayı"),
+            shiny::tags$h4(class = "sb-section", "Gene coverage and missing genes"),
             shiny::tags$p(
               class = "sb-hint",
-              "Her imza × kohort için bulunan/toplam gen, % kapsama ve missing_genes."
+              "Per signature x cohort: genes found/total, coverage percent, and missing_genes."
             ),
             if (requireNamespace("DT", quietly = TRUE)) {
               DT::DTOutput("coverage_table")
@@ -530,10 +531,10 @@ ui <- shiny::fluidPage(
           ),
           shiny::div(
             class = "sb-panel-block",
-            shiny::tags$h4(class = "sb-section", "Kopyalanabilir R kodu"),
+            shiny::tags$h4(class = "sb-section", "Copyable R code"),
             shiny::tags$p(
               class = "sb-hint",
-              "Son çalıştırılan snapshot parametrelerinden üretilir; canlı input ile çelişmez."
+              "Generated from the last run snapshot parameters; does not drift with live inputs."
             ),
             shiny::textAreaInput(
               "r_code_text",
@@ -543,7 +544,7 @@ ui <- shiny::fluidPage(
               width = "100%"
             ),
             shiny::tags$button(
-              "Kodu kopyala",
+              "Copy code",
               id = "copy_r_code",
               class = "btn btn-default",
               type = "button",
@@ -552,12 +553,12 @@ ui <- shiny::fluidPage(
           ),
           shiny::div(
             class = "sb-panel-block",
-            shiny::tags$h4(class = "sb-section", "Bilimsel sınır ve provenans"),
+            shiny::tags$h4(class = "sb-section", "Scientific limits and provenance"),
             shiny::tags$ul(
-              shiny::tags$li("Araştırma amaçlı keşif aracıdır; klinik karar için tasarlanmamıştır."),
-              shiny::tags$li("Dahili halka açık melanoma ICI kohortları (datasets_ici) ve demo imzaları kullanılır."),
-              shiny::tags$li("Grafikler, R kodu ve HTML rapor yalnızca results() snapshot nesnesinden (res, sigs, params) beslenir."),
-              shiny::tags$li("Cytokine-5 derived_from içerir (independent = FALSE); IFNG6 / Random3 bağımsızdır; Custom için independent = NA.")
+              shiny::tags$li("Research exploration tool only; not designed for clinical decisions."),
+              shiny::tags$li("Uses public melanoma ICI cohorts (datasets_ici) and demo signatures."),
+              shiny::tags$li("Plots, R code, and HTML report are driven only by the results() snapshot (res, sigs, params)."),
+              shiny::tags$li("Cytokine-5 includes derived_from (independent = FALSE); IFNG6 / Random3 are independent; Custom is independent = NA.")
             )
           )
         )
@@ -604,7 +605,7 @@ server <- function(input, output, session) {
     )
     if (inherits(ds, "error")) {
       output$upload_status <- shiny::renderText({
-        paste0("Hata: ", conditionMessage(ds))
+        paste0("Error: ", conditionMessage(ds))
       })
       return()
     }
@@ -621,14 +622,14 @@ server <- function(input, output, session) {
     )
     output$upload_status <- shiny::renderText({
       msg <- paste0(
-        "Eklendi: ", nm,
-        " | gen=", ds$info$n_genes,
-        " | ornek=", ds$info$n_samples,
+        "Added: ", nm,
+        " | genes=", ds$info$n_genes,
+        " | samples=", ds$info$n_samples,
         " | norm=", ds$info$normalization,
         " | scale=", ds$info$scale
       )
       if (length(warn_msgs) > 0L) {
-        msg <- paste0(msg, "\nUyarilar:\n- ", paste(warn_msgs, collapse = "\n- "))
+        msg <- paste0(msg, "\nWarnings:\n- ", paste(warn_msgs, collapse = "\n- "))
       }
       msg
     })
@@ -649,7 +650,7 @@ server <- function(input, output, session) {
     chosen <- chosen[nzchar(chosen)]
     sigs <- list()
     for (nm in chosen) {
-      shiny::validate(shiny::need(nm %in% names(signatures_demo), paste0("Bilinmeyen imza: ", nm)))
+      shiny::validate(shiny::need(nm %in% names(signatures_demo), paste0("Unknown signature: ", nm)))
       sig <- signatures_demo[[nm]]
       sig$direction <- direction
       sigs[[nm]] <- sig
@@ -657,11 +658,11 @@ server <- function(input, output, session) {
     custom_txt <- if (is.null(custom_genes)) "" else custom_genes
     if (nzchar(trimws(custom_txt))) {
       genes <- SigBenchR::parse_genes(custom_txt)
-      shiny::validate(shiny::need(length(genes) >= 1, "Özel imza için en az bir gen girin."))
-      # derived_from belirtilmez -> independent = NA (fail-closed)
+      shiny::validate(shiny::need(length(genes) >= 1, "Enter at least one gene for the custom signature."))
+      # derived_from omitted -> independent = NA (fail-closed)
       sigs[["Custom"]] <- list(genes = genes, direction = direction)
     }
-    shiny::validate(shiny::need(length(sigs) >= 1, "En az bir hazır imza seçin veya özel imza ekleyin."))
+    shiny::validate(shiny::need(length(sigs) >= 1, "Select at least one built-in signature or add a custom signature."))
     sigs
   }
 
@@ -749,11 +750,11 @@ server <- function(input, output, session) {
     miss_ds <- setdiff(params$datasets, names(pool))
     shiny::validate(shiny::need(
       length(miss_ds) == 0L,
-      paste0("Bilinmeyen veri seti: ", paste(miss_ds, collapse = ", "))
+      paste0("Unknown dataset: ", paste(miss_ds, collapse = ", "))
     ))
     ds <- pool[params$datasets]
 
-    shiny::withProgress(message = "Benchmark çalışıyor...", value = 0.2, {
+    shiny::withProgress(message = "Running benchmark...", value = 0.2, {
       shiny::incProgress(0.3, detail = "ROC / PR / null")
       out <- SigBenchR::run_benchmark(
         signatures = sigs,
@@ -800,7 +801,7 @@ server <- function(input, output, session) {
     if (isTRUE(stale_inputs())) {
       shiny::div(
         class = "sb-stale",
-        "Parametreler değişti — güncel sonuçları görmek için 'Analizi Çalıştır'a basın."
+        "Parameters changed — press 'Run analysis' to refresh results."
       )
     } else {
       NULL
@@ -811,12 +812,12 @@ server <- function(input, output, session) {
     if (is.null(input$run) || identical(as.integer(input$run), 0L)) {
       return(shiny::div(
         class = "sb-welcome",
-        shiny::tags$h4("Başlangıç rehberi"),
+        shiny::tags$h4("Getting started"),
         shiny::tags$ol(
-          shiny::tags$li("Soldan imza ve kohortları seçin (gerekirse özel gen listesi ekleyin)."),
-          shiny::tags$li("Yöntem, imza yönü ve SD politikasını ayarlayın."),
-          shiny::tags$li("\"Analizi Çalıştır\"a basın; özet metrikler ve sekmeler snapshot sonuçlarıyla dolar."),
-          shiny::tags$li("ROC / Forest, özet alt grupları ve DeLong karşılaştırmasını ilgili sekmelerde inceleyin.")
+          shiny::tags$li("Select signatures and cohorts on the left (add a custom gene list if needed)."),
+          shiny::tags$li("Set scoring method, signature direction, and SD policy."),
+          shiny::tags$li("Press \"Run analysis\"; KPI cards and tabs fill from the snapshot."),
+          shiny::tags$li("Inspect ROC / Forest, summary subgroups, and DeLong comparisons in their tabs.")
         )
       ))
     }
@@ -824,12 +825,12 @@ server <- function(input, output, session) {
     if (is.null(snap)) {
       return(shiny::div(
         class = "sb-welcome",
-        shiny::tags$h4("Başlangıç rehberi"),
+        shiny::tags$h4("Getting started"),
         shiny::tags$ol(
-          shiny::tags$li("Soldan imza ve kohortları seçin (gerekirse özel gen listesi ekleyin)."),
-          shiny::tags$li("Yöntem, imza yönü ve SD politikasını ayarlayın."),
-          shiny::tags$li("\"Analizi Çalıştır\"a basın; özet metrikler ve sekmeler snapshot sonuçlarıyla dolar."),
-          shiny::tags$li("ROC / Forest, özet alt grupları ve DeLong karşılaştırmasını ilgili sekmelerde inceleyin.")
+          shiny::tags$li("Select signatures and cohorts on the left (add a custom gene list if needed)."),
+          shiny::tags$li("Set scoring method, signature direction, and SD policy."),
+          shiny::tags$li("Press \"Run analysis\"; KPI cards and tabs fill from the snapshot."),
+          shiny::tags$li("Inspect ROC / Forest, summary subgroups, and DeLong comparisons in their tabs.")
         )
       ))
     }
@@ -865,7 +866,7 @@ server <- function(input, output, session) {
       i <- which.max(indep$auc)
       sprintf("%.3f (%s · %s)", indep$auc[i], indep$signature[i], indep$dataset[i])
     } else {
-      "Bağımsız sonuç yok"
+      "No independent result"
     }
 
     n_low <- sum(df$low_coverage %in% TRUE, na.rm = TRUE)
@@ -875,23 +876,23 @@ server <- function(input, output, session) {
       class = "sb-kpi-row",
       shiny::div(
         class = "sb-kpi",
-        shiny::tags$p(class = "sb-kpi-label", "Kohort / İmza"),
-        shiny::tags$p(class = "sb-kpi-value", sprintf("%d kohort · %d imza", n_ds, n_sig))
+        shiny::tags$p(class = "sb-kpi-label", "Cohort / Signature"),
+        shiny::tags$p(class = "sb-kpi-value", sprintf("%d cohorts · %d signatures", n_ds, n_sig))
       ),
       shiny::div(
         class = "sb-kpi",
-        shiny::tags$p(class = "sb-kpi-label", "Yöntem & SD"),
+        shiny::tags$p(class = "sb-kpi-label", "Method & SD"),
         shiny::tags$p(class = "sb-kpi-value", sprintf("%s · %s", hm, sd_lab))
       ),
       shiny::div(
         class = "sb-kpi",
-        shiny::tags$p(class = "sb-kpi-label", "En yüksek bağımsız AUC"),
+        shiny::tags$p(class = "sb-kpi-label", "Best independent AUC"),
         shiny::tags$p(class = "sb-kpi-value", best_auc)
       ),
       shiny::div(
         class = "sb-kpi",
-        shiny::tags$p(class = "sb-kpi-label", sprintf("Düşük kapsama (< %%%d)", thr_pct)),
-        shiny::tags$p(class = "sb-kpi-value", sprintf("%d hücre", as.integer(n_low)))
+        shiny::tags$p(class = "sb-kpi-label", sprintf("Low coverage (< %d%%)", thr_pct)),
+        shiny::tags$p(class = "sb-kpi-value", sprintf("%d cells", as.integer(n_low)))
       )
     )
   })
@@ -923,7 +924,7 @@ server <- function(input, output, session) {
     )
   })
 
-  # Forest referans çizgisi için tabakasız özet (çok satırlı stratify_by ile çelişmez)
+  # Unstratified summary for forest reference (avoids multi-row stratify_by clash)
   summary_res_forest <- shiny::reactive({
     shiny::req(results())
     snap <- results()
@@ -941,7 +942,7 @@ server <- function(input, output, session) {
     if (is.null(input$run) || identical(as.integer(input$run), 0L)) {
       shiny::updateTextAreaInput(
         session, "r_code_text",
-        value = "# Analizi çalıştırdıktan sonra tekrarlanabilir R kodu burada görünür."
+        value = "# Run the analysis to generate reproducible R code here."
       )
       return()
     }
@@ -949,7 +950,7 @@ server <- function(input, output, session) {
     if (is.null(snap)) {
       shiny::updateTextAreaInput(
         session, "r_code_text",
-        value = "# Analizi çalıştırdıktan sonra tekrarlanabilir R kodu burada görünür."
+        value = "# Run the analysis to generate reproducible R code here."
       )
       return()
     }
@@ -979,7 +980,7 @@ server <- function(input, output, session) {
         sd_handling = p$sd_handling,
         match_expression = p$match_expression
       ),
-      error = function(e) paste0("# Kod üretilemedi: ", conditionMessage(e))
+      error = function(e) paste0("# Could not generate code: ", conditionMessage(e))
     )
     shiny::updateTextAreaInput(session, "r_code_text", value = code)
   })
@@ -991,7 +992,7 @@ server <- function(input, output, session) {
     content = function(file) {
       shiny::req(results())
       if (!requireNamespace("rmarkdown", quietly = TRUE)) {
-        stop("HTML rapor için 'rmarkdown' paketini kurun.", call. = FALSE)
+        stop("Install 'rmarkdown' to download the HTML report.", call. = FALSE)
       }
       snap <- results()
       hm_active <- if (!is.null(input$heatmap_method) && nzchar(input$heatmap_method)) {
@@ -1035,12 +1036,110 @@ server <- function(input, output, session) {
     }
   )
 
+  .em <- "\u2014"
+  .en <- "\u2013"
+
+  .fmt3 <- function(x) {
+    x <- as.numeric(x)
+    ifelse(is.finite(x), sprintf("%.3f", x), .em)
+  }
+
+  .fmt_i2 <- function(x) {
+    x <- as.numeric(x)
+    ifelse(is.finite(x), sprintf("%.1f", x), .em)
+  }
+
+  .fmt_auc_ci <- function(est, lo, hi) {
+    est <- as.numeric(est)
+    lo <- as.numeric(lo)
+    hi <- as.numeric(hi)
+    out <- rep(.em, length(est))
+    full <- is.finite(est) & is.finite(lo) & is.finite(hi)
+    out[full] <- sprintf("%.3f (%.3f%s%.3f)", est[full], lo[full], .en, hi[full])
+    point_only <- is.finite(est) & !full
+    out[point_only] <- sprintf("%.3f", est[point_only])
+    out
+  }
+
+  .translate_note <- function(x) {
+    x <- as.character(x)
+    miss <- is.na(x) | !nzchar(x)
+    x[miss] <- .em
+    x <- gsub(
+      "([0-9]+) bagimsiz-olmayan/NA satir ozetten cikarildi",
+      "\\1 non-independent/NA cohorts excluded",
+      x
+    )
+    x <- gsub(
+      "([0-9]+) dusuk kapsama satir ozetten cikarildi",
+      "\\1 low-coverage cohorts excluded",
+      x
+    )
+    x <- gsub(
+      "([0-9]+) kucuk kohort uyarisi",
+      "\\1 small-cohort warning(s)",
+      x
+    )
+    x <- gsub(
+      "([0-9]+) var_zero/NA varyans satir IVW'den cikarildi",
+      "\\1 zero/NA-variance rows excluded from IVW",
+      x
+    )
+    x
+  }
+
+  .format_summary_display <- function(sm) {
+    if (!is.data.frame(sm) || nrow(sm) == 0L) {
+      return(sm)
+    }
+    k_col <- if ("n_cohorts" %in% names(sm)) sm$n_cohorts else sm$n_datasets
+    has_strata <- any(c("treatment", "endpoint_type") %in% names(sm))
+    if (isTRUE(has_strata)) {
+      stratum <- if ("treatment" %in% names(sm) && "endpoint_type" %in% names(sm)) {
+        paste(as.character(sm$treatment), as.character(sm$endpoint_type), sep = " / ")
+      } else if ("treatment" %in% names(sm)) {
+        as.character(sm$treatment)
+      } else {
+        as.character(sm$endpoint_type)
+      }
+      out <- data.frame(
+        Signature = as.character(sm$signature),
+        Method = as.character(sm$method),
+        Stratum = stratum,
+        k = as.integer(k_col),
+        `N-Weighted AUC` = .fmt3(sm$auc_n_weighted),
+        `REML AUC (95% CI)` = .fmt_auc_ci(sm$auc_re, sm$auc_re_ci_low, sm$auc_re_ci_high),
+        `I2 (%)` = .fmt_i2(sm$I2),
+        check.names = FALSE,
+        stringsAsFactors = FALSE
+      )
+    } else {
+      out <- data.frame(
+        Signature = as.character(sm$signature),
+        Method = as.character(sm$method),
+        k = as.integer(k_col),
+        `N-Weighted AUC` = .fmt3(sm$auc_n_weighted),
+        `IVW AUC` = .fmt3(sm$auc_ivw),
+        `REML AUC (95% CI)` = .fmt_auc_ci(sm$auc_re, sm$auc_re_ci_low, sm$auc_re_ci_high),
+        `I2 (%)` = .fmt_i2(sm$I2),
+        Note = if ("note" %in% names(sm)) .translate_note(sm$note) else rep(.em, nrow(sm)),
+        check.names = FALSE,
+        stringsAsFactors = FALSE
+      )
+    }
+    out
+  }
+
   .dt_round <- function(df) {
     if (!requireNamespace("DT", quietly = TRUE)) {
       return(df)
     }
     num_cols <- names(df)[vapply(df, is.numeric, logical(1))]
-    dt <- DT::datatable(df, options = list(scrollX = TRUE, pageLength = 8))
+    dt <- DT::datatable(
+      df,
+      options = list(scrollX = TRUE, autoWidth = TRUE, pageLength = 8),
+      rownames = FALSE
+    )
     if (length(num_cols) > 0L) {
       dt <- DT::formatRound(dt, columns = num_cols, digits = 3)
     }
@@ -1108,7 +1207,7 @@ server <- function(input, output, session) {
     hm <- input$heatmap_method
     shiny::validate(shiny::need(
       any(df$method == hm & !(df$skipped %in% TRUE)),
-      "AUC yok."
+      "No AUC available."
     ))
     SigBenchR::plot_auc_heatmap(
       df,
@@ -1124,7 +1223,7 @@ server <- function(input, output, session) {
 
   output$roc_plot <- shiny::renderPlot({
     if (is.null(input$run) || identical(as.integer(input$run), 0L) || is.null(results())) {
-      shiny::validate(shiny::need(FALSE, "ROC için önce analizi çalıştırın."))
+      shiny::validate(shiny::need(FALSE, "Run the analysis before viewing ROC curves."))
     }
     shiny::req(input$roc_dataset)
     snap <- results()
@@ -1142,10 +1241,10 @@ server <- function(input, output, session) {
     shiny::validate(
       shiny::need(
         !identical(input$cmp_sig1, input$cmp_sig2),
-        "DeLong için iki farklı imza seçin (İmza 1 ≠ İmza 2)."
+        "Select two different signatures for DeLong (Signature 1 != Signature 2)."
       )
     )
-    shiny::withProgress(message = "DeLong karşılaştırması...", value = 0.4, {
+    shiny::withProgress(message = "DeLong comparison...", value = 0.4, {
       genes1 <- if (identical(input$cmp_sig1, "Custom")) {
         SigBenchR::parse_genes(input$custom_genes)
       } else {
@@ -1157,14 +1256,14 @@ server <- function(input, output, session) {
         signatures_demo[[input$cmp_sig2]]$genes
       }
       shiny::validate(
-        shiny::need(length(genes1) >= 1, "İmza 1 genleri bulunamadı."),
-        shiny::need(length(genes2) >= 1, "İmza 2 genleri bulunamadı.")
+        shiny::need(length(genes1) >= 1, "Signature 1 genes not found."),
+        shiny::need(length(genes2) >= 1, "Signature 2 genes not found.")
       )
 
       cmp_pool <- active_dataset_pool()
       shiny::validate(shiny::need(
         input$cmp_dataset %in% names(cmp_pool),
-        paste0("Veri seti bulunamadı: ", input$cmp_dataset)
+        paste0("Dataset not found: ", input$cmp_dataset)
       ))
       s1 <- tryCatch(
         SigBenchR::score_for_dataset(
@@ -1178,7 +1277,7 @@ server <- function(input, output, session) {
       )
       shiny::validate(shiny::need(
         !inherits(s1, "error"),
-        paste0("İmza 1 skorlanamadı: ", if (inherits(s1, "error")) conditionMessage(s1) else "")
+        paste0("Could not score Signature 1: ", if (inherits(s1, "error")) conditionMessage(s1) else "")
       ))
 
       s2 <- tryCatch(
@@ -1193,7 +1292,7 @@ server <- function(input, output, session) {
       )
       shiny::validate(shiny::need(
         !inherits(s2, "error"),
-        paste0("İmza 2 skorlanamadı: ", if (inherits(s2, "error")) conditionMessage(s2) else "")
+        paste0("Could not score Signature 2: ", if (inherits(s2, "error")) conditionMessage(s2) else "")
       ))
 
       cmp <- tryCatch(
@@ -1212,7 +1311,7 @@ server <- function(input, output, session) {
       )
       shiny::validate(shiny::need(
         !inherits(cmp, "error"),
-        paste0("DeLong karşılaştırma hatası: ", if (inherits(cmp, "error")) conditionMessage(cmp) else "")
+        paste0("DeLong comparison error: ", if (inherits(cmp, "error")) conditionMessage(cmp) else "")
       ))
       cmp
     })
@@ -1220,14 +1319,14 @@ server <- function(input, output, session) {
 
   output$cmp_status <- shiny::renderText({
     if (identical(input$cmp_sig1, input$cmp_sig2)) {
-      return("Uyarı: İmza 1 ve İmza 2 aynı olamaz.")
+      return("Warning: Signature 1 and Signature 2 must differ.")
     }
     if (is.null(input$run_cmp) || identical(as.integer(input$run_cmp), 0L) || is.null(cmp_res())) {
-      return("Aynı veri setinde iki imza seçip DeLong karşılaştırın.")
+      return("Select two signatures on the same dataset and run DeLong.")
     }
     r <- cmp_res()
     sprintf(
-      "p=%.4g | p_adj_bh=%.4g (tek karşılaştırmada ham p ile eşit) | AUC1=%.3f | AUC2=%.3f",
+      "p=%.4g | p_adj_bh=%.4g (equals raw p for a single comparison) | AUC1=%.3f | AUC2=%.3f",
       r$p_value, r$p_adj_bh, r$auc1, r$auc2
     )
   })
@@ -1237,9 +1336,15 @@ server <- function(input, output, session) {
   output$cmp_fallback <- shiny::renderTable({ shiny::req(cmp_res()); cmp_res() })
 
   output$summary_table <- if (requireNamespace("DT", quietly = TRUE)) {
-    DT::renderDT({ shiny::req(summary_res()); .dt_round(summary_res()) })
+    DT::renderDT({
+      shiny::req(summary_res())
+      .dt_round(.format_summary_display(summary_res()))
+    })
   } else NULL
-  output$summary_fallback <- shiny::renderTable({ shiny::req(summary_res()); summary_res() })
+  output$summary_fallback <- shiny::renderTable({
+    shiny::req(summary_res())
+    .format_summary_display(summary_res())
+  })
 
   output$forest_plot <- shiny::renderPlot({
     shiny::req(results())
@@ -1248,7 +1353,7 @@ server <- function(input, output, session) {
       any(snap$res$signature == input$forest_sig &
             snap$res$method == input$heatmap_method &
             !(snap$res$skipped %in% TRUE)),
-      "Seçilen imza/yöntem için AUC yok."
+      "No AUC for the selected signature/method."
     ))
     SigBenchR::plot_auc_forest(
       snap$res,
@@ -1275,7 +1380,7 @@ server <- function(input, output, session) {
       snap <- results()
       shiny::validate(shiny::need(
         length(unique(snap$res$signature[!(snap$res$skipped %in% TRUE)])) >= 2,
-        "Korelasyon için en az iki imza çalıştırın."
+        "Run at least two signatures for correlation."
       ))
       .dt_round(SigBenchR::auc_correlation(snap$res, method = input$heatmap_method))
     })

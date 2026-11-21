@@ -82,7 +82,14 @@ test_that("export_report gecici dizinde HTML uretir", {
   expect_true(grepl("clinical decision", html, ignore.case = TRUE))
   expect_true(grepl("Null permutation", html, fixed = TRUE))
   expect_true(grepl("Not run", html, fixed = TRUE))
-  expect_true(grepl(">n/a<", html) || grepl("n/a", html, fixed = TRUE))
+  # Missing values render as em-dash (U+2014) or HTML entity in presentation layer
+  expect_true(
+    grepl("\u2014", html, fixed = TRUE) ||
+      grepl("&mdash;", html, fixed = TRUE) ||
+      grepl("&#8212;", html, fixed = TRUE) ||
+      grepl(">n/a<", html) ||
+      grepl("n/a", html, fixed = TRUE)
+  )
   expect_false(grepl("n_perm = 1000", html, fixed = TRUE))
   expect_true(grepl("sessionInfo", html, fixed = TRUE) || grepl("R version", html))
 })
