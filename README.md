@@ -97,7 +97,8 @@ Liu 2019 (cBioPortal) S3/LFS **403** verdiği için dahil edilmedi.
 - `gide_2019` (`sample_meta$treatment = "anti-PD1"`): `n = 41` alt kümesi yalnızca ENA `PD1_*_PRE` örnekleridir (**anti-PD1 monoterapi**); normalizasyon **normalized counts**. `ipiPD1_*_PRE` (anti-PD1 + anti-CTLA4 kombinasyon) dahil değildir; IMS `mel_gide19_cli_data.csv` pre satırları ile birebir örtüşür (`n_pos = 19`, `n_neg = 16`, `n_SD = 6`).
 
 **Ön işleme:** yalnızca pre-treatment; hasta başına tek örnek (pseudo-replication yok).  
-**Tarafsız null havuzu / paket boyutu:** her kohortta demo imza genleri + sıfır varyanslı olmayan genlerden **`seed = 42`** ile rastgele **~2.800 gen**; `compress = "xz"`; `data/` toplamı **&lt; 5 MB**. Ayrıntı ve yeniden üretim: `data-raw/prepare_ici_datasets.R`, `data-raw/ici_cohort_summary.csv`.  
+**Tarafsız null havuzu / paket boyutu:** her kohortta demo imza genleri + sıfır varyanslı olmayan genlerden **`seed = 42`** ile rastgele **~2.800 gen**; `compress = "xz"`; `data/` toplamı **&lt; 5 MB**. Ayrıntı, kaynak URL’leri ve dışlama kuralları: [`data-raw/PROVENANCE.md`](data-raw/PROVENANCE.md); yeniden üretim: `data-raw/prepare_ici_datasets.R`, `data-raw/ici_cohort_summary.csv`.  
+**Dürüst sınırlama:** ~2.800 genlik havuz nedeniyle özel (arbitrary) imzalarda gen kapsaması tipik olarak ~%14–15 ile sınırlıdır; bu sürüm **keşifsel bir prototiptir**, tam-genom ICI yeniden analizi değildir.  
 **Bağımsızlık:** `Cytokine-5$derived_from` bu kohort adlarını içerir (`independent = FALSE`); `IFNG6` / `Random3` açıkça `derived_from = character(0)` taşır (`independent = TRUE`). Kökeni belirtilmemiş özel imzalar `independent = NA` alır ve varsayılan bağımsız özete girmez.  
 **Yazar:** `DESCRIPTION` içinde `Efe Kaan Şengönül <fperskaan@gmail.com>` (`aut`, `cre`); placeholder yok.
 
