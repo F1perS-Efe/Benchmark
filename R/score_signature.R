@@ -64,6 +64,12 @@ score_signature <- function(expr,
                             weights = NULL) {
   method <- match.arg(method)
   parsed <- .parse_signature_genes(genes, genes_up, genes_down, weights = weights)
+  if (isTRUE(parsed$weighted) && identical(method, "median")) {
+    stop(
+      "Weighted continuous signatures do not support method = 'median'; use 'mean', 'zscore', 'rank', or 'ss_rank'.",
+      call. = FALSE
+    )
+  }
 
   cov_up <- if (length(parsed$genes_up) > 0L) {
     match_genes(expr, parsed$genes_up)
@@ -368,7 +374,7 @@ score_signature <- function(expr,
 
 #' Compute weighted linear signature scores across samples
 #'
-#' Applies the per-gene `method` transformation (`"mean"`/`"median"` use the
+#' Applies the per-gene `method` transformation (`"mean"` uses the
 #' prepared log-scale matrix directly; `"zscore"` standardizes each gene across
 #' the cohort; `"rank"` scales per-gene ranks to `[0, 1]`), then computes the
 #' weighted linear predictor `sum(w_i * x_{i,j})` (re-scaled proportionally if
@@ -376,6 +382,12 @@ score_signature <- function(expr,
 #'
 #' @noRd
 .score_weighted_on_genes <- function(expr, found, weights_found, method) {
+  if (identical(method, "median")) {
+    stop(
+      "Weighted continuous signatures do not support method = 'median'; use 'mean', 'zscore', 'rank', or 'ss_rank'.",
+      call. = FALSE
+    )
+  }
   if (length(found) == 0L) {
     return(NULL)
   }
@@ -411,17 +423,6 @@ score_signature <- function(expr,
     }
     w_ok <- w[ok]
     x_ok <- x[ok]
-    if (method == "median") {
-      # Weighted median of sign-oriented gene contributions scaled by total |w|
-      vals <- sign(w_ok) * x_ok
-      absw <- abs(w_ok)
-      ord <- order(vals)
-      vals <- vals[ord]
-      absw <- absw[ord] / sum(absw)
-      csum <- cumsum(absw)
-      idx <- which(csum >= 0.5)[1]
-      return(vals[idx] * total_abs_w)
-    }
     denom <- sum(abs(w_ok))
     scale_fac <- if (denom > 0 && total_abs_w > 0) total_abs_w / denom else 1
     sum(w_ok * x_ok) * scale_fac

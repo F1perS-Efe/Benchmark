@@ -184,10 +184,9 @@ run_benchmark <- function(signatures,
     }
     ds <- prep$ds
     enc <- prep$enc
-    expr_full <- prep$expr
+    expr_full <- prep$expr_kept
     y_kept <- prep$y_kept
-    y_full <- enc$response
-    names(y_full) <- colnames(expr_full)
+    y_full <- y_kept
 
     cancer <- if (!is.null(ds$sample_meta$cancer)) {
       paste(unique(as.character(ds$sample_meta$cancer)), collapse = ";")

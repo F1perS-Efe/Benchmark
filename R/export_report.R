@@ -55,7 +55,15 @@ export_report <- function(results,
   }
   output_file <- normalizePath(as.character(output_file)[1], mustWork = FALSE)
 
-  rmd <- system.file("rmd", "benchmark_report.Rmd", package = "SigBenchR")
+  local_rmd <- file.path("inst", "rmd", "benchmark_report.Rmd")
+  up_rmd <- file.path("..", "..", "inst", "rmd", "benchmark_report.Rmd")
+  rmd <- if (file.exists(local_rmd)) {
+    local_rmd
+  } else if (file.exists(up_rmd)) {
+    up_rmd
+  } else {
+    system.file("rmd", "benchmark_report.Rmd", package = "SigBenchR")
+  }
   if (!nzchar(rmd) || !file.exists(rmd)) {
     stop("Report template not found (inst/rmd/benchmark_report.Rmd).", call. = FALSE)
   }

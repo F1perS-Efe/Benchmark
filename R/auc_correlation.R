@@ -9,7 +9,7 @@
 #' @param method Skorlama yontemi. `NULL` ise ilk yontem.
 #'
 #' @return Uzun `data.frame`: `signature1`, `signature2`, `correlation`,
-#'   `n_datasets`, `method`.
+#'   `n_datasets`, `method`, `low_k_unreliable`.
 #' @export
 auc_correlation <- function(results, method = NULL) {
   if (!is.data.frame(results) || nrow(results) == 0L) {
@@ -45,12 +45,16 @@ auc_correlation <- function(results, method = NULL) {
 
   rows <- list()
   k <- 0L
+  any_low_k <- FALSE
   for (i in seq_len(length(sigs) - 1L)) {
     for (j in seq.int(i + 1L, length(sigs))) {
       x <- mat[, sigs[i]]
       y <- mat[, sigs[j]]
       ok <- is.finite(x) & is.finite(y)
       n_ok <- sum(ok)
+      if (n_ok < 5L) {
+        any_low_k <- TRUE
+      }
       # 2 noktada Pearson daima +/-1; anlamli korelasyon icin >= 3
       cor_val <- if (n_ok >= 3L) {
         suppressWarnings(stats::cor(x[ok], y[ok], method = "pearson"))
@@ -64,9 +68,16 @@ auc_correlation <- function(results, method = NULL) {
         correlation = cor_val,
         n_datasets = as.integer(n_ok),
         method = method,
+        low_k_unreliable = as.logical(n_ok < 5L),
         stringsAsFactors = FALSE
       )
     }
+  }
+  if (any_low_k) {
+    warning(
+      "Cross-cohort AUC correlation computed with fewer than 5 cohorts (n_datasets < 5) has high sampling variance and is flagged with low_k_unreliable = TRUE.",
+      call. = FALSE
+    )
   }
   out <- do.call(rbind, rows)
   rownames(out) <- NULL

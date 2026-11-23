@@ -59,8 +59,11 @@ package (\code{"babelgene"}, \code{"homologene"}, or \code{"org.Mm.eg.db"}).
 \details{
 Contested polymorphic MHC class I/II paralogs (\code{H2-K1}/\code{H2-D1} vs
 \code{HLA-A}/\code{HLA-B}, \code{H2-Ab1}/\code{H2-Aa} vs \code{HLA-DQB1}/\code{HLA-DQA1}), rodent-absent
-genes (\code{CCL18}, \code{HHLA2}), and blind \code{toupper()} conversion are disabled by
-default (\code{allow_uppercase_fallback = FALSE}). Ambiguous 1:many mouse-to-human
+genes (\code{CCL18}, \code{HHLA2}, \code{GNLY} which has no true mouse ortholog in wild-type
+mice, and murine \code{Ly6g}/\code{Ly6c1} vs human \code{LY6G6D}), multi-copy mouse
+chemokine paralogs (\code{Ccl21a}/\code{Ccl21b}/\code{Ccl21c} under \code{strict_1to1}), and
+blind \code{toupper()} conversion are disabled by default
+(\code{allow_uppercase_fallback = FALSE}). Ambiguous 1:many mouse-to-human
 mappings are never resolved silently; they are excluded and reported in
 \code{attr(res, "ortholog_stats")} with an explicit warning.
 

@@ -110,7 +110,7 @@ test_beyond_infiltration <- function(datasets,
       )
       next
     }
-    expr_full <- prep$expr
+    expr_full <- prep$expr_kept
     y_kept <- prep$y_kept
 
     eff_min_genes <- .resolve_min_genes(sig, default = min_genes)
@@ -263,6 +263,8 @@ test_beyond_infiltration <- function(datasets,
       auc_combined = as.numeric(cv_res$auc_comb),
       delta_auc_combined = as.numeric(cv_res$delta_auc),
       sd_delta_auc = as.numeric(cv_res$sd_delta_auc),
+      delta_min = as.numeric(cv_res$delta_min),
+      delta_max = as.numeric(cv_res$delta_max),
       delta_auc_ci_low = as.numeric(cv_res$delta_ci_low),
       delta_auc_ci_high = as.numeric(cv_res$delta_ci_high),
       delta_auc_oof = as.numeric(cv_res$delta_auc_oof),
@@ -279,6 +281,7 @@ test_beyond_infiltration <- function(datasets,
       separation_flag = isTRUE(separation_flag),
       analysis_status = status_str,
       adds_independent_value = FALSE,
+      exploratory_independent = FALSE,
       stringsAsFactors = FALSE
     )
   }
@@ -289,6 +292,7 @@ test_beyond_infiltration <- function(datasets,
       epv = numeric(), low_epv = logical(),
       auc_infiltration_only = numeric(), auc_combined = numeric(),
       delta_auc_combined = numeric(), sd_delta_auc = numeric(),
+      delta_min = numeric(), delta_max = numeric(),
       delta_auc_ci_low = numeric(), delta_auc_ci_high = numeric(),
       delta_auc_oof = numeric(), beta_adjusted = numeric(),
       or_adjusted = numeric(), p_adjusted = numeric(),
@@ -297,7 +301,9 @@ test_beyond_infiltration <- function(datasets,
       high_collinearity = logical(), jaccard_overlap = numeric(),
       converged = logical(), separation_flag = logical(),
       analysis_status = character(),
-      adds_independent_value = logical(), stringsAsFactors = FALSE
+      adds_independent_value = logical(),
+      exploratory_independent = logical(),
+      stringsAsFactors = FALSE
     )
     empty_sm <- data.frame(
       infiltration_axis = as.character(infiltration_axis)[1],
@@ -325,20 +331,27 @@ test_beyond_infiltration <- function(datasets,
     pc$lrt_p_adj_bh[ok_p] <- stats::p.adjust(pc$lrt_p[ok_p], method = "BH")
   }
 
-  pc$adds_independent_value <- isTRUE_vec(
+  base_indep <- isTRUE_vec(
     pc$converged &
       !pc$separation_flag &
-      !(pc$analysis_status == "failed_collinearity") &
+      !(pc$analysis_status %in% c("failed_collinearity", "failed_separation_or_convergence")) &
       is.finite(pc$lrt_p_adj_bh) & (pc$lrt_p_adj_bh < 0.05) &
       is.finite(pc$beta_adjusted) & (pc$beta_adjusted > 0) &
       is.finite(pc$delta_auc_combined) & (pc$delta_auc_combined > 0)
   )
+  pc$adds_independent_value <- isTRUE_vec(
+    base_indep & !pc$low_epv & !pc$high_collinearity & (pc$analysis_status == "ok")
+  )
+  pc$exploratory_independent <- isTRUE_vec(
+    base_indep & (pc$low_epv | pc$high_collinearity)
+  )
 
-  # 4.4: Directional Stouffer Z synthesis vs sign-blind Fisher omnibus p
+  # 4.4 & BUG-05: Directional Stouffer Z synthesis vs sign-blind Fisher omnibus p
   valid_meta <- is.finite(pc$lrt_p) & is.finite(pc$beta_adjusted) &
-    pc$converged & !pc$separation_flag
-  lrt_ok <- pc$lrt_p[is.finite(pc$lrt_p)]
-  bh_ok <- pc$lrt_p_adj_bh[is.finite(pc$lrt_p_adj_bh)]
+    pc$converged & !pc$separation_flag &
+    !(pc$analysis_status %in% c("failed_collinearity", "failed_separation_or_convergence"))
+  lrt_ok <- pc$lrt_p[valid_meta]
+  bh_ok <- pc$lrt_p_adj_bh[valid_meta & is.finite(pc$lrt_p_adj_bh)]
   d_ok <- pc$delta_auc_combined[is.finite(pc$delta_auc_combined)]
 
   fisher_p <- if (length(lrt_ok) > 0L) {
@@ -628,12 +641,14 @@ isTRUE_vec <- function(x) {
       fold_deltas_all[is.finite(fold_deltas_all)]
     }
     sd_delta <- if (length(delta_samples) >= 2L) stats::sd(delta_samples) else NA_real_
-    ci_low <- if (length(delta_samples) >= 2L) {
+    d_min <- if (length(delta_samples) >= 1L) min(delta_samples) else NA_real_
+    d_max <- if (length(delta_samples) >= 1L) max(delta_samples) else NA_real_
+    ci_low <- if (length(delta_samples) >= 20L) {
       as.numeric(stats::quantile(delta_samples, probs = 0.025, names = FALSE))
     } else {
       NA_real_
     }
-    ci_high <- if (length(delta_samples) >= 2L) {
+    ci_high <- if (length(delta_samples) >= 20L) {
       as.numeric(stats::quantile(delta_samples, probs = 0.975, names = FALSE))
     } else {
       NA_real_
@@ -644,6 +659,8 @@ isTRUE_vec <- function(x) {
       auc_comb = auc_comb,
       delta_auc = delta_auc,
       sd_delta_auc = sd_delta,
+      delta_min = d_min,
+      delta_max = d_max,
       delta_ci_low = ci_low,
       delta_ci_high = ci_high,
       delta_auc_oof = delta_oof,

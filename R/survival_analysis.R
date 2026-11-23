@@ -269,12 +269,12 @@ evaluate_survival <- function(dataset,
   median_surv_low <- NA_real_
   surv_note <- NA_character_
 
-  med_cut <- stats::median(z_score)
-  grp <- ifelse(z_score >= med_cut, "High", "Low")
+  med_cut <- stats::median(score_use)
+  grp <- ifelse(score_use >= med_cut, "High", "Low")
   n_high <- sum(grp == "High", na.rm = TRUE)
   n_low <- sum(grp == "Low", na.rm = TRUE)
   if (min(n_high, n_low) < 3L) {
-    grp_strict <- ifelse(z_score > med_cut, "High", "Low")
+    grp_strict <- ifelse(score_use > med_cut, "High", "Low")
     if (min(sum(grp_strict == "High"), sum(grp_strict == "Low")) >= 3L) {
       grp <- grp_strict
       n_high <- sum(grp == "High", na.rm = TRUE)
@@ -503,10 +503,15 @@ combine_response_and_survival <- function(auc_res, surv_res) {
     surv_keep <- data.frame(
       cohort = character(),
       signature = character(),
+      endpoint = character(),
       hr = numeric(),
       cox_p = numeric(),
+      p_adj_bh = numeric(),
       logrank_p = numeric(),
+      logrank_p_adj_bh = numeric(),
       c_index = numeric(),
+      ph_p = numeric(),
+      ph_violated = logical(),
       stringsAsFactors = FALSE
     )
     return(merge(auc, surv_keep, by = c("cohort", "signature"), all.x = TRUE))
@@ -530,7 +535,11 @@ combine_response_and_survival <- function(auc_res, surv_res) {
     )
   }
 
-  surv_cols <- if (use_method) c(need, "method") else need
+  opt_surv <- intersect(
+    c("endpoint", "p_adj_bh", "logrank_p_adj_bh", "ph_p", "ph_violated"),
+    names(surv_res)
+  )
+  surv_cols <- unique(c(need, if (use_method) "method" else character(0), opt_surv))
   surv_keep <- surv_res[, surv_cols, drop = FALSE]
 
   auc$.join_cohort <- tolower(trimws(as.character(auc$cohort)))
@@ -545,7 +554,13 @@ combine_response_and_survival <- function(auc_res, surv_res) {
     by_keys <- c(by_keys, ".join_method")
   }
 
-  dup_mask <- duplicated(surv_keep[, by_keys, drop = FALSE])
+  dedup_keys <- by_keys
+  if ("endpoint" %in% names(surv_keep)) {
+    surv_keep$.join_endpoint <- tolower(trimws(as.character(surv_keep$endpoint)))
+    dedup_keys <- c(dedup_keys, ".join_endpoint")
+  }
+
+  dup_mask <- duplicated(surv_keep[, dedup_keys, drop = FALSE])
   if (any(dup_mask)) {
     warning(
       "Duplicate survival rows detected (", sum(dup_mask),
@@ -554,6 +569,7 @@ combine_response_and_survival <- function(auc_res, surv_res) {
     )
     surv_keep <- surv_keep[!dup_mask, , drop = FALSE]
   }
+  surv_keep$.join_endpoint <- NULL
 
   # Report unmatched survival keys if any
   auc_keys <- do.call(paste, c(auc[, by_keys, drop = FALSE], list(sep = "\r")))
@@ -566,7 +582,8 @@ combine_response_and_survival <- function(auc_res, surv_res) {
     )
   }
 
-  surv_payload <- surv_keep[, c(by_keys, "hr", "cox_p", "logrank_p", "c_index"), drop = FALSE]
+  payload_cols <- unique(c("hr", "cox_p", "logrank_p", "c_index", opt_surv))
+  surv_payload <- surv_keep[, c(by_keys, payload_cols), drop = FALSE]
   out <- merge(auc, surv_payload, by = by_keys, all.x = TRUE, sort = FALSE)
   for (jk in by_keys) {
     out[[jk]] <- NULL

@@ -94,21 +94,22 @@ res[, c(
 `test_beyond_infiltration()` evaluates whether a signature adds value beyond a reference infiltration axis (`response ~ sig_score_z + inf_score_z` vs `response ~ inf_score_z`):
 
 * **Leakage-free fold-inside scaling:** Per-gene `zscore`/`rank` parameters and logistic predictor standardization are estimated strictly inside each training fold and applied to the test fold.
-* **Paired fold-level CV $\Delta\text{AUC}$:** Reports `delta_auc_combined`, `sd_delta_auc`, `delta_auc_ci_low`, and `delta_auc_ci_high`.
-* **Diagnostic gates & Directional Stouffer Z:** `adds_independent_value` requires BH-adjusted `lrt_p_adj_bh < 0.05`. Low Events Per Variable ($\text{EPV} < 5 \implies \text{low\_epv}$) and multicollinearity ($\text{VIF} \ge 5 \implies \text{high\_collinearity}$; $\text{VIF} \ge 10 \implies \text{failed\_collinearity}$) are flagged via `analysis_status`. Cross-cohort synthesis uses sample-size weighted **directional Stouffer Z** (`combined_lrt_p`, `stouffer_z`, `direction_conflict`) so opposite-sign cohort effects cancel rather than inflating significance.
+* **Paired fold-level CV $\Delta\text{AUC}$:** Reports `delta_auc_combined`, `sd_delta_auc`, and Repeat SD / Range (`delta_min`, `delta_max`; formal `delta_auc_ci_low`/`delta_auc_ci_high` require $\ge 20$ CV repeats).
+* **Diagnostic gates & Directional Stouffer Z:** `adds_independent_value` requires BH-adjusted `lrt_p_adj_bh < 0.05`, `analysis_status == "ok"`, `!low_epv`, and `!high_collinearity` (while `exploratory_independent` marks exploratory signals when EPV or VIF warnings exist). Low Events Per Variable ($\text{EPV} < 5 \implies \text{low\_epv}$) and multicollinearity ($\text{VIF} \ge 5 \implies \text{high\_collinearity}$; $\text{VIF} \ge 10 \implies \text{failed\_collinearity}$) are flagged via `analysis_status`. Cross-cohort synthesis uses sample-size weighted **directional Stouffer Z** (`combined_lrt_p`, `stouffer_z`, `direction_conflict`) so opposite-sign cohort effects cancel rather than inflating significance.
 
 ```{r beyond-inf-demo}
 bi <- test_beyond_infiltration(
   datasets = datasets_ici[c("van_allen_2015", "gide_2019")],
   signature = sigs[["IFNG6"]],
-  infiltration_axis = "IFN_Gamma",
+  infiltration_axis = "CD8_T_Cell",
   method = "zscore",
+  min_genes = 1L,
   n_folds = 4L,
   n_repeats = 2L,
   seed = 42L
 )
 bi$summary[, c("infiltration_axis", "n_cohorts", "n_independent", "stouffer_z", "combined_lrt_p", "direction_conflict")]
-bi$per_cohort[, c("cohort", "n", "epv", "vif", "delta_auc_combined", "lrt_p", "lrt_p_adj_bh", "analysis_status")]
+bi$per_cohort[, c("cohort", "n", "epv", "vif", "delta_auc_combined", "delta_min", "delta_max", "lrt_p", "lrt_p_adj_bh", "analysis_status")]
 ```
 
 # 6. Session Information

@@ -29,7 +29,7 @@ plot_roc_curves <- function(datasets,
     sd_handling = sd_handling,
     filter_response = TRUE
   )
-  expr_full <- prep$expr
+  expr_full <- prep$expr_kept
   y_kept <- prep$y_kept
 
   curve_rows <- list()

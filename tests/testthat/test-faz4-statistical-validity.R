@@ -44,14 +44,17 @@ test_that("4.1 & 4.2: test_beyond_infiltration computes fold-inside preprocessin
     pc <- res$per_cohort
     expect_equal(nrow(pc), 1L)
     expect_true(all(c(
-      "sd_delta_auc", "delta_auc_ci_low", "delta_auc_ci_high",
+      "sd_delta_auc", "delta_min", "delta_max", "delta_auc_ci_low", "delta_auc_ci_high",
       "lrt_p_adj_bh", "epv", "low_epv", "vif", "high_collinearity", "analysis_status"
     ) %in% names(pc)))
     expect_true(is.finite(pc$delta_auc_combined))
     expect_true(is.finite(pc$sd_delta_auc))
-    expect_true(is.finite(pc$delta_auc_ci_low))
-    expect_true(is.finite(pc$delta_auc_ci_high))
-    expect_lte(pc$delta_auc_ci_low, pc$delta_auc_ci_high)
+    expect_true(is.finite(pc$delta_min))
+    expect_true(is.finite(pc$delta_max))
+    expect_lte(pc$delta_min, pc$delta_max)
+    # With n_repeats = 3 (< 20), 95% quantile CIs are suppressed (NA) in favor of delta_min/delta_max
+    expect_true(is.na(pc$delta_auc_ci_low))
+    expect_true(is.na(pc$delta_auc_ci_high))
     expect_gt(pc$delta_auc_combined, 0)
   }
 })

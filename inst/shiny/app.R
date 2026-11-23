@@ -509,7 +509,7 @@ ui <- shiny::fluidPage(
           selected = c("mean", "zscore")
         ),
         shiny::radioButtons(
-          "direction", "Signature direction",
+          "direction", "Custom signature direction",
           choices = c("High = responder (<)" = "<", "Low = responder (>)" = ">"),
           selected = "<"
         ),
@@ -757,14 +757,14 @@ ui <- shiny::fluidPage(
             ),
             shiny::uiOutput("beyond_inf_alerts"),
             shiny::verbatimTextOutput("beyond_inf_summary"),
-            shiny::tags$h4(class = "sb-section", "Fold-level paired CV delta-AUC (+/- 95% CI)"),
+            shiny::tags$h4(class = "sb-section", "Fold-level paired CV delta-AUC (Repeat SD / Range (min-max))"),
             shiny::plotOutput("beyond_inf_plot", height = "280px"),
             shiny::tags$details(
               class = "sb-acc",
               shiny::tags$summary("Diagnostic field explanations (EPV, VIF, BH-adjusted LRT, Stouffer Z & analysis status)"),
               shiny::tags$ul(
                 shiny::tags$li(shiny::tags$strong("lrt_p (Raw) vs lrt_p_adj_bh (BH-adjusted FDR):"), " Likelihood-ratio test p-value before and after Benjamini-Hochberg correction across evaluated cohorts. Independent value requires lrt_p_adj_bh < 0.05."),
-                shiny::tags$li(shiny::tags$strong("delta_auc_combined / sd_delta_auc / [delta_auc_ci_low, delta_auc_ci_high]:"), " Paired cross-validated test AUC gain of the combined model over infiltration alone, with fold-level standard deviation and 95% confidence interval (preprocessing fit strictly inside each training fold)."),
+                shiny::tags$li(shiny::tags$strong("delta_auc_combined / sd_delta_auc / [delta_min, delta_max]:"), " Paired cross-validated test AUC gain of the combined model over infiltration alone, with repeat-level standard deviation and Repeat SD / Range (min-max) across 5-repeat CV (preprocessing fit strictly inside each training fold; formal 95% CI requires >= 20 repeats)."),
                 shiny::tags$li(shiny::tags$strong("epv (Events Per Variable) & low_epv:"), " min(n_pos, n_neg) / 2 for the 2-predictor logistic model. When EPV < 5, maximum-likelihood estimates are exploratory."),
                 shiny::tags$li(shiny::tags$strong("vif (Variance Inflation Factor) & high_collinearity:"), " 1 / (1 - r^2) between signature and reference infiltration axis. VIF >= 5 warns of multicollinearity; VIF >= 10 aborts coefficient estimation as collinearity failure."),
                 shiny::tags$li(shiny::tags$strong("direction_conflict & combined_lrt_p (Directional Stouffer Z):"), " Cross-cohort synthesis uses sample-size weighted directional Stouffer Z so opposite-sign effects cancel rather than inflate significance.")
@@ -1205,8 +1205,7 @@ server <- function(input, output, session) {
       "n_boot", "n_perm", "seed",
       "compute_pr", "compute_null", "sd_handling", "match_expression",
       "datasets", "sig_choice", "custom_genes",
-      "custom_genes_up", "custom_genes_down",
-      "heatmap_method", "forest_signature"
+      "custom_genes_up", "custom_genes_down"
     )
     !identical(cur[keys], snap$params[keys])
   })
@@ -1225,7 +1224,7 @@ server <- function(input, output, session) {
   report_model <- shiny::reactive({
     shiny::req(results())
     snap <- results()
-    hm_snap <- .snap_method(snap)
+    hm_snap <- .validated_hm_method(snap)
     fsig_snap <- .snap_forest_sig(snap)
     snap_params <- utils::modifyList(
       snap$params,
@@ -1547,7 +1546,7 @@ server <- function(input, output, session) {
         stop("Install 'rmarkdown' to download the HTML report.", call. = FALSE)
       }
       snap <- results()
-      hm_snap <- .snap_method(snap)
+      hm_snap <- .validated_hm_method(snap)
       fsig_snap <- .snap_forest_sig(snap)
       m <- report_model()
       man <- reproducibility_manifest()
@@ -1584,7 +1583,7 @@ server <- function(input, output, session) {
     shiny::req(results())
     snap <- results()
     m <- report_model()
-    hm_snap <- .snap_method(snap)
+    hm_snap <- .validated_hm_method(snap)
     fsig_snap <- .snap_forest_sig(snap)
     snap_params <- utils::modifyList(
       snap$params,
@@ -1617,7 +1616,7 @@ server <- function(input, output, session) {
     content = function(file) {
       shiny::req(results())
       snap <- results()
-      hm_snap <- .snap_method(snap)
+      hm_snap <- .validated_hm_method(snap)
       fsig_snap <- .snap_forest_sig(snap)
       m <- report_model()
       man <- reproducibility_manifest()
@@ -2292,13 +2291,24 @@ server <- function(input, output, session) {
     df$cohort_label <- factor(df$cohort_label, levels = rev(unique(df$cohort_label)))
     df$status_label <- .translate_analysis_status(df$analysis_status)
 
+    df$err_low <- if ("delta_min" %in% names(df)) {
+      ifelse(is.finite(df$delta_auc_ci_low), df$delta_auc_ci_low, df$delta_min)
+    } else {
+      df$delta_auc_ci_low
+    }
+    df$err_high <- if ("delta_max" %in% names(df)) {
+      ifelse(is.finite(df$delta_auc_ci_high), df$delta_auc_ci_high, df$delta_max)
+    } else {
+      df$delta_auc_ci_high
+    }
+
     ggplot2::ggplot(
       df,
       ggplot2::aes(x = .data$delta_auc_combined, y = .data$cohort_label, color = .data$status_label)
     ) +
       ggplot2::geom_vline(xintercept = 0, linetype = "dashed", color = "grey50") +
       ggplot2::geom_errorbar(
-        ggplot2::aes(xmin = .data$delta_auc_ci_low, xmax = .data$delta_auc_ci_high),
+        ggplot2::aes(xmin = .data$err_low, xmax = .data$err_high),
         orientation = "y",
         width = 0.2,
         na.rm = TRUE
@@ -2306,8 +2316,8 @@ server <- function(input, output, session) {
       ggplot2::geom_point(size = 2.8) +
       ggplot2::labs(
         title = "Paired Cross-Validated Delta-AUC Beyond Infiltration",
-        subtitle = "Delta-AUC = AUC(signature + infiltration) - AUC(infiltration alone); error bars: fold-level 95% CI",
-        x = "Paired CV Delta-AUC (95% CI)",
+        subtitle = "Delta-AUC = AUC(signature + infiltration) - AUC(infiltration alone); error bars: Repeat SD / Range (min-max)",
+        x = "Paired CV Delta-AUC (Repeat SD / Range (min-max))",
         y = "Cohort (sample size & EPV)",
         color = "Model diagnostic status"
       ) +
@@ -2321,9 +2331,11 @@ server <- function(input, output, session) {
       "cohort", "n", "n_pos", "n_neg", "epv", "low_epv",
       "r_with_infiltration", "vif", "high_collinearity", "jaccard_overlap",
       "auc_infiltration_only", "auc_combined",
-      "delta_auc_combined", "sd_delta_auc", "delta_auc_ci_low", "delta_auc_ci_high",
+      "delta_auc_combined", "sd_delta_auc", "delta_min", "delta_max",
+      "delta_auc_ci_low", "delta_auc_ci_high",
       "beta_adjusted", "or_adjusted", "p_adjusted", "lrt_p", "lrt_p_adj_bh",
-      "adds_independent_value", "analysis_status", "analysis_status_explanation",
+      "adds_independent_value", "exploratory_independent",
+      "analysis_status", "analysis_status_explanation",
       "converged", "separation_flag"
     )
     pc[, intersect(cols, names(pc)), drop = FALSE]

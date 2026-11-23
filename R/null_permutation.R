@@ -126,7 +126,14 @@ null_permutation_test <- function(mat,
     }
   }
 
-  exclude_up <- unique(toupper(as.character(exclude_genes)))
+  excl_raw <- as.character(exclude_genes)
+  excl_raw <- excl_raw[!is.na(excl_raw) & nzchar(trimws(excl_raw))]
+  excl_matched <- if (length(excl_raw) > 0L) {
+    tryCatch(match_genes(mat, excl_raw, use_aliases = TRUE)$found, error = function(e) character(0))
+  } else {
+    character(0)
+  }
+  exclude_up <- unique(toupper(c(excl_raw, excl_matched)))
   rows_up <- toupper(rownames(mat))
 
   # P1-1: vektorlestirilmis satir SD (apply yerine)
@@ -500,7 +507,7 @@ null_permutation_test <- function(mat,
     list(up = picked_up, down = picked_down)
   }
 
-  .arm_scores <- function(gene_names, arm_weights = NULL) {
+  .arm_scores <- function(gene_names) {
     if (length(gene_names) == 0L) {
       return(NULL)
     }
@@ -509,13 +516,6 @@ null_permutation_test <- function(mat,
       return(NULL)
     }
     sub <- score_mat[row_idx, , drop = FALSE]
-    if (!is.null(arm_weights) && length(arm_weights) == nrow(sub) && method != "median") {
-      w_mat <- matrix(arm_weights, nrow = nrow(sub), ncol = ncol(sub))
-      w_mat[!is.finite(sub)] <- NA_real_
-      out <- colSums(sub * w_mat, na.rm = TRUE) / colSums(w_mat, na.rm = TRUE)
-      out[colSums(is.finite(sub)) == 0L] <- NA_real_
-      return(out)
-    }
     if (method == "median") {
       out <- apply(sub, 2L, function(x) {
         if (all(is.na(x))) NA_real_ else stats::median(x, na.rm = TRUE)
@@ -526,6 +526,63 @@ null_permutation_test <- function(mat,
     }
     out
   }
+
+  .weighted_linear_scores <- function(genes_up_pick, genes_dn_pick) {
+    all_pick <- c(genes_up_pick, genes_dn_pick)
+    if (length(all_pick) == 0L) {
+      return(NULL)
+    }
+    row_idx <- match(all_pick, rownames(score_mat))
+    if (anyNA(row_idx)) {
+      return(NULL)
+    }
+    sub <- score_mat[row_idx, , drop = FALSE]
+    w_up_use <- if (length(genes_up_pick) > 0L && !is.null(w_up_vec)) {
+      rep_len(abs(as.numeric(w_up_vec)), length(genes_up_pick))
+    } else {
+      rep(1, length(genes_up_pick))
+    }
+    w_dn_use <- if (length(genes_dn_pick) > 0L && !is.null(w_dn_vec)) {
+      -rep_len(abs(as.numeric(w_dn_vec)), length(genes_dn_pick))
+    } else {
+      rep(-1, length(genes_dn_pick))
+    }
+    w <- c(w_up_use, w_dn_use)
+    total_abs_w <- sum(abs(w))
+
+    if (method == "median") {
+      out <- apply(sub, 2L, function(x) {
+        ok <- is.finite(x) & is.finite(w) & (w != 0)
+        if (!any(ok)) return(NA_real_)
+        w_ok <- w[ok]
+        x_ok <- x[ok]
+        vals <- sign(w_ok) * x_ok
+        absw <- abs(w_ok)
+        ord <- order(vals)
+        vals <- vals[ord]
+        absw <- absw[ord] / sum(absw)
+        csum <- cumsum(absw)
+        idx <- which(csum >= 0.5)[1]
+        vals[idx] * total_abs_w
+      })
+      names(out) <- colnames(score_mat)
+      return(out)
+    }
+
+    w_mat <- matrix(w, nrow = nrow(sub), ncol = ncol(sub))
+    abs_w_mat <- abs(w_mat)
+    ok_mat <- is.finite(sub)
+    w_mat[!ok_mat] <- 0
+    abs_w_mat[!ok_mat] <- 0
+    denom <- colSums(abs_w_mat)
+    scale_fac <- ifelse(denom > 0 & total_abs_w > 0, total_abs_w / denom, 1)
+    out <- colSums(sub * w_mat) * scale_fac
+    out[colSums(ok_mat) == 0L] <- NA_real_
+    names(out) <- colnames(score_mat)
+    out
+  }
+
+  has_continuous_weights <- !is.null(w_up_vec) || !is.null(w_dn_vec)
 
   .scores_from_pick <- function(picked) {
     if (method == "ss_rank") {
@@ -542,7 +599,14 @@ null_permutation_test <- function(mat,
         rep(0, ncol(mat))
       }
       scores <- if (has_up && has_down) {
-        s_up + s_down
+        if (isTRUE(has_continuous_weights)) {
+          sum_up <- if (!is.null(w_up_vec)) sum(abs(w_up_vec), na.rm = TRUE) else length(picked$up)
+          sum_dn <- if (!is.null(w_dn_vec)) sum(abs(w_dn_vec), na.rm = TRUE) else length(picked$down)
+          tot <- sum_up + sum_dn
+          if (tot > 0) (sum_up * s_up + sum_dn * s_down) / tot else (s_up + s_down)
+        } else {
+          s_up + s_down
+        }
       } else if (has_up) {
         s_up
       } else if (has_down) {
@@ -554,8 +618,12 @@ null_permutation_test <- function(mat,
       return(scores)
     }
 
-    scores_up <- .arm_scores(picked$up, arm_weights = w_up_vec)
-    scores_dn <- .arm_scores(picked$down, arm_weights = w_dn_vec)
+    if (isTRUE(has_continuous_weights)) {
+      return(.weighted_linear_scores(picked$up, picked$down))
+    }
+
+    scores_up <- .arm_scores(picked$up)
+    scores_dn <- .arm_scores(picked$down)
     if (!is.null(scores_up) && !is.null(scores_dn)) {
       scores <- scores_up - scores_dn
     } else if (!is.null(scores_up)) {

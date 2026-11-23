@@ -8,8 +8,11 @@
 #'
 #' Contested polymorphic MHC class I/II paralogs (`H2-K1`/`H2-D1` vs
 #' `HLA-A`/`HLA-B`, `H2-Ab1`/`H2-Aa` vs `HLA-DQB1`/`HLA-DQA1`), rodent-absent
-#' genes (`CCL18`, `HHLA2`), and blind `toupper()` conversion are disabled by
-#' default (`allow_uppercase_fallback = FALSE`). Ambiguous 1:many mouse-to-human
+#' genes (`CCL18`, `HHLA2`, `GNLY` which has no true mouse ortholog in wild-type
+#' mice, and murine `Ly6g`/`Ly6c1` vs human `LY6G6D`), multi-copy mouse
+#' chemokine paralogs (`Ccl21a`/`Ccl21b`/`Ccl21c` under `strict_1to1`), and
+#' blind `toupper()` conversion are disabled by default
+#' (`allow_uppercase_fallback = FALSE`). Ambiguous 1:many mouse-to-human
 #' mappings are never resolved silently; they are excluded and reported in
 #' `attr(res, "ortholog_stats")` with an explicit warning.
 #'
@@ -78,7 +81,8 @@ map_mouse_to_human <- function(expr,
 
   orth_info <- .resolve_ortholog_dictionary(
     ortholog_table = ortholog_table,
-    ortholog_policy = ortholog_policy
+    ortholog_policy = ortholog_policy,
+    input_genes = rn
   )
   curated <- orth_info$map
   curated_keys <- toupper(names(curated))
@@ -208,11 +212,26 @@ map_mouse_to_human <- function(expr,
 #'
 #' @noRd
 .resolve_ortholog_dictionary <- function(ortholog_table = NULL,
-                                         ortholog_policy = c("strict_1to1", "many_to_1")) {
+                                         ortholog_policy = c("strict_1to1", "many_to_1"),
+                                         input_genes = NULL) {
   ortholog_policy <- match.arg(ortholog_policy)
+  query_genes <- if (!is.null(input_genes) && length(input_genes) > 0L) {
+    unique(trimws(as.character(input_genes)))
+  } else {
+    unique(names(.mouse_to_human_immune_map()))
+  }
+  query_genes <- query_genes[!is.na(query_genes) & nzchar(query_genes)]
 
   if (is.null(ortholog_table)) {
     raw_map <- .mouse_to_human_immune_map()
+    if (identical(ortholog_policy, "many_to_1")) {
+      raw_map <- c(
+        raw_map,
+        "Ccl21a" = "CCL21",
+        "Ccl21b" = "CCL21",
+        "Ccl21c" = "CCL21"
+      )
+    }
     df <- data.frame(
       mouse_symbol = names(raw_map),
       human_symbol = unname(raw_map),
@@ -227,7 +246,7 @@ map_mouse_to_human <- function(expr,
       if (!requireNamespace("homologene", quietly = TRUE)) {
         stop("Package 'homologene' is not installed; supply a data.frame `ortholog_table` or install 'homologene'.", call. = FALSE)
       }
-      hm <- homologene::mouse2human(unique(names(.mouse_to_human_immune_map())))
+      hm <- homologene::mouse2human(query_genes)
       df <- data.frame(mouse_symbol = hm$mouseGene, human_symbol = hm$humanGene, stringsAsFactors = FALSE)
       scope <- "homologene_package"
       src_ver <- paste0("homologene_", as.character(utils::packageVersion("homologene")))
@@ -236,7 +255,7 @@ map_mouse_to_human <- function(expr,
       if (!requireNamespace("babelgene", quietly = TRUE)) {
         stop("Package 'babelgene' is not installed; supply a data.frame `ortholog_table` or install 'babelgene'.", call. = FALSE)
       }
-      bg <- babelgene::orthologs(genes = names(.mouse_to_human_immune_map()), species = "mouse", human = FALSE)
+      bg <- babelgene::orthologs(genes = query_genes, species = "mouse", human = FALSE)
       df <- data.frame(mouse_symbol = bg$symbol, human_symbol = bg$human_symbol, stringsAsFactors = FALSE)
       scope <- "babelgene_package"
       src_ver <- paste0("babelgene_", as.character(utils::packageVersion("babelgene")))
@@ -348,7 +367,6 @@ map_mouse_to_human <- function(expr,
     "Gzmk" = "GZMK",
     "Prf1" = "PRF1",
     "Nkg7" = "NKG7",
-    "Gnly" = "GNLY",
     "Fasl" = "FASLG",
     "Fas" = "FAS",
     "Tnf" = "TNF",
@@ -391,7 +409,6 @@ map_mouse_to_human <- function(expr,
     "Ccl17" = "CCL17",
     "Ccl19" = "CCL19",
     "Ccl20" = "CCL20",
-    "Ccl21a" = "CCL21",
     "Ccl22" = "CCL22",
     "Ccr2" = "CCR2",
     "Ccr4" = "CCR4",
@@ -469,7 +486,6 @@ map_mouse_to_human <- function(expr,
     "Itgax" = "ITGAX",
     "Itgae" = "ITGAE",
     "Cd14" = "CD14",
-    "Ly6g6d" = "LY6G6D",
     "Batf3" = "BATF3",
     "Clec9a" = "CLEC9A",
     "Vegfa" = "VEGFA",

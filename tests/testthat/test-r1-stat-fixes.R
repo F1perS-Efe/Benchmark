@@ -50,7 +50,7 @@ test_that("R1-1: beyond_infiltration uses repeated CV OOF AUC, detects separatio
   expect_false(isTRUE(res_s$per_cohort$adds_independent_value[1]))
 })
 
-test_that("R1-2: benchmark and survival scoring produce identical zscore/rank on full cohort without SD label leakage", {
+test_that("R1-2: benchmark scoring scales zscore/rank on kept samples (expr_kept) without excluded SD sample contamination", {
   data(datasets_ici, package = "SigBenchR")
   data(signatures_demo, package = "SigBenchR")
 
@@ -59,10 +59,10 @@ test_that("R1-2: benchmark and survival scoring produce identical zscore/rank on
   prep <- SigBenchR:::.prepare_cohort(ds, apply_log2 = TRUE, sd_handling = "exclude", filter_response = TRUE)
 
   for (meth in c("zscore", "rank")) {
-    sc_full <- score_signature(prep$expr, genes = sig$genes, method = meth)
+    sc_kept <- score_signature(prep$expr_kept, genes = sig$genes, method = meth)
     sc_bench <- score_for_dataset(ds, genes = sig$genes, method = meth, sd_handling = "exclude")
     kept_ids <- names(sc_bench$scores)
-    expect_equal(sc_bench$scores[kept_ids], sc_full$scores[kept_ids], tolerance = 1e-12)
+    expect_equal(sc_bench$scores[kept_ids], sc_kept$scores[kept_ids], tolerance = 1e-12)
   }
 })
 
@@ -90,9 +90,10 @@ test_that("R1-3: survival orientation consistency, cox.zph PH test, tie handling
 
   ev <- evaluate_survival(ds, stats::setNames(sc, colnames(mat)), orient_direction = "lower_better")
   expect_true(all(c("ph_p", "ph_violated", "surv_note") %in% names(ev)))
-  # lower_better ile ters cevrilmis z_score -> yuksek yonelimli skor iyi prognoz (HR < 1 ve High medyan > Low medyan)
+  # lower_better ile ters cevrilmis Cox z_score -> yuksek yonelimli skor iyi prognoz (HR < 1),
+  # KM High/Low ise biyolojik ham ifade medyanina gore ayrilir (Low ham ifade = uzun sagkalim)
   expect_lt(ev$hr, 1)
-  expect_gt(ev$median_surv_high, ev$median_surv_low)
+  expect_lt(ev$median_surv_high, ev$median_surv_low)
 
   # Yogun tie durumu -> logrank_p NA ve surv_note dolu
   sc_tie <- stats::setNames(c(rep(0, 48), 5, 6), colnames(mat))
@@ -151,7 +152,7 @@ test_that("R1-4: power uses se_null critical bound, REML tracks n_cohorts_re, an
     stringsAsFactors = FALSE
   )
   m4 <- build_report_model(results = data.frame(dataset = "c1", signature = "SigStrong", method = "zscore", auc = 0.78, low_coverage = FALSE), summary_tbl = sm4)
-  expect_true(grepl("Medium Priority", m4$tier1$signature_cards$priority_tier[1]))
+  expect_true(grepl("Exploratory Signal", m4$tier1$signature_cards$priority_tier[1]))
   expect_true("R_SMALL_K_META" %in% m4$tier1$alerts$rule_id)
 
   sm5 <- sm4; sm5$n_cohorts <- 5L

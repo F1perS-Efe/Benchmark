@@ -50,7 +50,7 @@ analyze_gene_contributions <- function(datasets,
       sd_handling = sd_handling,
       filter_response = TRUE
     )
-    expr_full <- prep$expr
+    expr_full <- prep$expr_kept
     y_kept <- prep$y_kept
 
     eff_min_genes <- .resolve_min_genes(sig, default = min_genes)
@@ -265,10 +265,12 @@ plot_gene_contributions <- function(contrib, top_n = 25L) {
     IFN_gamma_JAK_STAT = c("IFNG", "STAT1", "IRF1", "JAK1", "JAK2", "IDO1", "GBP1", "GBP5", "SOCS1", "ISG15"),
     Cytolytic_Effector = c("GZMA", "GZMB", "GZMK", "GZMH", "PRF1", "NKG7", "GNLY", "FASLG", "CD8A", "CD8B", "CD3D", "CD3E", "CD3G", "CD2", "IL2RG", "TBX21", "EOMES"),
     Chemokine_Recruitment = c("CXCL9", "CXCL10", "CXCL11", "CXCL13", "CCL2", "CCL3", "CCL4", "CCL5", "CCL8", "CCL18", "CCL19", "CCL21", "CCR5", "CXCR3", "CXCR6"),
-    Immune_Checkpoint = c("PDCD1", "CD274", "PDCD1LG2", "CTLA4", "LAG3", "HAVCR2", "TIGIT", "VSIR", "CD276", "VTCN1", "BTLA", "ICOS", "ICOSLG", "TNFRSF4", "TNFSF4", "TNFRSF9", "TNFSF9", "TNFRSF18", "CD27", "CD28", "CD80", "CD86", "CD40", "CD40LG"),
+    Immune_Checkpoint = c("PDCD1", "CD274", "PDCD1LG2", "CTLA4", "LAG3", "HAVCR2", "TIGIT", "VSIR", "BTLA", "ICOS", "ICOSLG", "TNFRSF4", "TNFSF4", "TNFRSF9", "TNFSF9", "TNFRSF18", "CD27", "CD28", "CD80", "CD86", "CD40", "CD40LG"),
+    B7_Immune_Exclusion = c("CD276", "VTCN1", "HHLA2"),
     Antigen_Presentation = c("HLA-A", "HLA-B", "HLA-C", "HLA-DRA", "HLA-DRB1", "HLA-DQA1", "HLA-DQB1", "HLA-E", "B2M", "TAP1", "TAP2", "PSMB8", "PSMB9", "PSMB10", "CIITA", "NLRC5"),
     TGFb_Stromal = c("TGFB1", "TGFB2", "TGFB3", "TGFBR1", "TGFBR2", "FAP", "ACTA2", "COL1A1", "COL1A2", "COL3A1", "VEGFA", "MMP2", "MMP9"),
-    Myeloid_Suppression = c("ARG1", "ARG2", "IL10", "CD68", "CD163", "MRC1", "CSF1R", "CCR2", "S100A8", "S100A9", "NOS2", "PTGS2")
+    Myeloid_Suppression = c("ARG1", "ARG2", "IL10", "CD163", "MRC1", "CSF1R", "CCR2", "S100A8", "S100A9", "NOS2", "PTGS2"),
+    Pan_Macrophage = c("CD68")
   )
   for (ax in names(axes)) {
     if (g %in% axes[[ax]]) {

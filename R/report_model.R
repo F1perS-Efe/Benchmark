@@ -10,7 +10,15 @@
 #' @export
 load_interpretation_rules <- function(rules_path = NULL) {
   if (is.null(rules_path) || !nzchar(as.character(rules_path)[1])) {
-    rules_path <- system.file("extdata", "interpretation_rules.yml", package = "SigBenchR")
+    local_cand <- file.path("inst", "extdata", "interpretation_rules.yml")
+    up_cand <- file.path("..", "..", "inst", "extdata", "interpretation_rules.yml")
+    if (file.exists(local_cand)) {
+      rules_path <- local_cand
+    } else if (file.exists(up_cand)) {
+      rules_path <- up_cand
+    } else {
+      rules_path <- system.file("extdata", "interpretation_rules.yml", package = "SigBenchR")
+    }
   }
   if (!nzchar(rules_path) || !file.exists(rules_path)) {
     stop("Interpretation rules YAML file not found in installed package (extdata/interpretation_rules.yml).", call. = FALSE)
@@ -217,6 +225,11 @@ build_report_model <- function(results,
                auc_est >= tiers$moderate$min_auc &&
                (!is.finite(ci_lo) || ci_lo > tiers$moderate$min_ci_low)) {
       rule <- tiers$moderate
+    } else if (k >= tiers$moderate$min_cohorts &&
+               auc_est >= tiers$moderate$min_auc) {
+      # High point AUC (>= 0.60) whose 95% CI crosses below min_ci_low / 0.50:
+      # flag as exploratory rather than none or Medium Priority
+      rule <- tiers$moderate
     } else {
       rule <- tiers$none
     }
@@ -229,6 +242,16 @@ build_report_model <- function(results,
       ci_high = fmt_num(ci_hi)
     ))
 
+    priority_lbl <- as.character(rule$label)
+    if (identical(rule$id, tiers$moderate$id) &&
+        is.finite(ci_lo) && ci_lo <= rules$auc$chance_level) {
+      priority_lbl <- "Exploratory Signal (CI crosses 0.50)"
+      interp <- paste0(
+        interp,
+        " Note: 95% CI lower bound (", fmt_num(ci_lo), ") is <= 0.50."
+      )
+    }
+
     data.frame(
       signature = sig,
       method = meth,
@@ -237,7 +260,7 @@ build_report_model <- function(results,
       auc_re_ci_low = as.numeric(ci_lo),
       auc_re_ci_high = as.numeric(ci_hi),
       i2_logit = as.numeric(i2_val),
-      priority_tier = as.character(rule$label),
+      priority_tier = priority_lbl,
       rule_id = as.character(rule$id),
       interpretation = interp,
       stringsAsFactors = FALSE
@@ -245,7 +268,21 @@ build_report_model <- function(results,
   })
 
   out <- do.call(rbind, rows)
-  ord <- order(!is.finite(out$auc_re), -out$auc_re, out$signature)
+  tier_rank <- ifelse(
+    out$rule_id == "E1_STRONG", 3L,
+    ifelse(out$rule_id == "E2_MODERATE", 2L,
+      ifelse(out$rule_id == "E3_NONE", 1L, 0L)
+    )
+  )
+  ci_above_chance <- is.finite(out$auc_re_ci_low) & (out$auc_re_ci_low > 0.50)
+  ord <- order(
+    -tier_rank,
+    !ci_above_chance,
+    -ifelse(is.finite(out$k), out$k, -1L),
+    !is.finite(out$auc_re),
+    -out$auc_re,
+    out$signature
+  )
   out <- out[ord, , drop = FALSE]
   rownames(out) <- NULL
   out
@@ -260,6 +297,38 @@ build_report_model <- function(results,
   if (nrow(valid) == 0L) {
     return(NULL)
   }
+  builtin_all <- tryCatch(
+    get_builtin_signatures(include_controls = TRUE),
+    error = function(e) list()
+  )
+  neg_ctrl_names <- names(builtin_all)[vapply(builtin_all, function(s) {
+    is.list(s) && identical(s$category, "negative_control")
+  }, logical(1))]
+  is_neg_ctrl <- (valid$signature %in% neg_ctrl_names) |
+    grepl("^NegCtrl_|^Random", valid$signature)
+  if ("category" %in% names(valid)) {
+    is_neg_ctrl <- is_neg_ctrl | (valid$category == "negative_control")
+  }
+  valid <- valid[!is_neg_ctrl, , drop = FALSE]
+  if (nrow(valid) == 0L) {
+    return(NULL)
+  }
+  tier_rank <- ifelse(
+    valid$rule_id == "E1_STRONG", 3L,
+    ifelse(valid$rule_id == "E2_MODERATE", 2L,
+      ifelse(valid$rule_id == "E3_NONE", 1L, 0L)
+    )
+  )
+  ci_above_chance <- is.finite(valid$auc_re_ci_low) & (valid$auc_re_ci_low > 0.50)
+  ord <- order(
+    -tier_rank,
+    !ci_above_chance,
+    -ifelse(is.finite(valid$k), valid$k, -1L),
+    -valid$auc_re,
+    valid$signature
+  )
+  valid <- valid[ord, , drop = FALSE]
+  rownames(valid) <- NULL
   valid[1L, , drop = FALSE]
 }
 

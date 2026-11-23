@@ -76,7 +76,7 @@ test_that("build_report_model constructs 3-tier structure and fires deterministi
   expect_identical(model$tier1$active_method, "zscore")
   expect_identical(model$tier1$best_signature$signature, "SigA")
   expect_identical(nrow(model$tier1$signature_cards), 1L)
-  expect_true(grepl("Medium Priority", model$tier1$signature_cards$priority_tier[1]))
+  expect_true(grepl("Exploratory Signal", model$tier1$signature_cards$priority_tier[1]))
 
   # Tetiklenen deterministik uyarilar
   alert_ids <- model$tier1$alerts$rule_id

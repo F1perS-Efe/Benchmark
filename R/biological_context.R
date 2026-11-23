@@ -72,7 +72,7 @@ correlate_reference_axes <- function(datasets,
       next
     }
     ds <- prep$ds
-    expr_full <- prep$expr
+    expr_full <- prep$expr_kept
     y_kept <- prep$y_kept
     norm <- if (!is.null(ds$info$normalization) &&
                 length(ds$info$normalization) > 0L &&

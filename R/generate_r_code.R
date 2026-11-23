@@ -201,14 +201,12 @@ generate_r_code <- function(signature_name = "Cytokine-5",
       if (length(demo_names) == 1L) {
         lines <- c(
           lines,
-          paste0("sigs <- signatures_demo[", fmt_chr(demo_names), "]"),
-          paste0("sigs[[1]]$direction <- ", fmt_chr(direction))
+          paste0("sigs <- signatures_demo[", fmt_chr(demo_names), "]")
         )
       } else {
         lines <- c(
           lines,
-          paste0("sigs <- signatures_demo[", fmt_chr_vec(demo_names), "]"),
-          paste0("for (nm in names(sigs)) sigs[[nm]]$direction <- ", fmt_chr(direction))
+          paste0("sigs <- signatures_demo[", fmt_chr_vec(demo_names), "]")
         )
       }
     } else if (use_builtin_only) {

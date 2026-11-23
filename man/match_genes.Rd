@@ -23,4 +23,7 @@ Liste: \code{found}, \code{missing}, \code{n_found}, \code{n_total}, \code{cover
 \description{
 Once buyuk harfe cevrilmis tam eslesme; eslesmeyenler icin istege bagli
 alias kurtarma (dahili \code{.ici_gene_alias_map()} veya ozel \code{alias_map}).
+Yinelenen sorgular ve ayni kanonik gene cozumlenen birden fazla alias
+tekillestirilir; boylece \code{n_found}, \code{n_total} ve \code{coverage_pct}
+(\code{100 * n_found / n_total}) her zaman matematiksel olarak tutarlidir.
 }

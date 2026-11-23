@@ -395,7 +395,11 @@ if (has_bi) {
 
   pc_bi <- bi_obj$per_cohort
   cat("\n\n### Per-Cohort Adjusted Models & Collinearity / EPV Diagnostics\n\n")
-  delta_ci <- .fmt_auc_ci(pc_bi$delta_auc_combined, pc_bi$delta_auc_ci_low, pc_bi$delta_auc_ci_high)
+  delta_range <- if (all(c("delta_min", "delta_max") %in% names(pc_bi))) {
+    .fmt_auc_ci(pc_bi$delta_auc_combined, pc_bi$delta_min, pc_bi$delta_max)
+  } else {
+    .fmt_auc_ci(pc_bi$delta_auc_combined, pc_bi$delta_auc_ci_low, pc_bi$delta_auc_ci_high)
+  }
   pc_df <- data.frame(
     Signature = if ("signature" %in% names(pc_bi)) as.character(pc_bi$signature) else rep("Selected", nrow(pc_bi)),
     Cohort = as.character(pc_bi$cohort),
@@ -404,7 +408,7 @@ if (has_bi) {
     `Low EPV (<5)` = if ("low_epv" %in% names(pc_bi)) ifelse(pc_bi$low_epv %in% TRUE, "YES", "no") else rep(.em, nrow(pc_bi)),
     VIF = if ("vif" %in% names(pc_bi)) .fmt3(pc_bi$vif) else rep(.em, nrow(pc_bi)),
     `High VIF (>=5)` = if ("high_collinearity" %in% names(pc_bi)) ifelse(pc_bi$high_collinearity %in% TRUE, "YES", "no") else rep(.em, nrow(pc_bi)),
-    `CV Delta-AUC (95% CI)` = delta_ci,
+    `CV Delta-AUC (Repeat SD / Range (min-max))` = delta_range,
     `SD Delta-AUC` = if ("sd_delta_auc" %in% names(pc_bi)) .fmt3(pc_bi$sd_delta_auc) else rep(.em, nrow(pc_bi)),
     `Adjusted Beta` = .fmt3(pc_bi$beta_adjusted),
     `Raw LRT p` = .fmt_p(pc_bi$lrt_p),
@@ -466,8 +470,8 @@ if (is.data.frame(perf) && nrow(perf) > 0L) {
     "<div class='sb-takeaway'><strong>Column Glossary:</strong> ",
     "<ul>",
     "<li><strong>ROC-AUC (95% CI):</strong> DeLong point estimate and 95% confidence interval.</li>",
-    "<li><strong>PR-AUC (95% CI) & Stability Diagnostics:</strong> Precision-Recall AUC with stratified bootstrap 95% CI, prevalence baseline (<code>n_pos / n</code>), <code>Tie Fraction</code>, <code>Small Positive Class</code> (<code>n_pos &lt; 5</code> or <code>n_neg &lt; 5</code>), valid bootstrap replicates (<code>n_boot_valid</code>), and <code>PR CI Unreliable</code> flag.</li>",
-    "<li><strong>Null Permutation Hypothesis Families:</strong> <code>Raw Null p</code> (empirical random-gene p-value), <code>Within-Method BH FDR</code> (<code>null_p_adj_bh</code>, adjusted within each scoring method), and <code>Global BH FDR</code> (<code>null_p_adj_bh_global</code>, adjusted across all evaluated methods &times; signatures &times; cohorts), plus the sampling universe (<code>Null Background Universe</code> and <code>Universe Genes</code>).</li>",
+    "<li><strong>PR-AUC (95% CI) &amp; Stability Diagnostics:</strong> Precision-Recall AUC with stratified bootstrap 95% CI, prevalence baseline (<code>n_pos / n</code>), <code>Tie Fraction</code>, <code>Small Positive Class</code> (<code>n_pos &lt; 5</code> or <code>n_neg &lt; 5</code>), valid bootstrap replicates (<code>n_boot_valid</code>), and <code>PR CI Unreliable</code> flag.</li>",
+    "<li><strong>Null Permutation Hypothesis Families:</strong> <code>Raw Null p</code> (empirical random-gene p-value), <code>BH FDR</code> (showing within-method <code>null_p_adj_bh</code> / global <code>null_p_adj_bh_global</code>), and <code>Flags</code> summarizing coverage status, small cohort / small positive class, PR CI instability, and <code>Null Background Universe</code> (full transcriptome vs. subsampled panel cohort).</li>",
     "</ul></div>\n\n"
   ))
   auc_ci <- if (all(c("auc", "auc_ci_low", "auc_ci_high") %in% names(perf))) {
@@ -483,6 +487,33 @@ if (is.data.frame(perf) && nrow(perf) > 0L) {
     rep(.em, nrow(perf))
   }
   status <- if ("coverage_status" %in% names(perf)) as.character(perf$coverage_status) else rep(.em, nrow(perf))
+  bh_col <- if ("null_p_adj_bh" %in% names(perf)) {
+    .fmt_null(perf$null_p_adj_bh)
+  } else if ("null_p_adj_bh_global" %in% names(perf)) {
+    .fmt_null(perf$null_p_adj_bh_global)
+  } else {
+    rep(if (isTRUE(compute_null)) .em else "Not run", nrow(perf))
+  }
+  flags_vec <- vapply(seq_len(nrow(perf)), function(i) {
+    fl <- character(0)
+    if (!is.na(status[i]) && nzchar(status[i]) && !status[i] %in% c("OK", .em)) {
+      fl <- c(fl, status[i])
+    }
+    if ("small_cohort" %in% names(perf) && isTRUE(perf$small_cohort[i])) {
+      fl <- c(fl, "small_cohort")
+    }
+    if ("small_positive_class" %in% names(perf) && isTRUE(perf$small_positive_class[i])) {
+      fl <- c(fl, "small_pos_class(<5)")
+    }
+    if ("ci_unreliable" %in% names(perf) && isTRUE(perf$ci_unreliable[i])) {
+      fl <- c(fl, "PR_CI_unreliable")
+    }
+    if ("background_type" %in% names(perf) && !is.na(perf$background_type[i]) &&
+        nzchar(as.character(perf$background_type[i]))) {
+      fl <- c(fl, .translate_bg(perf$background_type[i]))
+    }
+    if (length(fl) == 0L) "OK" else paste(fl, collapse = "; ")
+  }, character(1))
   out <- data.frame(
     Signature = as.character(perf$signature),
     Cohort = as.character(perf$dataset),
@@ -494,19 +525,10 @@ if (is.data.frame(perf) && nrow(perf) > 0L) {
     ),
     `ROC-AUC (95% CI)` = auc_ci,
     `PR-AUC (95% CI)` = pr_ci,
-    `PR Baseline` = if ("pr_baseline" %in% names(perf)) .fmt3(perf$pr_baseline) else rep(.em, nrow(perf)),
-    `Tie Fraction` = if ("tie_fraction" %in% names(perf)) .fmt3(perf$tie_fraction) else rep(.em, nrow(perf)),
-    `Small Pos Class (<5)` = if ("small_positive_class" %in% names(perf)) ifelse(is.na(perf$small_positive_class), .em, ifelse(perf$small_positive_class %in% TRUE, "YES", "no")) else rep(.em, nrow(perf)),
-    `Valid Bootstraps` = if ("n_boot_valid" %in% names(perf)) ifelse(is.finite(perf$n_boot_valid), as.character(as.integer(perf$n_boot_valid)), .em) else rep(.em, nrow(perf)),
-    `PR CI Unreliable` = if ("ci_unreliable" %in% names(perf)) ifelse(is.na(perf$ci_unreliable), .em, ifelse(perf$ci_unreliable %in% TRUE, "YES (Unstable)", "no")) else rep(.em, nrow(perf)),
     Coverage = if ("coverage_pct" %in% names(perf)) .fmt_pct(perf$coverage_pct) else rep(.em, nrow(perf)),
-    Status = status,
-    `Power (0.70)` = if ("power_auc70" %in% names(perf)) .fmt3(perf$power_auc70) else rep(.em, nrow(perf)),
     `Raw Null p` = if ("null_p" %in% names(perf)) .fmt_null(perf$null_p) else rep(if (isTRUE(compute_null)) .em else "Not run", nrow(perf)),
-    `Within-Method BH FDR` = if ("null_p_adj_bh" %in% names(perf)) .fmt_null(perf$null_p_adj_bh) else rep(if (isTRUE(compute_null)) .em else "Not run", nrow(perf)),
-    `Global BH FDR` = if ("null_p_adj_bh_global" %in% names(perf)) .fmt_null(perf$null_p_adj_bh_global) else rep(if (isTRUE(compute_null)) .em else "Not run", nrow(perf)),
-    `Null Background Universe` = if ("background_type" %in% names(perf)) .translate_bg(perf$background_type) else rep(if (isTRUE(compute_null)) .em else "Not run", nrow(perf)),
-    `Universe Genes` = if ("universe_size" %in% names(perf)) ifelse(is.finite(perf$universe_size), as.character(as.integer(perf$universe_size)), .em) else rep(.em, nrow(perf)),
+    `BH FDR` = bh_col,
+    Flags = flags_vec,
     check.names = FALSE,
     stringsAsFactors = FALSE
   )

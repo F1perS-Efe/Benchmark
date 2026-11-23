@@ -53,7 +53,7 @@ score_for_dataset <- function(dataset,
     sd_handling = sd_handling,
     filter_response = TRUE
   )
-  expr_full <- prep$expr
+  expr_full <- prep$expr_kept
   y_kept <- prep$y_kept
 
   scored <- score_signature(

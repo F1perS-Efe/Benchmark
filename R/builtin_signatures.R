@@ -97,7 +97,7 @@ get_builtin_signatures <- function(include_controls = TRUE) {
       biological_interpretation = "Weighted 18-gene T cell-inflamed gene expression profile (17 positive IFN-g/adaptive resistance genes and negatively weighted CD276/B7-H3)",
       original_reference = "Ayers M, Lunceford J, Nebozhyn M, et al. J Clin Invest. 2017;127(8):2930-2940; Cristescu R, Mogg R, Ayers M, et al. Science. 2018;362(6411):eaar3593.",
       doi = "10.1172/JCI91190; 10.1126/science.aar3593",
-      scoring_compatibility = c("mean", "zscore", "rank", "ss_rank", "median"),
+      scoring_compatibility = c("mean", "zscore", "rank", "ss_rank"),
       known_limitations = "Original clinical assay normalizes log2 expression against 11 housekeeping genes on NanoString before applying the 18 linear regression weights (CD276 weight = -0.023900)."
     ),
     Cytolytic_Activity = .make_builtin_sig(
@@ -260,12 +260,8 @@ get_builtin_signatures <- function(include_controls = TRUE) {
   if (!is.null(weights)) {
     weights <- as.numeric(weights)
     names(weights) <- genes
-    genes_up <- genes[weights > 0]
-    genes_down <- genes[weights < 0]
     gene_dirs <- stats::setNames(ifelse(weights > 0, "+", "-"), genes)
   } else {
-    genes_up <- if (identical(direction, "negative")) character(0) else genes
-    genes_down <- if (identical(direction, "negative")) genes else character(0)
     dir_sym <- if (identical(direction, "negative")) "-" else "+"
     gene_dirs <- stats::setNames(rep(dir_sym, length(genes)), genes)
   }

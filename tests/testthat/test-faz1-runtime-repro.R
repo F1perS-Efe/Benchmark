@@ -54,9 +54,13 @@ test_that("Faz 1.1 & 1.2: download_manifest, download_pub_bundle, and download_r
     hash0 <- man0$reproducibility_hash
     expect_true(nzchar(hash0))
 
-    # Changing view selectors or analysis parameters without re-running must flag stale_inputs()
+    # Changing view selectors within the snapshot does NOT flag stale_inputs(),
+    # whereas changing analysis parameters without re-running must flag stale_inputs()
     session$setInputs(heatmap_method = "zscore")
-    expect_true(stale_inputs())
+    expect_false(stale_inputs())
+    expect_identical(report_model()$tier1$active_method, "zscore")
+
+    session$setInputs(heatmap_method = "mean")
     session$setInputs(
       forest_sig = "Cytokine-5",
       sd_handling = "as_0",
@@ -65,7 +69,7 @@ test_that("Faz 1.1 & 1.2: download_manifest, download_pub_bundle, and download_r
     )
     expect_true(stale_inputs())
 
-    # report_model() and reproducibility_manifest() must stay locked to the snapshot
+    # report_model() and reproducibility_manifest() reflect the validated active method ("mean") and stay locked to the snapshot
     expect_identical(report_model()$tier1$active_method, "mean")
     expect_identical(reproducibility_manifest()$reproducibility_hash, hash0)
 

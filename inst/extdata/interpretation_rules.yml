@@ -68,7 +68,7 @@ evidence_tiers:
     template: "{signature} shows consistent discrimination across {k} independent cohorts (REML AUC {auc_re}, 95% CI {ci_low}-{ci_high})."
   moderate:
     id: "E2_MODERATE"
-    label: "Medium Priority (Exploratory)"
+    label: "Exploratory Signal"
     min_cohorts: 1
     min_auc: 0.60
     min_ci_low: 0.45

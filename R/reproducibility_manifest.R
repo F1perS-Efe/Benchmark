@@ -65,6 +65,7 @@ build_reproducibility_manifest <- function(results,
     "methods", "direction", "sd_handling", "coverage_threshold",
     "sensitivity_threshold", "n_boot", "n_perm", "seed",
     "compute_pr", "compute_null", "match_expression",
+    "apply_log2", "min_genes",
     "heatmap_method", "forest_signature", "stratify_by"
   )
   run_params <- list()
@@ -208,11 +209,22 @@ export_manifest <- function(manifest, path, format = c("json", "yaml")) {
       ds <- datasets[[nm]]
       sids <- colnames(ds$expr)
       gids <- rownames(ds$expr)
+      expr_vals <- as.numeric(ds$expr)
+      expr_str <- paste(ifelse(is.finite(expr_vals), sprintf("%.8g", expr_vals), "NA"), collapse = ",")
+      resp_col <- if (is.data.frame(ds$sample_meta) && "response_label" %in% names(ds$sample_meta)) {
+        as.character(ds$sample_meta$response_label)
+      } else if (is.data.frame(ds$sample_meta) && "response" %in% names(ds$sample_meta)) {
+        as.character(ds$sample_meta$response)
+      } else {
+        character(0)
+      }
       out[[nm]] <- list(
         n_samples = as.integer(ncol(ds$expr)),
         n_genes = as.integer(nrow(ds$expr)),
         sample_ids_md5 = .md5_string(paste(sids, collapse = ",")),
         genes_md5 = .md5_string(paste(gids, collapse = ",")),
+        expr_values_md5 = .md5_string(expr_str),
+        response_md5 = .md5_string(paste(ifelse(is.na(resp_col), "NA", resp_col), collapse = ",")),
         normalization = as.character(ds$info$normalization)[1],
         scale = as.character(ds$info$scale)[1]
       )

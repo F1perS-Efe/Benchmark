@@ -13,7 +13,7 @@ auc_correlation(results, method = NULL)
 }
 \value{
 Uzun \code{data.frame}: \code{signature1}, \code{signature2}, \code{correlation},
-\code{n_datasets}, \code{method}.
+\code{n_datasets}, \code{method}, \code{low_k_unreliable}.
 }
 \description{
 Secilen skorlama yonteminde her imza icin veri setleri uzerindeki AUC

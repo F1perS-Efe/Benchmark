@@ -179,8 +179,8 @@ test_that("6.1 & 6.2: build_report_model, export_report, and export_publication_
 
   # Verify separate raw vs adjusted p-value headers & diagnostic explanations in HTML report
   expect_true(grepl("Raw Null p", html_txt, fixed = TRUE))
-  expect_true(grepl("Within-Method BH FDR", html_txt, fixed = TRUE))
-  expect_true(grepl("Global BH FDR", html_txt, fixed = TRUE))
+  expect_true(grepl("BH FDR", html_txt, fixed = TRUE))
+  expect_true(grepl("Flags", html_txt, fixed = TRUE))
   expect_true(grepl("Null Background Universe", html_txt, fixed = TRUE))
   expect_true(grepl("Subsampled panel cohort", html_txt, fixed = TRUE))
   expect_true(grepl("PR CI Unreliable", html_txt, fixed = TRUE))

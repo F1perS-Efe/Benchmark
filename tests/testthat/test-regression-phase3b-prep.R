@@ -67,7 +67,7 @@ test_that("auc_correlation 2 veri setinde NA, 3+ sonlu", {
   expect_lte(corr3$correlation[1], 1)
 })
 
-test_that("generate_r_code hazir imzada direction imzaya yazilir", {
+test_that("generate_r_code hazir imzada kendi direction degerini korur, yalnizca Custom imzaya direction yazar", {
   code <- generate_r_code(
     signature_name = "Cytokine-5",
     direction = ">",
@@ -77,19 +77,8 @@ test_that("generate_r_code hazir imzada direction imzaya yazilir", {
     dataset_names = "demo_A"
   )
   expect_silent(parse(text = code))
-  expect_true(grepl('sigs[[1]]$direction <- ">"', code, fixed = TRUE))
+  expect_false(grepl('sigs[[1]]$direction <- ">"', code, fixed = TRUE))
   expect_true(grepl('direction = ">"', code, fixed = TRUE))
-
-  # Uretilen kod, demo imza yonunu gercekten ">" yapmali
-  data(signatures_demo, package = "SigBenchR")
-  env <- new.env(parent = baseenv())
-  env$signatures_demo <- signatures_demo
-  eval(parse(text = paste(
-    'sigs <- signatures_demo["Cytokine-5"]',
-    'sigs[[1]]$direction <- ">"',
-    sep = "\n"
-  )), envir = env)
-  expect_identical(env$sigs[[1]]$direction, ">")
 })
 
 test_that("null_permutation_test hizli yol seed tekrarlanabilir (mean/zscore)", {

@@ -51,7 +51,7 @@ test_that("P0-2 encode_response warns on unknown labels", {
   expect_true(is.na(enc$response[3]))
 })
 
-test_that("R1 label-leakage guard: zscore/rank scale on full cohort independently of SD response labels", {
+test_that("R1 label-leakage guard: zscore/rank scale strictly on kept samples (expr_kept) when sd_handling = 'exclude'", {
   skip_if_not_installed("pROC")
   set.seed(11)
   n_keep <- 20L
@@ -74,16 +74,16 @@ test_that("R1 label-leakage guard: zscore/rank scale on full cohort independentl
     ),
     info = list(normalization = "TPM", scale = "log2")
   )
-  ds_relabeled <- ds_full
-  ds_relabeled$sample_meta$response_label <- c(rep(c("CR", "PD"), each = 10L), rep("CR", n_sd))
+  ds_sd_corrupted <- ds_full
+  ds_sd_corrupted$expr[, paste0("SD", seq_len(n_sd))] <- 1e6
 
   for (m in c("zscore", "rank")) {
     sc_full <- score_for_dataset(ds_full, genes = genes, method = m, sd_handling = "exclude")
-    sc_unlabeled <- score_signature(expr, genes = genes, method = m)$scores[samples[seq_len(n_keep)]]
-    sc_relabeled <- score_for_dataset(ds_relabeled, genes = genes, method = m, sd_handling = "exclude")
+    sc_kept_only <- score_signature(expr[, samples[seq_len(n_keep)], drop = FALSE], genes = genes, method = m)$scores
+    sc_corrupted <- score_for_dataset(ds_sd_corrupted, genes = genes, method = m, sd_handling = "exclude")
 
-    expect_equal(sc_full$scores, sc_unlabeled, tolerance = 1e-12)
-    expect_equal(sc_full$scores, sc_relabeled$scores[samples[seq_len(n_keep)]], tolerance = 1e-12)
+    expect_equal(sc_full$scores, sc_kept_only, tolerance = 1e-12)
+    expect_equal(sc_full$scores, sc_corrupted$scores, tolerance = 1e-12)
     expect_identical(length(sc_full$scores), n_keep)
   }
 })
