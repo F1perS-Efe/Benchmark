@@ -10,10 +10,10 @@
 #' @export
 jaccard_signatures <- function(signatures) {
   if (is.null(names(signatures)) || any(!nzchar(names(signatures)))) {
-    stop("`signatures` isimli bir liste olmalidir.", call. = FALSE)
+    stop("`signatures` must be a named list.", call. = FALSE)
   }
   if (length(signatures) < 2L) {
-    stop("Jaccard icin en az iki imza gerekir.", call. = FALSE)
+    stop("At least two signatures are required for Jaccard overlap.", call. = FALSE)
   }
 
   gene_sets <- lapply(signatures, function(sig) {
@@ -31,7 +31,7 @@ jaccard_signatures <- function(signatures) {
     genes <- as.character(genes)
     genes <- genes[!is.na(genes) & nzchar(genes)]
     if (length(genes) == 0L) {
-      stop("Her imzada `genes` veya `genes_up`/`genes_down` zorunludur.", call. = FALSE)
+      stop("Each signature requires `genes` or `genes_up`/`genes_down`.", call. = FALSE)
     }
     unique(toupper(genes))
   })

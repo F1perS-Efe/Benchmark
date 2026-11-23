@@ -14,12 +14,12 @@
 #' @export
 match_genes <- function(expr, genes, use_aliases = TRUE, alias_map = NULL) {
   if (is.null(rownames(expr))) {
-    stop("`expr` satir adlari (gen sembolleri) zorunludur.", call. = FALSE)
+    stop("`expr` rownames (gene symbols) are required.", call. = FALSE)
   }
   genes <- as.character(genes)
   genes <- genes[!is.na(genes) & nzchar(genes)]
   if (length(genes) == 0L) {
-    stop("`genes` bos olamaz.", call. = FALSE)
+    stop("`genes` cannot be empty.", call. = FALSE)
   }
 
   genes_up <- toupper(genes)
@@ -40,7 +40,7 @@ match_genes <- function(expr, genes, use_aliases = TRUE, alias_map = NULL) {
       alias_map
     }
     if (is.null(names(amap)) || any(!nzchar(names(amap)))) {
-      stop("`alias_map` isimli bir karakter vektoru olmalidir.", call. = FALSE)
+      stop("`alias_map` must be a named character vector.", call. = FALSE)
     }
     amap_vals <- toupper(as.character(amap))
     names(amap_vals) <- toupper(names(amap))

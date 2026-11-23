@@ -7,7 +7,7 @@ test_that("prepare_expression linear log2 uygular; negatifte hata", {
   m_neg[1, 1] <- -1
   expect_error(
     prepare_expression(m_neg, scale = "linear", apply_log2 = TRUE),
-    "Negatif"
+    "negative|Negatif"
   )
 })
 

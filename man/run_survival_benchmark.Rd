@@ -30,7 +30,12 @@ run_survival_benchmark(
 \item{apply_log2, min_genes}{Expression prep / scoring thresholds.}
 }
 \value{
-\code{data.frame} with one row per cohort x signature (plus \code{signature}).
+\code{data.frame} with one row per cohort x signature, including separate
+Benjamini-Hochberg FDR columns for the continuous Cox proportional hazards
+family (\code{cox_p} -> \code{p_adj_bh}) and the median-dichotomized Kaplan-Meier
+log-rank family (\code{logrank_p} -> \code{logrank_p_adj_bh}), while keeping the
+Schoenfeld proportional hazards assumption check (\code{ph_p}, \code{ph_violated})
+intentionally unadjusted as a model diagnostic.
 }
 \description{
 Scores each signature with \code{score_signature()} on cohorts that contain

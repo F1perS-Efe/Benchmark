@@ -1,0 +1,83 @@
+version: "1.0.0"
+
+primary_method: "zscore"
+
+auc:
+  strong_auc: 0.70
+  moderate_auc: 0.60
+  chance_level: 0.50
+  ci_chance_rule:
+    id: "R_AUC_CI_CHANCE"
+    severity: "warning"
+    title: "95% CI crosses chance level (0.50)"
+    template: "Pooled REML AUC 95% CI lower bound ({ci_low}) is <= 0.50; discrimination is not statistically distinguishable from chance across cohorts."
+
+heterogeneity:
+  moderate_i2_logit: 25
+  high_i2_logit: 50
+  moderate_rule:
+    id: "R_HET_MODERATE"
+    severity: "info"
+    title: "Moderate cross-cohort heterogeneity"
+    template: "Logit-scale I2 is {i2_logit}% (25-50%); inspect cohort-level forest plot and treatment strata."
+  high_rule:
+    id: "R_HET_HIGH"
+    severity: "warning"
+    title: "High cross-cohort heterogeneity"
+    template: "Logit-scale I2 is {i2_logit}% (>= 50%); pooled REML estimate should be interpreted cautiously and stratified by treatment/endpoint."
+
+coverage:
+  ok_min_pct: 70
+  low_rule:
+    id: "R_COV_LOW"
+    severity: "warning"
+    title: "Low gene coverage detected"
+    template: "{n_low_cov} signature-cohort cell(s) have gene coverage < 70% and are excluded/shaded to avoid unreliable scoring."
+
+reference_overlap:
+  jaccard_threshold: 0.50
+  overlap_rule:
+    id: "R_REF_OVERLAP"
+    severity: "warning"
+    title: "Circular reference-axis overlap"
+    template: "{n_overlap} signature-axis pair(s) share >= 50% gene overlap (Jaccard >= 0.50); correlation is circular and non-informative for independent validation."
+
+subgroup_pooling:
+  pooled_rule:
+    id: "R_SUBGROUP_POOLED"
+    severity: "warning"
+    title: "Heterogeneous clinical subgroups pooled"
+    template: "Summary pools distinct treatment regimens or clinical endpoints; review treatment- and endpoint-stratified tables."
+
+small_k_meta:
+  min_cohorts_confirmatory: 5
+  small_k_rule:
+    id: "R_SMALL_K_META"
+    severity: "info"
+    title: "Small-k meta-analysis (k < 5)"
+    template: "Pooled REML + HKSJ uses k = {k} cohorts (< 5); treat cross-cohort synthesis as exploratory."
+
+evidence_tiers:
+  strong:
+    id: "E1_STRONG"
+    label: "High Priority (Strong)"
+    min_cohorts: 5
+    min_auc: 0.70
+    min_ci_low: 0.50
+    max_i2_logit: 50
+    template: "{signature} shows consistent discrimination across {k} independent cohorts (REML AUC {auc_re}, 95% CI {ci_low}-{ci_high})."
+  moderate:
+    id: "E2_MODERATE"
+    label: "Medium Priority (Exploratory)"
+    min_cohorts: 1
+    min_auc: 0.60
+    min_ci_low: 0.45
+    template: "{signature} shows an exploratory trend (AUC {auc_re}) but requires larger or stratified validation."
+  none:
+    id: "E3_NONE"
+    label: "Low Priority (No Clear Signal)"
+    template: "{signature} did not reliably discriminate response in these cohorts."
+  unevaluable:
+    id: "E0_UNEVALUABLE"
+    label: "Unevaluable"
+    template: "{signature} could not be evaluated in the independent summary (k = 0)."

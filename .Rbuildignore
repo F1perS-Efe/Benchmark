@@ -9,6 +9,8 @@
 ^README\.Rmd$
 ^\.github$
 ^.*\.tar\.gz$
+^.*\.patch$
+^scratch$
 \.DS_Store$
 ^\.socraticodeignore$
 ^LICENSE\.md$

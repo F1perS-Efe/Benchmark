@@ -1,0 +1,53 @@
+cohorts:
+  van_allen_2015:
+    source_type: "builtin"
+    species: "human"
+    cancer_type: "melanoma"
+    treatment: "anti-CTLA4"
+    endpoint_type: "clinical_benefit"
+    normalization: "TPM"
+    scale: "linear"
+    n_samples: 42
+    n_genes: 2800
+    file_path: ""
+    meta_path: ""
+    md5: ""
+  hugo_2016:
+    source_type: "builtin"
+    species: "human"
+    cancer_type: "melanoma"
+    treatment: "anti-PD1"
+    endpoint_type: "RECIST"
+    normalization: "FPKM"
+    scale: "linear"
+    n_samples: 26
+    n_genes: 2800
+    file_path: ""
+    meta_path: ""
+    md5: ""
+  riaz_2017:
+    source_type: "builtin"
+    species: "human"
+    cancer_type: "melanoma"
+    treatment: "anti-PD1"
+    endpoint_type: "RECIST"
+    normalization: "FPKM"
+    scale: "linear"
+    n_samples: 49
+    n_genes: 2800
+    file_path: ""
+    meta_path: ""
+    md5: ""
+  gide_2019:
+    source_type: "builtin"
+    species: "human"
+    cancer_type: "melanoma"
+    treatment: "anti-PD1"
+    endpoint_type: "RECIST"
+    normalization: "normalized_counts"
+    scale: "linear"
+    n_samples: 41
+    n_genes: 2800
+    file_path: ""
+    meta_path: ""
+    md5: ""

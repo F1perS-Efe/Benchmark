@@ -31,7 +31,7 @@ test_that("summarize_auc n/IVW, var_zero ve independent kurallari", {
 
   expect_warning(
     sm <- summarize_auc(res, method = "mean", include_nonindependent = FALSE),
-    "varyansi 0"
+    "zero or NA variance|varyansi 0"
   )
   expect_equal(nrow(sm), 1)
   # C non-indep dislandi; D var_zero n-agirlikliya dahil, IVW'den cikarildi

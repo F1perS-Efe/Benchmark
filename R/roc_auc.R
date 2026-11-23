@@ -1,19 +1,20 @@
-#' ROC-AUC hesapla (sabit yon, cift ters cevirme yok)
+#' Compute ROC-AUC with fixed direction (no silent sign flipping)
 #'
-#' Akis: `orient_score()` ile skorlari "yuksek = yanitli" yap, ardindan
-#' `pROC::roc()` cagrisini her zaman `direction = "<"` ile yap.
-#' AUC < 0.5 ise ters cevirmeden durustce raporlanir.
+#' Aligns scores via [orient_score()] so higher values represent responders,
+#' then invokes `pROC::roc()` with `direction = "<"`. When AUC < 0.5, values
+#' are reported directly without flipping.
 #'
-#' DeLong yontemiyle %95 GA (`ci.auc`) ve AUC varyansi (`var`) eklenir.
+#' Computes DeLong 95% confidence intervals (`ci.auc`) and AUC variance (`var`).
 #'
-#' @param scores Ornek skorlari (isimli vektor olabilir).
-#' @param response 0/1 yanit vektoru (ayni uzunluk / hizali isimler).
-#' @param direction Imza yonu: `"<"` veya `">"`. Yalnizca `orient_score`'a gider.
-#' @param min_n Kucuk kohort icin toplam n esigi. Varsayilan 20.
-#' @param min_per_class Kucuk kohort icin sinif basi minimum. Varsayilan 5.
+#' @param scores Numeric sample score vector (optionally named).
+#' @param response Integer/numeric 0/1 response vector (aligned to `scores`).
+#' @param direction Signature direction: `"<"` or `">"`. Passed to [orient_score()].
+#' @param min_n Minimum total sample size for `small_cohort` flag. Default `20L`.
+#' @param min_per_class Minimum per-class sample size for `small_cohort` flag. Default `5L`.
 #'
-#' @return Liste: `auc`, `auc_ci_low`, `auc_ci_high`, `auc_var`, `var_zero`,
-#'   `small_cohort`, `n`, `n_pos`, `n_neg`, `roc`, `scores_oriented`.
+#' @return A list with `auc`, `auc_ci_low`, `auc_ci_high`, `auc_var`,
+#'   `var_zero`, `small_cohort`, `n`, `n_pos`, `n_neg`, `roc`,
+#'   `scores_oriented`, and `response`.
 #' @export
 roc_auc <- function(scores,
                     response,
@@ -26,7 +27,7 @@ roc_auc <- function(scores,
   response <- as.integer(response)
 
   if (length(scores) != length(response)) {
-    stop("`scores` ve `response` ayni uzunlukta olmalidir.", call. = FALSE)
+    stop("`scores` and `response` must have the same length.", call. = FALSE)
   }
 
   ok <- is.finite(scores) & !is.na(response)
@@ -39,12 +40,12 @@ roc_auc <- function(scores,
 
   if (n_pos == 0L || n_neg == 0L) {
     stop(
-      "ROC icin her iki sinif da gerekli (n_pos=", n_pos, ", n_neg=", n_neg, ").",
+      "Both response classes are required for ROC (n_pos=", n_pos, ", n_neg=", n_neg, ").",
       call. = FALSE
     )
   }
 
-  # Tek yon hizalama; pROC her zaman direction = "<"
+  # Single-direction alignment; pROC always receives direction = "<"
   scores_oriented <- orient_score(scores, direction = direction)
 
   roc_obj <- pROC::roc(
@@ -56,9 +57,9 @@ roc_auc <- function(scores,
   )
 
   auc_val <- as.numeric(pROC::auc(roc_obj))
-  # AUC==1 iken pROC uyari verir; var_zero ile zaten isaretliyoruz
+  # Suppress pROC warning when AUC == 1; flagged explicitly via var_zero
   ci <- suppressWarnings(as.numeric(pROC::ci.auc(roc_obj, method = "delong")))
-  # ci.auc donusu: [low, mid/auc, high]
+  # ci.auc returns c(low, median/auc, high)
   auc_ci_low <- ci[1]
   auc_ci_high <- ci[3]
 

@@ -6,6 +6,10 @@
 #' @param direction Yon.
 #' @param apply_log2,sd_handling,min_genes Diger ayarlar.
 #' @param genes_up,genes_down Isaretli imza kollari (`genes` ile birlikte verilmez).
+#' @param signature Optional full signature definition (list or vector). When
+#'   provided, `genes`, `genes_up`, `genes_down`, `weights`, and signature-level
+#'   `min_genes` are resolved from `signature` if not explicitly supplied.
+#' @param weights Optional named numeric vector of continuous gene weights.
 #'
 #' @return Liste: `scores` (isimli), `response` (isimli, 0/1, SD dislanmis NA),
 #'   `coverage`.
@@ -18,22 +22,46 @@ score_for_dataset <- function(dataset,
                               sd_handling = "exclude",
                               min_genes = 3L,
                               genes_up = NULL,
-                              genes_down = NULL) {
-  ds <- validate_dataset(dataset)
-  expr <- collapse_duplicate_genes(as.matrix(ds$expr))
-  expr <- prepare_expression(expr, scale = ds$info$scale, apply_log2 = apply_log2)
-  enc <- encode_response(ds$sample_meta$response_label, sd_handling = sd_handling)
+                              genes_down = NULL,
+                              signature = NULL,
+                              weights = NULL) {
+  if (!is.null(signature)) {
+    sig_obj <- .as_signature(signature)
+    if (is.null(genes) && is.null(genes_up) && is.null(genes_down)) {
+      genes <- sig_obj$genes
+      genes_up <- sig_obj$genes_up
+      genes_down <- sig_obj$genes_down
+    }
+    if (is.null(weights)) {
+      weights <- sig_obj$weights
+    }
+    min_genes <- .resolve_min_genes(sig_obj, default = min_genes)
+  } else if (is.list(genes)) {
+    sig_obj <- .as_signature(genes)
+    genes <- sig_obj$genes
+    genes_up <- sig_obj$genes_up
+    genes_down <- sig_obj$genes_down
+    if (is.null(weights)) {
+      weights <- sig_obj$weights
+    }
+    min_genes <- .resolve_min_genes(sig_obj, default = min_genes)
+  }
 
-  # P0-3: skorlamadan once SD / NA yanit orneklerini cikar
-  expr_kept <- expr[, enc$kept, drop = FALSE]
-  y_kept <- enc$response[enc$kept]
-  names(y_kept) <- colnames(expr_kept)
+  prep <- .prepare_cohort(
+    dataset,
+    apply_log2 = apply_log2,
+    sd_handling = sd_handling,
+    filter_response = TRUE
+  )
+  expr_full <- prep$expr
+  y_kept <- prep$y_kept
 
   scored <- score_signature(
-    expr_kept,
+    expr_full,
     genes = genes,
     genes_up = genes_up,
     genes_down = genes_down,
+    weights = weights,
     method = method,
     min_genes = min_genes
   )
@@ -41,15 +69,16 @@ score_for_dataset <- function(dataset,
     stop(scored$skip_reason, call. = FALSE)
   }
 
-  sample_ids <- names(scored$scores)
+  sample_ids <- intersect(names(scored$scores), names(y_kept))
   resp <- y_kept[sample_ids]
-  keep <- is.finite(scored$scores) & !is.na(resp)
+  sc_kept <- scored$scores[sample_ids]
+  keep <- is.finite(sc_kept) & !is.na(resp)
 
   list(
-    scores = scored$scores[keep],
+    scores = sc_kept[keep],
     response = resp[keep],
     coverage = scored$coverage,
     direction = direction,
-    expr = expr_kept
+    expr = expr_full
   )
 }

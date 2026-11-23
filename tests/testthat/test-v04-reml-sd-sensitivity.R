@@ -98,7 +98,7 @@ test_that("edge cases: k = 1 and AUC = 1.0 excluded from REML safely", {
   )
   expect_warning(
     sm_vz <- summarize_auc(res_vz, method = "mean"),
-    "varyansi 0"
+    "zero or NA variance|varyansi 0"
   )
   expect_equal(sm_vz$auc_n_weighted[1], (20 * 1.0 + 30 * 0.7) / 50)
   expect_equal(sm_vz$auc_re[1], 0.7, tolerance = 1e-10)

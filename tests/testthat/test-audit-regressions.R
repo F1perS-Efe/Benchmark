@@ -35,12 +35,12 @@ test_that("P0-2 validate_dataset rejects non-numeric and duplicate sample_id", {
     nrow = 2,
     dimnames = list(c("A", "B"), c("S1", "S2"))
   )
-  expect_error(validate_dataset(bad_chr), "sayisal")
+  expect_error(validate_dataset(bad_chr), "numeric|sayisal")
 
   bad_id <- base
   bad_id$sample_meta$sample_id <- c("S1", "S1")
   colnames(bad_id$expr) <- c("S1", "S1")
-  expect_error(validate_dataset(bad_id), "tekil")
+  expect_error(validate_dataset(bad_id), "unique|tekil")
 })
 
 test_that("P0-2 encode_response warns on unknown labels", {
@@ -51,7 +51,7 @@ test_that("P0-2 encode_response warns on unknown labels", {
   expect_true(is.na(enc$response[3]))
 })
 
-test_that("P0-3 SD exclusion does not leak into zscore/rank AUC", {
+test_that("R1 label-leakage guard: zscore/rank scale on full cohort independently of SD response labels", {
   skip_if_not_installed("pROC")
   set.seed(11)
   n_keep <- 20L
@@ -63,7 +63,6 @@ test_that("P0-3 SD exclusion does not leak into zscore/rank AUC", {
     nrow = length(genes),
     dimnames = list(genes, samples)
   )
-  # Make signature somewhat informative on kept samples
   expr[1:3, 1:10] <- expr[1:3, 1:10] + 1.5
   labels <- c(rep(c("CR", "PD"), each = 10L), rep("SD", n_sd))
   ds_full <- list(
@@ -75,43 +74,17 @@ test_that("P0-3 SD exclusion does not leak into zscore/rank AUC", {
     ),
     info = list(normalization = "TPM", scale = "log2")
   )
-  ds_pre <- list(
-    expr = expr[, seq_len(n_keep), drop = FALSE],
-    sample_meta = data.frame(
-      sample_id = samples[seq_len(n_keep)],
-      response_label = labels[seq_len(n_keep)],
-      stringsAsFactors = FALSE
-    ),
-    info = list(normalization = "TPM", scale = "log2")
-  )
-  sigs <- list(S = list(genes = genes, direction = "<", derived_from = character(0)))
+  ds_relabeled <- ds_full
+  ds_relabeled$sample_meta$response_label <- c(rep(c("CR", "PD"), each = 10L), rep("CR", n_sd))
 
-  res_full <- run_benchmark(
-    signatures = sigs,
-    datasets = list(D = ds_full),
-    methods = c("zscore", "rank"),
-    sd_handling = "exclude",
-    compute_pr = FALSE,
-    compute_null = FALSE,
-    min_n = 5L,
-    min_per_class = 2L
-  )
-  res_pre <- run_benchmark(
-    signatures = sigs,
-    datasets = list(D = ds_pre),
-    methods = c("zscore", "rank"),
-    sd_handling = "exclude",
-    compute_pr = FALSE,
-    compute_null = FALSE,
-    min_n = 5L,
-    min_per_class = 2L
-  )
   for (m in c("zscore", "rank")) {
-    expect_equal(
-      res_full$auc[res_full$method == m],
-      res_pre$auc[res_pre$method == m],
-      tolerance = 1e-12
-    )
+    sc_full <- score_for_dataset(ds_full, genes = genes, method = m, sd_handling = "exclude")
+    sc_unlabeled <- score_signature(expr, genes = genes, method = m)$scores[samples[seq_len(n_keep)]]
+    sc_relabeled <- score_for_dataset(ds_relabeled, genes = genes, method = m, sd_handling = "exclude")
+
+    expect_equal(sc_full$scores, sc_unlabeled, tolerance = 1e-12)
+    expect_equal(sc_full$scores, sc_relabeled$scores[samples[seq_len(n_keep)]], tolerance = 1e-12)
+    expect_identical(length(sc_full$scores), n_keep)
   }
 })
 
@@ -210,7 +183,7 @@ test_that("P0-6 n_weighted includes var_zero; IVW excludes", {
   )
   expect_warning(
     sm <- summarize_auc(res, method = "mean"),
-    "varyansi 0"
+    "zero or NA variance|varyansi 0"
   )
   expect_equal(sm$auc_n_weighted, (20 * 1.0 + 30 * 0.7) / 50)
   expect_equal(sm$auc_ivw, 0.7)

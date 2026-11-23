@@ -77,11 +77,11 @@ compare_signatures_one <- function(scores1,
                                    name1 = "sig1",
                                    name2 = "sig2") {
   if (is.null(dataset1) || is.null(dataset2)) {
-    stop("`dataset1` ve `dataset2` zorunludur.", call. = FALSE)
+    stop("`dataset1` and `dataset2` are required.", call. = FALSE)
   }
   if (!identical(as.character(dataset1), as.character(dataset2))) {
     stop(
-      "Farkli veri setleri arasinda DeLong karsilastirmasi yapilamaz (",
+      "DeLong comparison cannot be performed across different datasets (",
       dataset1, " vs ", dataset2, ").",
       call. = FALSE
     )
@@ -106,14 +106,14 @@ compare_signatures_one <- function(scores1,
       common <- intersect(common, names(response))
     }
     if (length(common) == 0L) {
-      stop("Ortak ornek id bulunamadi.", call. = FALSE)
+      stop("No common sample IDs found.", call. = FALSE)
     }
     scores1 <- as.numeric(scores1[common])
     scores2 <- as.numeric(scores2[common])
     if (!is.null(names(response))) {
       response <- as.integer(response[common])
     } else {
-      stop("Isimli skorlar icin `response` da isimli olmalidir.", call. = FALSE)
+      stop("`response` must also be named when scores are named.", call. = FALSE)
     }
   } else {
     scores1 <- as.numeric(scores1)
@@ -121,7 +121,7 @@ compare_signatures_one <- function(scores1,
     response <- as.integer(response)
     if (length(scores1) != length(scores2) || length(scores1) != length(response)) {
       stop(
-        "scores1, scores2 ve response ayni uzunlukta olmali.",
+        "`scores1`, `scores2`, and `response` must have the same length.",
         call. = FALSE
       )
     }
@@ -133,7 +133,7 @@ compare_signatures_one <- function(scores1,
   response <- response[ok]
 
   if (length(unique(response)) < 2L) {
-    stop("Karsilastirma icin her iki yanit sinifi da gerekli.", call. = FALSE)
+    stop("Both response classes are required for comparison.", call. = FALSE)
   }
 
   s1 <- orient_score(scores1, direction = direction1)

@@ -2,7 +2,7 @@
 % Please edit documentation in R/generate_r_code.R
 \name{generate_r_code}
 \alias{generate_r_code}
-\title{Shiny / CLI parametrelerinden tekrarlanabilir R kodu uret}
+\title{Generate a reproducible R script from Shiny or CLI parameters}
 \usage{
 generate_r_code(
   signature_name = "Cytokine-5",
@@ -17,45 +17,58 @@ generate_r_code(
   compute_pr = TRUE,
   compute_null = FALSE,
   sd_handling = "exclude",
-  match_expression = FALSE
+  match_expression = FALSE,
+  genes_up = NULL,
+  genes_down = NULL,
+  weights = NULL
 )
 }
 \arguments{
-\item{signature_name}{Hazir demo imza adi (\code{"Cytokine-5"}, \code{"IFNG6"},
-\code{"Random3"}). Ozel gen listesi icin \code{NULL}.}
+\item{signature_name}{Built-in signature name(s) from \code{\link[=get_builtin_signatures]{get_builtin_signatures()}}
+or \code{signatures_demo} (e.g. \code{"Cytokine-5"}, \code{"IFNG6"},
+\code{"T_Cell_Inflamed_GEP"}), or \code{NULL} for custom genes only.}
 
-\item{genes}{Ozel imza genleri (karakter vektoru). \code{signature_name}
-\code{NULL} iken zorunlu.}
+\item{genes}{Custom signature gene vector. Required when \code{signature_name}
+is \code{NULL}.}
 
-\item{methods}{Skorlama yontemleri.}
+\item{methods}{Scoring method names.}
 
-\item{direction}{Imza yonu (\code{"<"} veya \code{">"}).}
+\item{direction}{Default signature direction (\code{"<"} or \code{">"}).}
 
-\item{coverage_threshold}{Kapsama esigi (0-1).}
+\item{coverage_threshold}{Coverage threshold in \verb{[0, 1]}.}
 
-\item{n_boot}{PR bootstrap tekrari.}
+\item{n_boot}{PR bootstrap replicates.}
 
-\item{n_perm}{Null permutasyon sayisi.}
+\item{n_perm}{Null permutation replicates.}
 
-\item{seed}{Rastgelelik tohumu.}
+\item{seed}{RNG seed.}
 
-\item{dataset_names}{Veri seti adlari. ICI kohort adlari
-(\code{van_allen_2015}, \code{hugo_2016}, \code{riaz_2017}, \code{gide_2019}) verilirse
-uretilen kod \code{data(datasets_ici)} ve \code{datasets_ici[...]} kullanir;
-aksi halde \code{datasets_demo}.}
+\item{dataset_names}{Dataset names. When all names belong to \code{datasets_ici}
+(\code{van_allen_2015}, \code{hugo_2016}, \code{riaz_2017}, \code{gide_2019}), generated code
+uses \code{data(datasets_ici)} and \code{datasets_ici[...]}; when all belong to
+\code{datasets_demo}, it uses \code{data(datasets_demo)}.}
 
-\item{compute_pr}{PR-AUC hesaplansin mi.}
+\item{compute_pr}{Whether to compute PR-AUC.}
 
-\item{compute_null}{Null permutasyon calissin mi.}
+\item{compute_null}{Whether to run null permutation testing.}
 
-\item{sd_handling}{SD politikasi (\code{"exclude"}, \code{"as_0"}, \code{"as_1"}).}
+\item{sd_handling}{Stable disease policy (\code{"exclude"}, \code{"as_0"}, \code{"as_1"}).}
 
-\item{match_expression}{Null icin ifade duzeyine eslestirilmis ornekleme.}
+\item{match_expression}{Whether to use expression-matched null sampling.}
+
+\item{genes_up}{Optional up-regulated custom signature gene vector (for
+signed custom signatures; mutually exclusive with \code{genes}).}
+
+\item{genes_down}{Optional down-regulated custom signature gene vector (for
+signed custom signatures; mutually exclusive with \code{genes}).}
+
+\item{weights}{Optional named numeric vector of continuous gene weights for
+a weighted linear custom signature.}
 }
 \value{
-Tek bir karakter dizisi (R kodu; satirlar \verb{\\\\n} ile ayrilir).
+A single character string of R code separated by \verb{\\n}.
 }
 \description{
-Secili imza, yontemler ve esikler icin dogrudan calistirilabilir
-kisa bir R betigi dondurur (genelde 10-20 satir).
+Returns a short, directly runnable R script (typically 10-20 lines) for the
+selected signatures, scoring methods, and thresholds.
 }

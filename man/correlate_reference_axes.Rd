@@ -12,7 +12,8 @@ correlate_reference_axes(
   cor_method = "spearman",
   sd_handling = "exclude",
   apply_log2 = TRUE,
-  min_genes = 3L
+  min_genes = 3L,
+  overlap_threshold = 0.5
 )
 }
 \arguments{
@@ -33,10 +34,14 @@ Default \code{"spearman"}.}
 \item{apply_log2}{Passed to \code{prepare_expression()}. Default \code{TRUE}.}
 
 \item{min_genes}{Minimum genes for scoring. Default \code{3L}.}
+
+\item{overlap_threshold}{Jaccard or overlap fraction threshold at or above
+which \code{overlap_flag} is set to \code{TRUE} (default \code{0.50}).}
 }
 \value{
 \code{data.frame} with columns \code{cohort}, \code{signature}, \code{reference_axis},
-\code{cor}, \code{p_value}, \code{n_samples}, \code{normalization}.
+\code{cor}, \code{p_value}, \code{n_samples}, \code{normalization}, \code{jaccard_overlap},
+\code{overlap_flag}, \code{overlap_note}.
 }
 \description{
 Scores each user signature and each reference axis on the same SD-filtered

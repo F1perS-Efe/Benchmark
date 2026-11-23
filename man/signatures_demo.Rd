@@ -8,7 +8,7 @@
 Isimli liste; her eleman \code{list(genes, direction, derived_from, citation)}.
 }
 \usage{
-signatures_demo
+data(signatures_demo)
 }
 \description{
 Cytokine-5 (Kus et al. 2025), IFNG6 (Ayers et al. 2017) ve Random3.

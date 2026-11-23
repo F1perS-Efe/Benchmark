@@ -12,22 +12,38 @@ controls (housekeeping / ribosomal / geNorm). If \code{FALSE}, return only
 literature ICI signatures.}
 }
 \value{
-Named list of signature definitions.
+Named list of standardized signature definitions.
 }
 \description{
-Returns an expanded immuno-oncology signature panel for benchmarking.
-Demo signatures Cytokine-5 and IFNG6 keep the same gene lists as
-\code{signatures_demo} (data object unchanged). Synthetic fake-gene controls
-(\code{Random3}, \code{NegCtrl_RandomA}, \code{NegCtrl_RandomB}) are omitted from the
-default panel so coverage counters reflect real gene absence only.
+Returns a curated immuno-oncology gene signature panel with standardized
+biological and methodological metadata for benchmarking. Demo signatures
+\code{Cytokine-5} and \code{IFNG6} keep the same gene lists as \code{signatures_demo}.
+Synthetic fake-gene controls (\code{Random3}, \code{NegCtrl_RandomA},
+\code{NegCtrl_RandomB}) are omitted from the default panel so coverage counters
+reflect real gene absence only. \code{IMPRES_Like} is omitted because Auslander
+et al. (2018) IMPRES uses 15 pairwise binary gene comparisons rather than
+linear gene averaging and was trained/validated on overlapping melanoma ICI
+cohorts (\code{van_allen_2015}, \code{hugo_2016}, \code{riaz_2017}).
 }
 \details{
-Metadata per signature:
+Standardized metadata fields per signature:
 \itemize{
-\item \code{direction}: \code{"positive"}, \code{"negative"}, or \code{"signed"} (ROC mapping via
-\code{\link[=run_benchmark]{run_benchmark()}}; legacy \code{"<"} / \code{">"} also accepted)
+\item \code{signature_name}: canonical signature identifier
+\item \code{biological_interpretation}: concise description of the biological axis
+\item \code{genes}: character vector of constituent HGNC gene symbols
+\item \code{genes_up}, \code{genes_down}: positive and negative gene subsets (when signed/weighted)
+\item \code{gene_directions}: named character vector (\code{"+"} or \code{"-"}) per gene
+\item \code{weights}: named numeric vector of published continuous coefficients (e.g.
+Ayers/Cristescu 18-gene \code{T_Cell_Inflamed_GEP} where \code{CD276 = -0.023900} and
+\code{STAT1 = 0.250229}), or \code{NULL} for equal-weight signatures
+\item \code{min_genes}: integer minimum matched gene threshold (\code{2L} or \code{3L})
+\item \code{species}: \code{"Homo sapiens"}
+\item \code{direction}: \code{"positive"}, \code{"negative"}, or \code{"signed"}
 \item \code{category}: \code{"literature_ici"} or \code{"negative_control"}
-\item \code{derived_from}: character vector of source cohorts, or \code{NULL} (fail-closed
-\code{independent = NA}) / \code{character(0)} (independent)
+\item \code{derived_from}: character vector of source cohorts (\code{character(0)} when independent)
+\item \code{citation}, \code{original_reference}: bibliographic reference
+\item \code{doi}: persistent DOI or publication identifier
+\item \code{scoring_compatibility}: compatible \code{score_signature()} methods
+\item \code{known_limitations}: documented biological and methodological caveats
 }
 }

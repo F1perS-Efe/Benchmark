@@ -18,7 +18,8 @@ null_permutation_test(
   observed_scores = NULL,
   min_genes = 3L,
   n_genes_down = 0L,
-  signature_genes_down = NULL
+  signature_genes_down = NULL,
+  weights = NULL
 )
 }
 \arguments{
@@ -39,11 +40,12 @@ Down-only isaretli null icin \code{0L} olabilir.}
 
 \item{seed}{RNG tohumu.}
 
-\item{match_expression}{TRUE ise imza genlerinin ortalama ifadesine yakin
-quantile-bin eslestirilmis ornekleme yapar.}
+\item{match_expression}{TRUE ise imza genlerinin hem ortalama ifadesine (5 quantile)
+hem de gen dispersiyonuna/SD'sine (3 tertile) yakin 2D-bin eslestirilmis
+ornekleme yapar.}
 
 \item{signature_genes}{\code{match_expression = TRUE} icin up / tek yonlu imza
-genleri (ifade ortalamasi eslestirme referansi). \code{NULL} ise \code{exclude_genes}
+genleri (ifade ortalamasi/SD eslestirme referansi). \code{NULL} ise \code{exclude_genes}
 (up kolu yoksa eslestirme atlanir).}
 
 \item{observed_scores}{Opsiyonel: gozlenen imza skorlari (isimli).
@@ -56,10 +58,14 @@ Verilmezse \code{signature_genes} ile skorlanir.}
 \item{signature_genes_down}{\code{match_expression = TRUE} ve \code{n_genes_down > 0}
 iken down kolu ifade-bin referansi. \code{NULL} ise down kolu guvenli rastgele
 fallback kullanir.}
+
+\item{weights}{Opsiyonel isimli sayisal vektor: surekli gen agirliklari
+(orn. Ayers/Cristescu \code{T_Cell_Inflamed_GEP} regresyon katsayilari).}
 }
 \value{
 Liste: \code{obs_auc}, \code{null_aucs}, \code{null_p}, \code{n_perm}, \code{n_genes},
-\code{pool_size}, \code{seed}.
+\code{n_genes_effective}, \code{pool_size}, \code{universe_size}, \code{partial_background},
+\code{background_type}, \code{seed}.
 }
 \description{
 Bulunan imza gen sayisi kadar rastgele gen seti skorlanir; gozlenen AUC
@@ -83,4 +89,6 @@ ayrik \code{n_genes} (up) + \code{n_genes_down} (down) rastgele gen cekilir;
 skor \code{up - down} (\code{ss_rank} icin \code{s_up + s_down}) olur.
 Yalnizca down kolu (\code{n_genes = 0}, \code{n_genes_down >= 1}) icin skor \code{-down}
 (\code{ss_rank} icin azalan sira \code{s_down}) uretilir.
+Surekli agirlikli (\code{weights}) imzalar icin her rastgele cekilis ayni pozitif ve
+negatif katsayi buyukluk dagilimiyla (\code{w_up}, \code{w_dn}) agirliklandirilir.
 }

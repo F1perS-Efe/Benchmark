@@ -15,6 +15,9 @@ params:
   sensitivity_tbl: NULL
   params_list: NULL
   surv_res: NULL
+  beyond_inf: NULL
+  report_model: NULL
+  manifest: NULL
 ---
 
 ```{r setup, include=FALSE}
@@ -31,13 +34,32 @@ results <- params$results
 summary_tbl <- params$summary_tbl
 sensitivity_tbl <- params$sensitivity_tbl
 surv_res <- params$surv_res
+beyond_inf <- params$beyond_inf
 pl <- params$params_list
 if (is.null(pl)) pl <- list()
 
-hm <- if (!is.null(pl$heatmap_method)) as.character(pl$heatmap_method)[1] else "mean"
+model <- params$report_model
+if (is.null(model) && is.data.frame(results)) {
+  model <- SigBenchR::build_report_model(
+    results = results,
+    summary_tbl = if (is.data.frame(summary_tbl) && nrow(summary_tbl) > 0L) summary_tbl else NULL,
+    sensitivity_tbl = sensitivity_tbl,
+    params_list = pl,
+    ref_axes = if (!is.null(pl$bio_context) && is.data.frame(pl$bio_context)) pl$bio_context else NULL,
+    surv_res = surv_res,
+    beyond_inf = beyond_inf
+  )
+}
+
+hm <- if (!is.null(model$tier1$active_method)) {
+  model$tier1$active_method
+} else if (!is.null(pl$heatmap_method)) {
+  as.character(pl$heatmap_method)[1]
+} else {
+  "mean"
+}
 fsig <- if (!is.null(pl$forest_signature)) as.character(pl$forest_signature)[1] else NA_character_
 cov_thr <- if (!is.null(pl$coverage_threshold)) as.numeric(pl$coverage_threshold)[1] else 0.70
-sd_pol <- if (!is.null(pl$sd_handling)) as.character(pl$sd_handling)[1] else "exclude"
 compute_null <- isTRUE(pl$compute_null)
 if (!compute_null && is.data.frame(results) && "null_p" %in% names(results)) {
   compute_null <- any(is.finite(results$null_p), na.rm = TRUE)
@@ -52,14 +74,8 @@ if (!compute_null && is.data.frame(results) && "null_p" %in% names(results)) {
 }
 
 .fmt_pct <- function(x) {
-  # coverage_pct is stored on the 0-100 scale
   x <- as.numeric(x)
   ifelse(is.finite(x), sprintf("%.1f%%", x), .em)
-}
-
-.fmt_i2 <- function(x) {
-  x <- as.numeric(x)
-  ifelse(is.finite(x), sprintf("%.1f", x), .em)
 }
 
 .fmt_p <- function(x) {
@@ -85,40 +101,37 @@ if (!compute_null && is.data.frame(results) && "null_p" %in% names(results)) {
   n <- length(est)
   out <- rep(.em, n)
   full <- is.finite(est) & is.finite(lo) & is.finite(hi)
-  out[full] <- sprintf(
-    "%.3f (%.3f%s%.3f)",
-    est[full], lo[full], .en, hi[full]
-  )
+  out[full] <- sprintf("%.3f (%.3f%s%.3f)", est[full], lo[full], .en, hi[full])
   point_only <- is.finite(est) & !full
   out[point_only] <- sprintf("%.3f", est[point_only])
   out
 }
 
-.translate_note <- function(x) {
-  x <- as.character(x)
-  miss <- is.na(x) | !nzchar(x)
-  x[miss] <- .em
-  x <- gsub(
-    "([0-9]+) bagimsiz-olmayan/NA satir ozetten cikarildi",
-    "\\1 non-independent/NA cohorts excluded",
-    x
-  )
-  x <- gsub(
-    "([0-9]+) dusuk kapsama satir ozetten cikarildi",
-    "\\1 low-coverage cohorts excluded",
-    x
-  )
-  x <- gsub(
-    "([0-9]+) kucuk kohort uyarisi",
-    "\\1 small-cohort warning(s)",
-    x
-  )
-  x <- gsub(
-    "([0-9]+) var_zero/NA varyans satir IVW'den cikarildi",
-    "\\1 zero/NA-variance rows excluded from IVW",
-    x
-  )
-  x
+.translate_status <- function(st) {
+  vapply(as.character(st), function(s) {
+    if (is.na(s) || !nzchar(s)) return(.em)
+    switch(
+      s,
+      ok = "Valid adjusted model (EPV >= 5, VIF < 5)",
+      exploratory_low_epv_or_collinear = "Exploratory: low EPV (< 5) or elevated collinearity (5 <= VIF < 10)",
+      failed_collinearity = "Aborted: severe multicollinearity with infiltration axis (VIF >= 10)",
+      failed_separation_or_convergence = "Unreliable: quasi-complete separation or GLM non-convergence",
+      s
+    )
+  }, character(1), USE.NAMES = FALSE)
+}
+
+.translate_bg <- function(bg) {
+  vapply(as.character(bg), function(b) {
+    if (is.na(b) || !nzchar(b)) return(if (isTRUE(compute_null)) .em else "Not run")
+    switch(
+      b,
+      subsampled_panel_cohort = "Subsampled panel cohort (~2,800 genes)",
+      full_transcriptome = "Full transcriptome (>= 5,000 genes)",
+      partial_ortholog_subset = "Partial ortholog-mapped subset (restricted background)",
+      b
+    )
+  }, character(1), USE.NAMES = FALSE)
 }
 
 .kable_wrap <- function(df, align = NULL, note_wrap = FALSE, ...) {
@@ -143,293 +156,128 @@ if (!compute_null && is.data.frame(results) && "null_p" %in% names(results)) {
   invisible(NULL)
 }
 
-.format_meta_overall <- function(sm) {
-  k_col <- if ("n_cohorts" %in% names(sm)) sm$n_cohorts else sm$n_datasets
-  data.frame(
-    Signature = as.character(sm$signature),
-    Method = as.character(sm$method),
-    k = as.integer(k_col),
-    `N-Weighted AUC` = .fmt3(sm$auc_n_weighted),
-    `IVW AUC` = .fmt3(sm$auc_ivw),
-    `REML AUC (95% CI)` = .fmt_auc_ci(sm$auc_re, sm$auc_re_ci_low, sm$auc_re_ci_high),
-    `I2 (%)` = .fmt_i2(sm$I2),
-    Note = if ("note" %in% names(sm)) .translate_note(sm$note) else rep(.em, nrow(sm)),
-    check.names = FALSE,
-    stringsAsFactors = FALSE
-  )
-}
-
-.format_meta_strata <- function(sm, stratum_col) {
-  k_col <- if ("n_cohorts" %in% names(sm)) sm$n_cohorts else sm$n_datasets
-  data.frame(
-    Signature = as.character(sm$signature),
-    Method = as.character(sm$method),
-    Stratum = as.character(sm[[stratum_col]]),
-    k = as.integer(k_col),
-    `N-Weighted AUC` = .fmt3(sm$auc_n_weighted),
-    `REML AUC (95% CI)` = .fmt_auc_ci(sm$auc_re, sm$auc_re_ci_low, sm$auc_re_ci_high),
-    `I2 (%)` = .fmt_i2(sm$I2),
-    check.names = FALSE,
-    stringsAsFactors = FALSE
-  )
+.badge_class <- function(tier_label) {
+  tl <- tolower(as.character(tier_label)[1])
+  if (grepl("high", tl)) return("sb-badge sb-badge-high")
+  if (grepl("medium", tl)) return("sb-badge sb-badge-med")
+  "sb-badge sb-badge-low"
 }
 ```
 
-# 1. Executive Summary & Run Parameters
+# Tier 1: Executive Summary
 
 ```{r clinical-decision-disclaimer, results='asis'}
-# Emit as a single-line HTML notice so pandoc wrap cannot split
-# "clinical decision" across lines (breaks grepl in tests).
 cat(paste0(
   "<div class='sb-notice'><strong>Research use only.</strong> ",
   "This report is not a clinical decision support tool. ",
   "AUC measures discrimination between response classes, not calibrated ",
-  "clinical prediction. Thresholds must not be changed after inspecting ",
-  "results.</div>\n"
+  "clinical prediction. Weighted RNA-seq signature scores (e.g., <code>T_Cell_Inflamed_GEP</code> ",
+  "continuous regression coefficients) are evaluated on cohort transcriptomic scales and do not ",
+  "claim analytical equivalence to proprietary clinical assay platforms (e.g., NanoString nCounter). ",
+  "Thresholds must not be changed after inspecting results.</div>\n"
 ))
 ```
 
-```{r exploratory-notice, results='asis'}
-n_cohorts_report <- if (is.data.frame(results) && nrow(results) > 0 && "dataset" %in% names(results)) {
-  length(unique(as.character(results$dataset[!(results$skipped %in% TRUE)])))
+```{r tier1-kpi-cards, results='asis'}
+best <- if (!is.null(model)) model$tier1$best_signature else NULL
+if (!is.null(best) && nrow(best) > 0L) {
+  auc_txt <- .fmt_auc_ci(best$auc_re[1], best$auc_re_ci_low[1], best$auc_re_ci_high[1])
+  i2_txt <- if (is.finite(best$i2_logit[1])) sprintf("%.1f%%", best$i2_logit[1]) else .em
+  badge_cls <- .badge_class(best$priority_tier[1])
+  cat("<div class='sb-tier1-grid'>\n")
+  cat(sprintf("<div class='sb-card'><p class='sb-card-label'>Best Independent Signature</p><p class='sb-card-value'>%s (%s, k=%d)</p></div>\n",
+              best$signature[1], best$method[1], best$k[1]))
+  cat(sprintf("<div class='sb-card'><p class='sb-card-label'>Pooled REML AUC (95%% CI)</p><p class='sb-card-value'>%s</p></div>\n", auc_txt))
+  cat(sprintf("<div class='sb-card'><p class='sb-card-label'>Logit-Scale Heterogeneity (I2 logit)</p><p class='sb-card-value'>%s</p></div>\n", i2_txt))
+  cat(sprintf("<div class='sb-card'><p class='sb-card-label'>Evidence Tier</p><p class='sb-card-value'><span class='%s'>%s</span></p></div>\n",
+              badge_cls, best$priority_tier[1]))
+  cat("</div>\n")
 } else {
-  0L
-}
-small_n_flag <- FALSE
-if (is.data.frame(results) && nrow(results) > 0) {
-  if ("power_auc70" %in% names(results)) {
-    small_n_flag <- any(is.finite(results$power_auc70) & results$power_auc70 < 0.80, na.rm = TRUE)
-  }
-  if ("small_cohort" %in% names(results)) {
-    small_n_flag <- small_n_flag || any(results$small_cohort %in% TRUE, na.rm = TRUE)
-  }
-  if ("n" %in% names(results)) {
-    small_n_flag <- small_n_flag || any(is.finite(results$n) & results$n < 40, na.rm = TRUE)
-  }
-}
-if (n_cohorts_report <= 4L || isTRUE(small_n_flag)) {
-  cat(paste0(
-    "<div class='sb-notice'><strong>Exploratory Notice.</strong> ",
-    "This benchmark is exploratory (k &le; 4 and/or small-n cohorts). ",
-    "REML + HKSJ and cross-cohort summaries are hypothesis-generating and require ",
-    "independent validation. Per-row power for AUC = 0.70 is reported as ",
-    "<code>power_auc70</code>.</div>\n"
-  ))
+  cat("<div class='sb-notice'><strong>No evaluable independent signature.</strong> Check gene coverage or enable non-independent inclusion in summary settings.</div>\n")
 }
 ```
 
-```{r params-table, results='asis'}
-pick <- function(x, default = NA) {
-  if (is.null(x) || length(x) == 0L) default else x
-}
-null_status <- if (isTRUE(compute_null)) {
-  n_perm_val <- pick(pl$n_perm, NA)
-  paste0("Run (n_perm = ", as.character(n_perm_val), ")")
-} else {
-  "Not run"
-}
-param_df <- data.frame(
-  Parameter = c(
-    "Methods",
-    "Direction",
-    "SD handling",
-    "Coverage threshold",
-    "Sensitivity threshold",
-    "n_boot",
-    "Null permutation",
-    "Seed",
-    "Match expression",
-    "Heatmap method",
-    "Forest signature"
-  ),
-  Value = c(
-    paste(pick(pl$methods, character(0)), collapse = ", "),
-    as.character(pick(pl$direction, "<")),
-    as.character(pick(pl$sd_handling, "exclude")),
-    as.character(pick(pl$coverage_threshold, NA)),
-    as.character(pick(pl$sensitivity_threshold, NA)),
-    as.character(pick(pl$n_boot, NA)),
-    null_status,
-    as.character(pick(pl$seed, NA)),
-    as.character(pick(pl$match_expression, FALSE)),
-    hm,
-    as.character(fsig)
-  ),
-  stringsAsFactors = FALSE
-)
-.kable_wrap(param_df, align = c("l", "l"))
-```
-
-# 2. Cohort Overview
-
-```{r cohort-overview, results='asis'}
-if (is.data.frame(results) && nrow(results) > 0) {
-  use <- results[!(results$skipped %in% TRUE), , drop = FALSE]
-  if (nrow(use) == 0L) use <- results
-  keys <- intersect(
-    c("dataset", "normalization", "treatment", "endpoint_type",
-      "n", "n_pos", "n_neg", "n_excluded_sd"),
-    names(use)
-  )
-  agg <- unique(use[, keys, drop = FALSE])
-  if ("n_excluded_sd" %in% names(agg)) {
-    names(agg)[names(agg) == "n_excluded_sd"] <- "n_sd"
-  } else {
-    agg$n_sd <- NA_integer_
+```{r tier1-alerts, results='asis'}
+alerts <- if (!is.null(model)) model$tier1$alerts else NULL
+if (is.data.frame(alerts) && nrow(alerts) > 0L) {
+  cat("### Key Alerts (Rule-Based & Statistical Diagnostics)\n\n")
+  for (i in seq_len(nrow(alerts))) {
+    cls <- if (identical(alerts$severity[i], "info")) "sb-alert sb-alert-info" else "sb-alert"
+    cat(sprintf(
+      "<div class='%s'><strong>[%s] %s:</strong> %s</div>\n",
+      cls, alerts$rule_id[i], alerts$title[i], alerts$message[i]
+    ))
   }
-  label_map <- c(
-    dataset = "Cohort",
-    n = "n_total",
-    n_pos = "n_pos",
-    n_neg = "n_neg",
-    n_sd = "n_sd",
-    treatment = "Treatment",
-    endpoint_type = "Endpoint type",
-    normalization = "Normalization"
-  )
-  show <- intersect(names(label_map), names(agg))
-  out <- agg[, show, drop = FALSE]
-  names(out) <- unname(label_map[show])
-  for (nm in names(out)) {
-    if (is.numeric(out[[nm]])) {
-      out[[nm]] <- ifelse(is.finite(out[[nm]]), as.character(as.integer(out[[nm]])), .em)
-    } else {
-      out[[nm]] <- ifelse(is.na(out[[nm]]) | !nzchar(as.character(out[[nm]])), .em, as.character(out[[nm]]))
-    }
-  }
-  align <- ifelse(names(out) %in% c("n_total", "n_pos", "n_neg", "n_sd"), "r", "l")
-  .kable_wrap(out, align = align)
-} else {
-  cat("No cohort rows available.\n")
 }
 ```
 
-# 3. Signature Performance
-
-Signature x cohort discrimination metrics. When null permutation was not run,
-`Null p` is shown as `Not run`.
-
-```{r performance-table, results='asis'}
-if (is.data.frame(results) && nrow(results) > 0) {
-  perf <- results
-  auc_ci <- if (all(c("auc", "auc_ci_low", "auc_ci_high") %in% names(perf))) {
-    .fmt_auc_ci(perf$auc, perf$auc_ci_low, perf$auc_ci_high)
-  } else if ("auc" %in% names(perf)) {
-    .fmt3(perf$auc)
-  } else {
-    rep(.em, nrow(perf))
-  }
-  status <- if ("coverage_status" %in% names(perf)) {
-    ifelse(is.na(perf$coverage_status) | !nzchar(as.character(perf$coverage_status)),
-           .em, as.character(perf$coverage_status))
-  } else if ("low_coverage" %in% names(perf)) {
-    ifelse(perf$low_coverage %in% TRUE, "low_power", "ok")
-  } else {
-    rep(.em, nrow(perf))
-  }
-  cov_pct <- if ("coverage_pct" %in% names(perf)) {
-    .fmt_pct(perf$coverage_pct)
-  } else {
-    rep(.em, nrow(perf))
-  }
-  null_p_show <- if ("null_p" %in% names(perf)) {
-    .fmt_null(perf$null_p)
-  } else {
-    rep(if (isTRUE(compute_null)) .em else "Not run", nrow(perf))
-  }
-  power_show <- if ("power_auc70" %in% names(perf)) {
-    .fmt3(perf$power_auc70)
-  } else {
-    rep(.em, nrow(perf))
-  }
-  pr_show <- if ("pr_auc" %in% names(perf)) {
-    .fmt3(perf$pr_auc)
-  } else {
-    rep(.em, nrow(perf))
-  }
-  out <- data.frame(
-    Signature = as.character(perf$signature),
-    Cohort = as.character(perf$dataset),
-    Method = as.character(perf$method),
-    `AUC (95% CI)` = auc_ci,
-    `PR-AUC` = pr_show,
-    Coverage = cov_pct,
-    Status = status,
-    `Power (0.70)` = power_show,
-    `Null p` = null_p_show,
+```{r tier1-decision-cards, results='asis'}
+cards <- if (!is.null(model)) model$tier1$signature_cards else NULL
+if (is.data.frame(cards) && nrow(cards) > 0L) {
+  cat("### Signature Decision Summary\n\n")
+  card_df <- data.frame(
+    Signature = cards$signature,
+    Method = cards$method,
+    k = cards$k,
+    `REML AUC (95% CI)` = .fmt_auc_ci(cards$auc_re, cards$auc_re_ci_low, cards$auc_re_ci_high),
+    `I2 logit (%)` = ifelse(is.finite(cards$i2_logit), sprintf("%.1f", cards$i2_logit), .em),
+    Priority = cards$priority_tier,
+    Rule = cards$rule_id,
+    Interpretation = cards$interpretation,
     check.names = FALSE,
     stringsAsFactors = FALSE
   )
-  .kable_wrap(out, align = c("l", "l", "l", "r", "r", "r", "l", "r", "r"))
-} else {
-  cat("No performance rows available.\n")
+  .kable_wrap(card_df, align = c("l", "l", "r", "r", "r", "l", "l", "l"), note_wrap = TRUE)
 }
 ```
 
-# 4. Meta-Analysis & Clinical Stratification
+# Tier 2: Comparative Evidence & Biological Context {.sb-tier-break}
 
-Overall REML + truncated HKSJ summary (unstratified), followed by treatment and
-endpoint-type strata. Forest and heatmap use the selected scoring method;
-normalization labels are retained in cohort axes where available.
+## Meta-Analysis Summary (Overall & Clinical Strata)
 
 ```{r meta-overall, results='asis'}
-if (is.data.frame(summary_tbl) && nrow(summary_tbl) > 0) {
-  out <- .format_meta_overall(summary_tbl)
+sm_fmt <- if (!is.null(model)) model$tier2$summary_formatted else NULL
+if (is.data.frame(sm_fmt) && nrow(sm_fmt) > 0L) {
   .kable_wrap(
-    out,
-    align = c("l", "l", "r", "r", "r", "r", "r", "l"),
+    sm_fmt,
+    align = c("l", "l", "r", "r", "r", "r", "r", "r", "l"),
     note_wrap = TRUE
   )
+  cat("<div class='sb-takeaway'><strong>What this shows:</strong> Pooled REML AUC and 95% HKSJ intervals are paired with logit-scale heterogeneity (<code>I2 logit</code>, <code>tau2</code>). When <code>k &le; 4</code> or clinical endpoints differ, interpret pooled estimates as exploratory and inspect the stratified tables below.</div>\n")
 } else {
   cat("Summary table is empty.\n")
 }
 ```
 
-### Treatment strata
+### Treatment Strata
 
 ```{r summary-by-treatment, results='asis'}
-if (is.data.frame(results) && nrow(results) > 0 && "treatment" %in% names(results)) {
-  sg_tx <- tryCatch(
-    suppressWarnings(
-      SigBenchR::summarize_auc(results, method = hm, stratify_by = "treatment")
-    ),
-    error = function(e) NULL
-  )
-  if (is.data.frame(sg_tx) && nrow(sg_tx) > 0) {
-    out <- .format_meta_strata(sg_tx, "treatment")
-    .kable_wrap(out, align = c("l", "l", "l", "r", "r", "r", "r"))
-  } else {
-    cat("Treatment-stratified summary unavailable.\n")
-  }
+sg_tx <- if (!is.null(model)) model$tier2$treatment_strata else NULL
+if (is.data.frame(sg_tx) && nrow(sg_tx) > 0L) {
+  out <- SigBenchR::format_meta_summary(sg_tx, stratum_col = "treatment")
+  .kable_wrap(out, align = c("l", "l", "l", "r", "r", "r", "r", "r"))
 } else {
-  cat("No treatment column in results.\n")
+  cat("Treatment-stratified summary unavailable.\n")
 }
 ```
 
-### Endpoint type strata
+### Endpoint Type Strata
 
 ```{r summary-by-endpoint, results='asis'}
-if (is.data.frame(results) && nrow(results) > 0 && "endpoint_type" %in% names(results)) {
-  sg_ep <- tryCatch(
-    suppressWarnings(
-      SigBenchR::summarize_auc(results, method = hm, stratify_by = "endpoint_type")
-    ),
-    error = function(e) NULL
-  )
-  if (is.data.frame(sg_ep) && nrow(sg_ep) > 0) {
-    out <- .format_meta_strata(sg_ep, "endpoint_type")
-    .kable_wrap(out, align = c("l", "l", "l", "r", "r", "r", "r"))
-  } else {
-    cat("Endpoint-type stratified summary unavailable.\n")
-  }
+sg_ep <- if (!is.null(model)) model$tier2$endpoint_strata else NULL
+if (is.data.frame(sg_ep) && nrow(sg_ep) > 0L) {
+  out <- SigBenchR::format_meta_summary(sg_ep, stratum_col = "endpoint_type")
+  .kable_wrap(out, align = c("l", "l", "l", "r", "r", "r", "r", "r"))
 } else {
-  cat("No endpoint_type column in results.\n")
+  cat("Endpoint-type stratified summary unavailable.\n")
 }
 ```
+
+## Discrimination Plots
 
 ```{r heatmap, fig.cap="AUC heatmap (low coverage shaded)"}
 ok_hm <- is.data.frame(results) &&
-  nrow(results) > 0 &&
+  nrow(results) > 0L &&
   any(results$method == hm & !(results$skipped %in% TRUE))
 if (ok_hm) {
   print(SigBenchR::plot_auc_heatmap(results, method = hm, coverage_threshold = cov_thr))
@@ -440,17 +288,21 @@ if (ok_hm) {
 
 ```{r forest, fig.cap="AUC forest plot (DeLong 95% CI)"}
 ok_fr <- is.data.frame(results) &&
-  nrow(results) > 0 &&
+  nrow(results) > 0L &&
   !is.na(fsig) &&
   nzchar(fsig) &&
   any(results$signature == fsig & results$method == hm & !(results$skipped %in% TRUE))
 if (ok_fr) {
-  forest_summary <- tryCatch(
-    suppressWarnings(
-      SigBenchR::summarize_auc(results, method = hm, stratify_by = NULL)
-    ),
-    error = function(e) summary_tbl
-  )
+  forest_summary <- if (!is.null(model) && is.data.frame(model$tier2$summary_tbl)) {
+    model$tier2$summary_tbl
+  } else {
+    tryCatch(
+      suppressWarnings(
+        SigBenchR::summarize_auc(results, method = hm, stratify_by = NULL)
+      ),
+      error = function(e) summary_tbl
+    )
+  }
   print(
     SigBenchR::plot_auc_forest(
       results,
@@ -464,58 +316,15 @@ if (ok_fr) {
 }
 ```
 
-```{r clinical-benefit, results='asis'}
-has_surv <- !is.null(surv_res) && is.data.frame(surv_res) && nrow(surv_res) > 0
-if (has_surv) {
-  cat("\n\n### Clinical benefit (survival)\n\n")
-  surv_show <- surv_res
-  for (nm in names(surv_show)) {
-    if (is.numeric(surv_show[[nm]])) {
-      if (nm %in% c("cox_p", "logrank_p")) {
-        surv_show[[nm]] <- .fmt_p(surv_show[[nm]])
-      } else if (nm %in% c("hr", "hr_ci_low", "hr_ci_high", "c_index",
-                           "median_surv_high", "median_surv_low")) {
-        surv_show[[nm]] <- .fmt3(surv_show[[nm]])
-      } else {
-        surv_show[[nm]] <- ifelse(
-          is.finite(as.numeric(surv_show[[nm]])),
-          as.character(surv_show[[nm]]),
-          .em
-        )
-      }
-    } else {
-      surv_show[[nm]] <- ifelse(
-        is.na(surv_show[[nm]]) | !nzchar(as.character(surv_show[[nm]])),
-        .em,
-        as.character(surv_show[[nm]])
-      )
-    }
-  }
-  .kable_wrap(surv_show)
-}
+```{r plots-takeaway, results='asis'}
+cat("<div class='sb-takeaway'><strong>What this shows:</strong> Grey heatmap cells indicate gene coverage below threshold and are excluded from independent pooling. Forest error bars reflect per-cohort DeLong 95% CIs; cohort labels retain sample size and expression normalization to highlight cross-platform differences.</div>\n")
 ```
 
-# 5. Biological Context
-
-Spearman correlations of user signatures with reference immune axes
-(`IFN_Gamma`, `Cytotoxicity`, `T_Cell_Infiltration`) after SD exclusion (`enc$kept`).
+## Biological Context (Reference Immune Axes)
 
 ```{r biological-context, results='asis'}
-bio_tbl <- NULL
-if (!is.null(pl$bio_context) && is.data.frame(pl$bio_context)) {
-  bio_tbl <- pl$bio_context
-} else if (!is.null(pl$datasets) && !is.null(pl$signatures)) {
-  bio_tbl <- tryCatch(
-    SigBenchR::correlate_reference_axes(
-      datasets = pl$datasets,
-      signatures = pl$signatures,
-      method = hm,
-      sd_handling = sd_pol
-    ),
-    error = function(e) NULL
-  )
-}
-if (is.data.frame(bio_tbl) && nrow(bio_tbl) > 0) {
+bio_tbl <- if (!is.null(model)) model$tier2$ref_axes else NULL
+if (is.data.frame(bio_tbl) && nrow(bio_tbl) > 0L) {
   bio_show <- bio_tbl
   for (nm in names(bio_show)) {
     if (is.numeric(bio_show[[nm]])) {
@@ -524,6 +333,8 @@ if (is.data.frame(bio_tbl) && nrow(bio_tbl) > 0) {
       } else {
         bio_show[[nm]] <- .fmt3(bio_show[[nm]])
       }
+    } else if (is.logical(bio_show[[nm]])) {
+      bio_show[[nm]] <- ifelse(is.na(bio_show[[nm]]), .em, ifelse(bio_show[[nm]], "YES", "no"))
     } else {
       bio_show[[nm]] <- ifelse(
         is.na(bio_show[[nm]]) | !nzchar(as.character(bio_show[[nm]])),
@@ -532,38 +343,246 @@ if (is.data.frame(bio_tbl) && nrow(bio_tbl) > 0) {
       )
     }
   }
-  .kable_wrap(bio_show)
+  .kable_wrap(bio_show, note_wrap = TRUE)
 } else {
   cat("Biological context table unavailable (provide bio_context or datasets/signatures).\n")
 }
 ```
 
-# 6. Methods & Known Limitations
+```{r beyond-infiltration-section, results='asis'}
+bi_obj <- if (!is.null(model) && !is.null(model$tier2$beyond_infiltration)) {
+  model$tier2$beyond_infiltration
+} else {
+  beyond_inf
+}
+has_bi <- is.list(bi_obj) &&
+  is.data.frame(bi_obj$per_cohort) &&
+  nrow(bi_obj$per_cohort) > 0L
 
-<ul class="sb-limits">
-<li>Scores are oriented with <code>orient_score()</code>; ROC-AUC uses DeLong 95% CIs on kept samples only (<code>enc$kept</code>).</li>
-<li>Null permutation (when enabled) uses vectorized Mann-Whitney AUC with p = (k + 1) / (B + 1) and BH adjustment within method.</li>
-<li>Cross-cohort synthesis uses n-weighted and inverse-variance summaries plus logit-AUC REML with truncated HKSJ intervals.</li>
-<li>Bundled demo matrices use a ~2,800-gene pool; arbitrary signatures may show honest low coverage.</li>
-<li>Meta-analysis with k &le; 4 cohorts is exploratory; endpoint definitions differ (clinical benefit vs RECIST).</li>
-<li>Cohort normalizations remain heterogeneous; raw expression is never pooled across platforms.</li>
-</ul>
+if (has_bi) {
+  cat("\n\n## Beyond Infiltration (Adjusted Logistic Regression & Paired CV Delta-AUC)\n\n")
+  cat(paste0(
+    "<div class='sb-takeaway'><strong>Methodology & Diagnostic Guide:</strong> ",
+    "Tests whether a signature adds independent predictive value beyond baseline T-cell infiltration ",
+    "(<code>glm: response ~ sig_score_z + inf_score_z</code> vs <code>response ~ inf_score_z</code>). ",
+    "Per-gene scaling (<code>zscore</code>/<code>rank</code>) and predictor standardization are learned strictly inside each training fold. ",
+    "<strong>Raw LRT p</strong> (<code>lrt_p</code>) and <strong>BH-adjusted LRT FDR</strong> (<code>lrt_p_adj_bh</code>) are reported in separate columns; ",
+    "independent value requires <code>lrt_p_adj_bh &lt; 0.05</code>, positive adjusted effect, and positive paired CV <code>delta_auc_combined</code>. ",
+    "Cross-cohort synthesis uses sample-size weighted <strong>directional Stouffer Z</strong> (<code>combined_lrt_p</code>) so opposite-sign cohort effects ",
+    "(<code>direction_conflict = YES</code>) cancel rather than inflating significance in the reference unsigned Fisher omnibus test (<code>fisher_omnibus_p</code>). ",
+    "Cohorts with <strong>EPV &lt; 5</strong> or <strong>5 &le; VIF &lt; 10</strong> are exploratory; <strong>VIF &ge; 10</strong> aborts estimation as severe multicollinearity.</div>\n\n"
+  ))
 
-```{r session, results='asis'}
-pkgs <- c("SigBenchR", "pROC", "PRROC", "ggplot2", "withr", "rmarkdown", "knitr", "survival")
-vers <- vapply(pkgs, function(p) {
-  if (requireNamespace(p, quietly = TRUE)) {
-    as.character(utils::packageVersion(p))
-  } else {
-    .em
+  sm_bi <- bi_obj$summary
+  if (is.data.frame(sm_bi) && nrow(sm_bi) > 0L) {
+    cat("### Cross-Cohort Directional Synthesis\n\n")
+    sm_df <- data.frame(
+      Signature = if ("signature" %in% names(sm_bi)) as.character(sm_bi$signature) else rep("Selected", nrow(sm_bi)),
+      `Reference Axis` = as.character(sm_bi$infiltration_axis),
+      Method = as.character(sm_bi$method),
+      `Cohorts (k)` = as.integer(sm_bi$n_cohorts),
+      `Independent (BH p < 0.05)` = as.integer(sm_bi$n_independent),
+      `Directional Stouffer Z` = if ("stouffer_z" %in% names(sm_bi)) .fmt3(sm_bi$stouffer_z) else rep(.em, nrow(sm_bi)),
+      `Directional Stouffer p` = .fmt_p(sm_bi$combined_lrt_p),
+      `Direction Conflict` = if ("direction_conflict" %in% names(sm_bi)) ifelse(sm_bi$direction_conflict %in% TRUE, "YES (Opposite signs)", "no") else rep(.em, nrow(sm_bi)),
+      `Fisher Omnibus p (Unsigned Ref)` = if ("fisher_omnibus_p" %in% names(sm_bi)) .fmt_p(sm_bi$fisher_omnibus_p) else rep(.em, nrow(sm_bi)),
+      `Mean CV Delta-AUC` = .fmt3(sm_bi$mean_delta_auc),
+      check.names = FALSE,
+      stringsAsFactors = FALSE
+    )
+    .kable_wrap(sm_df, note_wrap = TRUE)
   }
-}, character(1))
-.kable_wrap(
-  data.frame(Package = pkgs, Version = unname(vers), stringsAsFactors = FALSE),
-  align = c("l", "l")
+
+  pc_bi <- bi_obj$per_cohort
+  cat("\n\n### Per-Cohort Adjusted Models & Collinearity / EPV Diagnostics\n\n")
+  delta_ci <- .fmt_auc_ci(pc_bi$delta_auc_combined, pc_bi$delta_auc_ci_low, pc_bi$delta_auc_ci_high)
+  pc_df <- data.frame(
+    Signature = if ("signature" %in% names(pc_bi)) as.character(pc_bi$signature) else rep("Selected", nrow(pc_bi)),
+    Cohort = as.character(pc_bi$cohort),
+    n = as.integer(pc_bi$n),
+    EPV = if ("epv" %in% names(pc_bi)) sprintf("%.1f", pc_bi$epv) else rep(.em, nrow(pc_bi)),
+    `Low EPV (<5)` = if ("low_epv" %in% names(pc_bi)) ifelse(pc_bi$low_epv %in% TRUE, "YES", "no") else rep(.em, nrow(pc_bi)),
+    VIF = if ("vif" %in% names(pc_bi)) .fmt3(pc_bi$vif) else rep(.em, nrow(pc_bi)),
+    `High VIF (>=5)` = if ("high_collinearity" %in% names(pc_bi)) ifelse(pc_bi$high_collinearity %in% TRUE, "YES", "no") else rep(.em, nrow(pc_bi)),
+    `CV Delta-AUC (95% CI)` = delta_ci,
+    `SD Delta-AUC` = if ("sd_delta_auc" %in% names(pc_bi)) .fmt3(pc_bi$sd_delta_auc) else rep(.em, nrow(pc_bi)),
+    `Adjusted Beta` = .fmt3(pc_bi$beta_adjusted),
+    `Raw LRT p` = .fmt_p(pc_bi$lrt_p),
+    `BH-Adjusted LRT FDR` = if ("lrt_p_adj_bh" %in% names(pc_bi)) .fmt_p(pc_bi$lrt_p_adj_bh) else rep(.em, nrow(pc_bi)),
+    `Independent Value` = ifelse(pc_bi$adds_independent_value %in% TRUE, "YES", "no"),
+    `Diagnostic Status` = if ("analysis_status" %in% names(pc_bi)) .translate_status(pc_bi$analysis_status) else rep(.em, nrow(pc_bi)),
+    check.names = FALSE,
+    stringsAsFactors = FALSE
+  )
+  .kable_wrap(pc_df, note_wrap = TRUE)
+}
+```
+
+```{r clinical-benefit, results='asis'}
+surv_tbl <- if (!is.null(model) && !is.null(model$tier2$survival)) model$tier2$survival else surv_res
+has_surv <- !is.null(surv_tbl) && is.data.frame(surv_tbl) && nrow(surv_tbl) > 0L
+if (has_surv) {
+  cat("\n\n## Clinical Benefit (Survival Benchmark)\n\n")
+  cat(paste0(
+    "<div class='sb-takeaway'><strong>Hypothesis Families & PH Diagnostic Note:</strong> ",
+    "Continuous Cox proportional hazards regression (<code>Raw Cox p</code> vs <code>Cox BH-Adjusted FDR</code>) and ",
+    "median-dichotomized Kaplan-Meier log-rank tests (<code>Raw Log-Rank p</code> vs <code>Log-Rank BH-Adjusted FDR</code>) ",
+    "test distinct statistical hypotheses and are BH-adjusted as separate families. ",
+    "The Schoenfeld residual proportional hazards test (<code>PH Diagnostic p (Unadjusted)</code>, <code>ph_p</code>) ",
+    "is a model assumption check rather than an efficacy p-value; it is intentionally left unadjusted so PH violations (<code>ph_p &lt; 0.05</code>) are never masked by FDR correction.</div>\n\n"
+  ))
+  hr_ci <- .fmt_auc_ci(surv_tbl$hr, surv_tbl$hr_ci_low, surv_tbl$hr_ci_high)
+  surv_df <- data.frame(
+    Cohort = as.character(surv_tbl$cohort),
+    Signature = if ("signature" %in% names(surv_tbl)) as.character(surv_tbl$signature) else rep(.em, nrow(surv_tbl)),
+    Method = if ("method" %in% names(surv_tbl)) as.character(surv_tbl$method) else rep(hm, nrow(surv_tbl)),
+    Endpoint = as.character(surv_tbl$endpoint),
+    `n (Events)` = sprintf("%d (%d)", as.integer(surv_tbl$n_samples), as.integer(surv_tbl$n_events)),
+    `HR (95% CI)` = hr_ci,
+    `C-Index` = .fmt3(surv_tbl$c_index),
+    `Raw Cox p` = .fmt_p(surv_tbl$cox_p),
+    `Cox BH-Adjusted FDR` = if ("p_adj_bh" %in% names(surv_tbl)) .fmt_p(surv_tbl$p_adj_bh) else rep(.em, nrow(surv_tbl)),
+    `Raw Log-Rank p` = .fmt_p(surv_tbl$logrank_p),
+    `Log-Rank BH-Adjusted FDR` = if ("logrank_p_adj_bh" %in% names(surv_tbl)) .fmt_p(surv_tbl$logrank_p_adj_bh) else rep(.em, nrow(surv_tbl)),
+    `PH Diagnostic p (Unadjusted)` = .fmt_p(surv_tbl$ph_p),
+    `PH Violated` = ifelse(surv_tbl$ph_violated %in% TRUE, "YES (PH violated)", "no"),
+    Note = ifelse(is.na(surv_tbl$surv_note) | !nzchar(as.character(surv_tbl$surv_note)), .em, as.character(surv_tbl$surv_note)),
+    check.names = FALSE,
+    stringsAsFactors = FALSE
+  )
+  .kable_wrap(surv_df, note_wrap = TRUE)
+}
+```
+
+# Tier 3: Technical Appendix {.sb-tier-break}
+
+<details class="sb-appendix" open>
+<summary>Cohort-Level Performance, PR-AUC Stability, Null Permutation FDR & Coverage Diagnostics</summary>
+
+```{r performance-table, results='asis'}
+perf <- if (!is.null(model) && is.data.frame(model$tier3$cohort_metrics)) model$tier3$cohort_metrics else results
+if (is.data.frame(perf) && nrow(perf) > 0L) {
+  cat(paste0(
+    "<div class='sb-takeaway'><strong>Column Glossary:</strong> ",
+    "<ul>",
+    "<li><strong>ROC-AUC (95% CI):</strong> DeLong point estimate and 95% confidence interval.</li>",
+    "<li><strong>PR-AUC (95% CI) & Stability Diagnostics:</strong> Precision-Recall AUC with stratified bootstrap 95% CI, prevalence baseline (<code>n_pos / n</code>), <code>Tie Fraction</code>, <code>Small Positive Class</code> (<code>n_pos &lt; 5</code> or <code>n_neg &lt; 5</code>), valid bootstrap replicates (<code>n_boot_valid</code>), and <code>PR CI Unreliable</code> flag.</li>",
+    "<li><strong>Null Permutation Hypothesis Families:</strong> <code>Raw Null p</code> (empirical random-gene p-value), <code>Within-Method BH FDR</code> (<code>null_p_adj_bh</code>, adjusted within each scoring method), and <code>Global BH FDR</code> (<code>null_p_adj_bh_global</code>, adjusted across all evaluated methods &times; signatures &times; cohorts), plus the sampling universe (<code>Null Background Universe</code> and <code>Universe Genes</code>).</li>",
+    "</ul></div>\n\n"
+  ))
+  auc_ci <- if (all(c("auc", "auc_ci_low", "auc_ci_high") %in% names(perf))) {
+    .fmt_auc_ci(perf$auc, perf$auc_ci_low, perf$auc_ci_high)
+  } else {
+    .fmt3(perf$auc)
+  }
+  pr_ci <- if (all(c("pr_auc", "pr_ci_low", "pr_ci_high") %in% names(perf))) {
+    .fmt_auc_ci(perf$pr_auc, perf$pr_ci_low, perf$pr_ci_high)
+  } else if ("pr_auc" %in% names(perf)) {
+    .fmt3(perf$pr_auc)
+  } else {
+    rep(.em, nrow(perf))
+  }
+  status <- if ("coverage_status" %in% names(perf)) as.character(perf$coverage_status) else rep(.em, nrow(perf))
+  out <- data.frame(
+    Signature = as.character(perf$signature),
+    Cohort = as.character(perf$dataset),
+    Method = as.character(perf$method),
+    `n (Pos/Neg)` = ifelse(
+      is.finite(perf$n) & is.finite(perf$n_pos) & is.finite(perf$n_neg),
+      sprintf("%d (%d/%d)", as.integer(perf$n), as.integer(perf$n_pos), as.integer(perf$n_neg)),
+      .em
+    ),
+    `ROC-AUC (95% CI)` = auc_ci,
+    `PR-AUC (95% CI)` = pr_ci,
+    `PR Baseline` = if ("pr_baseline" %in% names(perf)) .fmt3(perf$pr_baseline) else rep(.em, nrow(perf)),
+    `Tie Fraction` = if ("tie_fraction" %in% names(perf)) .fmt3(perf$tie_fraction) else rep(.em, nrow(perf)),
+    `Small Pos Class (<5)` = if ("small_positive_class" %in% names(perf)) ifelse(is.na(perf$small_positive_class), .em, ifelse(perf$small_positive_class %in% TRUE, "YES", "no")) else rep(.em, nrow(perf)),
+    `Valid Bootstraps` = if ("n_boot_valid" %in% names(perf)) ifelse(is.finite(perf$n_boot_valid), as.character(as.integer(perf$n_boot_valid)), .em) else rep(.em, nrow(perf)),
+    `PR CI Unreliable` = if ("ci_unreliable" %in% names(perf)) ifelse(is.na(perf$ci_unreliable), .em, ifelse(perf$ci_unreliable %in% TRUE, "YES (Unstable)", "no")) else rep(.em, nrow(perf)),
+    Coverage = if ("coverage_pct" %in% names(perf)) .fmt_pct(perf$coverage_pct) else rep(.em, nrow(perf)),
+    Status = status,
+    `Power (0.70)` = if ("power_auc70" %in% names(perf)) .fmt3(perf$power_auc70) else rep(.em, nrow(perf)),
+    `Raw Null p` = if ("null_p" %in% names(perf)) .fmt_null(perf$null_p) else rep(if (isTRUE(compute_null)) .em else "Not run", nrow(perf)),
+    `Within-Method BH FDR` = if ("null_p_adj_bh" %in% names(perf)) .fmt_null(perf$null_p_adj_bh) else rep(if (isTRUE(compute_null)) .em else "Not run", nrow(perf)),
+    `Global BH FDR` = if ("null_p_adj_bh_global" %in% names(perf)) .fmt_null(perf$null_p_adj_bh_global) else rep(if (isTRUE(compute_null)) .em else "Not run", nrow(perf)),
+    `Null Background Universe` = if ("background_type" %in% names(perf)) .translate_bg(perf$background_type) else rep(if (isTRUE(compute_null)) .em else "Not run", nrow(perf)),
+    `Universe Genes` = if ("universe_size" %in% names(perf)) ifelse(is.finite(perf$universe_size), as.character(as.integer(perf$universe_size)), .em) else rep(.em, nrow(perf)),
+    check.names = FALSE,
+    stringsAsFactors = FALSE
+  )
+  .kable_wrap(out, note_wrap = TRUE)
+}
+```
+
+```{r coverage-diag, results='asis'}
+cov_d <- if (!is.null(model)) model$tier3$coverage_diagnostics else NULL
+if (is.data.frame(cov_d) && nrow(cov_d) > 0L) {
+  cat("\n\n### Gene Coverage Diagnostics\n\n")
+  cov_d$coverage_pct <- .fmt_pct(cov_d$coverage_pct)
+  .kable_wrap(cov_d, note_wrap = TRUE)
+}
+```
+
+</details>
+
+<details class="sb-appendix">
+<summary>Run Parameters, Rules Provenance & Session Info</summary>
+
+```{r params-table, results='asis'}
+pick <- function(x, default = NA) if (is.null(x) || length(x) == 0L) default else x
+null_status <- if (isTRUE(compute_null)) {
+  paste0("Run (n_perm = ", as.character(pick(pl$n_perm, NA)), ")")
+} else {
+  "Not run"
+}
+rmeta <- if (!is.null(model)) model$tier3$rules_meta else list(version = NA, md5 = NA)
+man <- params$manifest
+if (is.null(man) && is.data.frame(results)) {
+  man <- SigBenchR::build_reproducibility_manifest(
+    results = results,
+    summary_tbl = if (is.data.frame(summary_tbl) && nrow(summary_tbl) > 0L) summary_tbl else NULL,
+    report_model = model,
+    params_list = pl
+  )
+}
+param_df <- data.frame(
+  Parameter = c(
+    "Methods", "Direction", "SD handling", "Coverage threshold",
+    "Sensitivity threshold", "n_boot", "Null permutation", "Seed",
+    "Match expression", "Heatmap method", "Forest signature",
+    "Rules version", "Rules MD5",
+    "Reproducibility hash", "Timestamp (UTC)"
+  ),
+  Value = c(
+    paste(pick(pl$methods, character(0)), collapse = ", "),
+    as.character(pick(pl$direction, "<")),
+    as.character(pick(pl$sd_handling, "exclude")),
+    as.character(pick(pl$coverage_threshold, NA)),
+    as.character(pick(pl$sensitivity_threshold, NA)),
+    as.character(pick(pl$n_boot, NA)),
+    null_status,
+    as.character(pick(pl$seed, NA)),
+    as.character(pick(pl$match_expression, FALSE)),
+    hm,
+    as.character(fsig),
+    as.character(pick(rmeta$version, .em)),
+    as.character(pick(rmeta$md5, .em)),
+    as.character(pick(if (!is.null(man)) man$reproducibility_hash else NULL, .em)),
+    as.character(pick(if (!is.null(man)) man$timestamp_utc else NULL, .em))
+  ),
+  stringsAsFactors = FALSE
 )
+.kable_wrap(param_df, align = c("l", "l"))
 ```
 
 ```{r sessioninfo}
-sessionInfo()
+utils::sessionInfo()
 ```
+
+</details>
+
+<script>
+window.addEventListener("beforeprint", function() {
+  document.querySelectorAll("details.sb-appendix").forEach(function(d) { d.open = true; });
+});
+</script>

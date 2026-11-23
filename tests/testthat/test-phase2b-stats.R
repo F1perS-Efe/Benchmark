@@ -91,7 +91,7 @@ test_that("compare_signatures ayni DS calisir, farkli DS hata, BH dogru", {
 
   expect_error(
     compare_signatures(s1, s2, resp, dataset1 = "D1", dataset2 = "D2"),
-    "Farkli veri setleri"
+    "different datasets|Farkli veri setleri"
   )
 
   # Ortak ornek yok
@@ -101,7 +101,7 @@ test_that("compare_signatures ayni DS calisir, farkli DS hata, BH dogru", {
       scores1 = s1, scores2 = s_bad, response = resp,
       dataset1 = "D1", dataset2 = "D1"
     ),
-    "Ortak ornek"
+    "No common sample IDs|Ortak ornek"
   )
 
   multi <- compare_signatures(comparisons = list(

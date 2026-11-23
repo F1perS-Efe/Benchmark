@@ -13,7 +13,9 @@ score_for_dataset(
   sd_handling = "exclude",
   min_genes = 3L,
   genes_up = NULL,
-  genes_down = NULL
+  genes_down = NULL,
+  signature = NULL,
+  weights = NULL
 )
 }
 \arguments{
@@ -28,6 +30,12 @@ score_for_dataset(
 \item{apply_log2, sd_handling, min_genes}{Diger ayarlar.}
 
 \item{genes_up, genes_down}{Isaretli imza kollari (\code{genes} ile birlikte verilmez).}
+
+\item{signature}{Optional full signature definition (list or vector). When
+provided, \code{genes}, \code{genes_up}, \code{genes_down}, \code{weights}, and signature-level
+\code{min_genes} are resolved from \code{signature} if not explicitly supplied.}
+
+\item{weights}{Optional named numeric vector of continuous gene weights.}
 }
 \value{
 Liste: \code{scores} (isimli), \code{response} (isimli, 0/1, SD dislanmis NA),

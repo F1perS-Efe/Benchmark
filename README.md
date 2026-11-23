@@ -2,11 +2,11 @@
 
 [![R-CMD-check](https://github.com/F1perS-Efe/Benchmark/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/F1perS-Efe/Benchmark/actions/workflows/R-CMD-check.yaml)
 
-SigBenchR, bir gen imzasının immünoterapi yanıt sınıflarını birden fazla kohortta ayırt edip etmediğini (discrimination) sınayan bir R paketidir. AUC burada klinik tahmin veya kalibrasyon modeli değildir.
+SigBenchR, bir gen imzasının immünoterapi yanıt sınıflarını birden fazla kohortta ayırt edip etmediğini (discrimination) ve temel T-hücresi infiltrasyonu ötesinde bağımsız bilgi katıp katmadığını tekrarlanabilir biçimde sınayan bir R/Bioconductor paketidir. AUC burada klinik tahmin veya kalibrasyon modeli değildir.
 
-Araç klinik karar desteği için değildir. Sonuçlar araştırma amaçlıdır; küçük örneklemlerde belirsizlik yüksektir. “Kanıt yok” da geçerli bir sonuçtur. Eşikleri sonuçlara baktıktan sonra değiştirmeyin.
+**Klinik Sorumluluk Reddi:** Araç klinik karar desteği için değildir. Sonuçlar yalnızca araştırma amaçlıdır; küçük örneklemlerde ($\text{EPV} < 5$ veya $k \le 4$) belirsizlik yüksektir. “Kanıt yok” da geçerli bir bilimsel sonuçtur. Eşikleri sonuçlara baktıktan sonra değiştirmeyin.
 
-Paket Bioconductor `Imports` kullanmaz. Veri setleri `list(expr, sample_meta, info)` sözleşmesini izler; isteğe bağlı GMT ve `SummarizedExperiment` adapter’ları vardır.
+Paket zorunlu Bioconductor `Imports` bağımlılığı taşımaz (`LazyData: false`). Veri setleri `list(expr, sample_meta, info)` sözleşmesini izler; isteğe bağlı GMT (`read_gmt()`) ve `SummarizedExperiment` (`as_sigbenchr_dataset()`) adaptörleri `Suggests` üzerinden desteklenir.
 
 ## Kurulum
 
@@ -16,100 +16,105 @@ R 4.2 veya üzeri gerekir. Depo kökünde:
 Rscript setup.R
 ```
 
-Betik `renv` proje kütüphanesini açar, `renv.lock` içindeki paketleri kurar, Shiny arayüzü, HTML rapor ve testler için Suggests paketlerini (`shiny`, `DT`, `rmarkdown`, `knitr`, `survival`, `testthat`) yükler ve `SigBenchR` paketini aynı kütüphaneye kurar. Ardından aynı klasörde açılan bir R oturumunda:
+Betik `renv` proje kütüphanesini açar, `renv.lock` içindeki paketleri kurar, Shiny arayüzü, HTML rapor ve testler için `Suggests` paketlerini (`shiny`, `DT`, `rmarkdown`, `knitr`, `survival`, `testthat`, `zip`) yükler ve `SigBenchR` paketini aynı kütüphaneye kurar. Ardından:
 
 ```r
 library(SigBenchR)
 SigBenchR::run_app()
 ```
 
-Aynı adımlar elle:
+## Hızlı Başlangıç
 
-```r
-renv::restore()
-renv::install(
-  c("shiny", "DT", "rmarkdown", "knitr", "survival", "testthat"),
-  lock = FALSE
-)
-renv::install(".", lock = FALSE)
-```
-
-## Hızlı başlangıç
-
-### CLI
+### CLI İş Akışı
 
 ```r
 library(SigBenchR)
 
-data(datasets_ici)
-data(signatures_demo)
+data(datasets_ici, package = "SigBenchR")
+sigs <- get_builtin_signatures(include_controls = TRUE)
 
 res <- run_benchmark(
-  signatures = signatures_demo,
+  signatures = sigs[c("IFNG6", "T_Cell_Inflamed_GEP", "Cytolytic_Activity", "Myeloid_Suppression")],
   datasets = datasets_ici,
-  methods = c("mean", "zscore", "median", "rank"),
+  methods = c("mean", "zscore", "ss_rank"),
+  compute_pr = TRUE,
+  n_boot = 200L,
+  compute_null = TRUE,
+  n_perm = 200L,
+  match_expression = TRUE,
   seed = 42L
 )
 
-print(res)
-plot_auc_heatmap(res, method = "mean")
+# Yöntem-içi (null_p_adj_bh) ve yöntemler-arası global (null_p_adj_bh_global) FDR
+head(res[, c(
+  "dataset", "signature", "method", "auc", "auc_ci_low", "auc_ci_high",
+  "pr_auc", "ci_unreliable", "null_p", "null_p_adj_bh", "null_p_adj_bh_global",
+  "background_type"
+)])
 
-sm <- summarize_auc(res, method = "mean")
-plot_auc_forest(res, signature = "IFNG6", method = "mean", summary = sm)
-jaccard_signatures(signatures_demo)
-auc_correlation(res, method = "mean")
+# Logit-AUC REML + kesilmiş HKSJ meta-analiz özeti
+sm <- summarize_auc(res, method = "zscore", stratify_by = c("treatment", "endpoint_type"))
 
-cat(generate_r_code(
-  signature_name = "IFNG6",
-  methods = c("mean", "zscore"),
-  seed = 42L,
-  dataset_names = names(datasets_ici)
-))
+# Temel T-hücresi infiltrasyonu ötesinde bağımsız değer testi (fold-içi CV + yönlü Stouffer Z)
+bi <- test_beyond_infiltration(
+  datasets = datasets_ici,
+  signature = sigs[["T_Cell_Inflamed_GEP"]],
+  infiltration_axis = "CD8_T_Cell",
+  method = "zscore",
+  seed = 42L
+)
+print(bi$summary)
+print(bi$per_cohort[, c(
+  "cohort", "n", "epv", "low_epv", "vif", "high_collinearity",
+  "delta_auc_combined", "sd_delta_auc", "delta_auc_ci_low", "delta_auc_ci_high",
+  "lrt_p", "lrt_p_adj_bh", "adds_independent_value", "analysis_status"
+)])
 ```
 
-Sentetik `datasets_demo` (`demo_A`, `demo_B`) birim testleri ve hızlı denemeler içindir. Geniş literatür paneli için CLI’da `get_builtin_signatures()` kullanın.
-
-### Shiny
+### Shiny Arayüzü
 
 ```r
 SigBenchR::run_app()
+# Yerel CSV/TSV kohort yükleme özelliğini açmak için (100 MB yükleme sınırı):
+SigBenchR::run_app(allow_upload = TRUE)
 ```
 
-Shiny varsayılan kohortları `van_allen_2015`, `hugo_2016`, `riaz_2017`, `gide_2019`’dur. İmza seçimi varsayılan olarak `signatures_demo` (Cytokine-5, IFNG6, Random3) ile sınırlıdır. Null permütasyon kapalıdır; açıkça işaretlenmelidir.
+Shiny arayüzü varsayılan olarak tüm yerleşik literatür imzalarını ve gerçek negatif kontrolleri (`get_builtin_signatures(include_controls = TRUE)`), tek yönlü veya işaretli (`genes_up` / `genes_down`) özel imza girişini ve `van_allen_2015`, `hugo_2016`, `riaz_2017`, `gide_2019` kohortlarını sunar. Tüm sekmeler, grafikler, kopyalanabilir R kodu, HTML rapor (`download_report`), JSON manifest (`download_manifest`) ve Publication Bundle (`download_pub_bundle`) yalnızca son çalıştırılan **değişmez (immutable) `results()` snapshot** nesnesinden beslenir ve aynı deterministik `reproducibility_hash` (MD5) değerini paylaşır.
 
-Arayüzde sonuç tablosu, ısı haritası, ROC, DeLong, özet, forest, Jaccard, AUC korelasyonu, HTML rapor indirme ve “Bu analizin R kodunu kopyala” vardır.
+## Temel Bilimsel ve İstatistiksel Özellikler
 
-## Özellikler
+1. **Skorlama Motoru ve Sürekli Ağırlıklı İmzalar (`score_signature()`):**
+   - Yöntemler: `mean`, `zscore` (vektörleştirilmiş gen z-skoru; GSVA değil), `median`, `rank` (kohort-içi sıralama), `ss_rank` (örnek-içi dikey sıralama; `singscore` normalizasyonuyla uyumlu).
+   - **Sürekli Regresyon Katsayıları (`weights`):** `T_Cell_Inflamed_GEP` (Ayers et al., *JCI* 2017; Cristescu et al., *Science* 2018) 18 genlik modelinde 17 pozitif IFN-$\gamma$/adaptif direnç geninin yanında negatif katsayılı **`CD276 = -0.023900`** ve **`STAT1 = 0.250229`** ağırlıkları orijinal doğrusal kombinasyon ($\sum w_i x_{i,j}$) olarak uygulanır. *Not:* RNA-seq üzerinde hesaplanan bu skorlar ticari NanoString nCounter klinik tahlili ile analitik eşdeğerlik iddia etmez.
+   - **Biyolojik Eksen Ayrımı:** `Checkpoint_Axis` (6 genlik klasik adaptif PD-1/PD-L1/CTLA-4/LAG-3/TIGIT ekseni) ile immün dışlanma (immune exclusion) belirteçleri olan `B7_Immune_Exclusion` (`CD276`/B7-H3, `VTCN1`/B7-H4) birbirinden ayrılmıştır. `Myeloid_Suppression` imzasından M1/TAM ayrımı yapmayan pan-makrofaj belirteci `CD68` ve IFN-$\gamma$ hedefi `IDO1` çıkarılmıştır (`direction = "negative"`).
 
-**Skorlama:** `mean`, `zscore` (ortalama gen z-skoru; GSVA değil), `median`, `rank` (kohort-içi sıralama; singscore değil), `ss_rank` (örnek-içi dikey sıralama; singscore normalizasyonuyla uyumlu, saf base R). İşaretli `+`/`-` imzalar `genes_up` / `genes_down` veya isimli sayısal `genes` (`c(IFNG = 1, VEGFA = -1)`) ile verilir.
+2. **2D İfade-Dispersiyon Eşleşmeli Null Permutation ve Çoklu Test Aileleri (`null_permutation_test()`, `adjust_null_p()`):**
+   - `match_expression = TRUE` seçildiğinde rastgele genler yalnızca ortalama ifadeye göre değil, **5 ortalama ifade quantile $\times$ 3 gen standart sapması/dispersiyon tertile** (15 hücreli 2D ızgara) içinden örneklenir.
+   - Sürekli ağırlıklı (`weights`) ve işaretli (`genes_up`/`genes_down`) imzaların null çekilişleri, gözlenen imzanın katsayı büyüklük dağılımıyla skorlanır.
+   - `background_type` alanı, kullanılan arka plan evrenini açıkça sınıflandırır: `"subsampled_panel_cohort"` (~2.800 gen), `"full_transcriptome"` ($\ge 5.000$ gen) veya `"partial_ortholog_subset"`.
+   - `adjust_null_p()` hem yöntem-içi BH FDR (`null_p_adj_bh`) hem de tüm `method x signature x dataset` ailesi üzerinden global BH FDR (`null_p_adj_bh_global`) değerlerini ayrı sütunlarda raporlar.
 
-**Değerlendirme:** ROC-AUC (DeLong %95 GA), PR-AUC (tabakalı bootstrap), isteğe bağlı null permütasyon (`compute_null = FALSE`; `B = 1000`; p = (k+1)/(B+1); BH: `null_p_adj_bh`), eşleştirilmiş DeLong (`compare_signatures`). Skorlama ve permütasyon yalnızca `enc$kept` örneklerinde çalışır.
+3. **Fare-İnsan Ortolog Dönüşümü ve Arka Plan Bütünlüğü (`map_mouse_to_human()`):**
+   - Polimorfik MHC paralogları, kemirgende bulunmayan genler ve kör `toupper()` dönüşümü varsayılan olarak kapalıdır.
+   - `ortholog_policy = "strict_1to1"` (varsayılan) ve `"many_to_1"` politikalarını destekler; `1:many` belirsiz eşleşmeler reddedilir ve `attr(res, "ortholog_stats")` içinde raporlanır.
+   - `keep_unmapped_context = TRUE` (varsayılan) iken tam transkriptom arka planı `attr(res, "transcriptome_bg_expr")` içinde korunarak `ss_rank` dikey sıralamasının ve `null_permutation_test()` örnekleme havuzunun eşleşen gen altkümesine daralması önlenir.
 
-**Özet ve yardımcıları:** `summarize_auc()` — n-ağırlıklı + ters-varyans, Cochran Q, I², logit-AUC REML + kesilmiş HKSJ; isteğe bağlı `stratify_by`. Forest: `plot_auc_forest()`. SD duyarlılığı: `check_sd_sensitivity()`. Dayanıklılık: `check_sensitivity()` (eşik 0.10 keyfidir). Hanley–McNeil güç: `estimate_auc_power()` / `power_auc70`. Biyolojik eksenler: `correlate_reference_axes()`. İsteğe bağlı Cox PH / Kaplan–Meier: `evaluate_survival()` (`survival` Suggests).
+4. **Beyond Infiltration (`test_beyond_infiltration()`):**
+   - **Fold-İçi Ön-İşleme:** Çapraz doğrulama (CV) sırasında `zscore` ve `rank` gen dönüşümleri ile lojistik regresyon girdisi standardizasyonu (`sig_score_z`, `inf_score_z`) yalnızca eğitim fold'u (`tr_idx`) üzerinde öğrenilip test fold'una (`te_idx`) uygulanır (test sızıntısı önlenir).
+   - **Eşleştirilmiş Fold-İçi CV $\Delta\text{AUC}$:** Foldlar arası olasılık birleştirmesi (OOF pooling) yerine fold-içi eşleştirilmiş test AUC farkları üzerinden `delta_auc_combined`, `sd_delta_auc`, `delta_auc_ci_low` ve `delta_auc_ci_high` hesaplanır.
+   - **Tanı Korumaları ve Yönlü Stouffer Z:** `adds_independent_value` kararı BH düzeltmeli **`lrt_p_adj_bh < 0.05`** şartına bağlıdır. Küçük örneklem ($\text{EPV} = \min(n_{\text{pos}}, n_{\text{neg}})/2 < 5 \implies \text{low\_epv}$) ve çoklu doğrusallık ($\text{VIF} = 1/(1-r^2) \ge 5 \implies \text{high\_collinearity}$; $\text{VIF} \ge 10 \implies \text{failed\_collinearity}$) açıkça işaretlenir. Kohortlar-arası p-değeri birleştirmesi örneklem büyüklüğü ağırlıklı **yönlü Stouffer Z** (`combined_lrt_p`, `stouffer_z`, `direction_conflict`) ile yapılır; zıt yönlü etkiler birbirini iptal eder.
 
-**Veri ve kapsama:** `read_user_dataset()`, `load_cohort_bundle()`, `read_gmt()`. Gen takma adı kurtarma (~53 immuno-onkoloji alias; `match_genes(use_aliases = TRUE)`). `coverage_status`: `ok` / `low_power` / `invalid`. İmza örtüşmesi: `jaccard_signatures()`; kohortlar arası: `auc_correlation()`.
+5. **PR-AUC Bağlı Değer (Tie) ve Küçük Sınıf Korumaları (`pr_auc()`):**
+   - Yoğun bağlı skorlarda Davis-Goadrich interpolasyonu sonlu değilse otomatik olarak `auc.integral` tahminine geri dönülür; `tie_fraction`, `small_positive_class` ($n_{\text{pos}} < 5$ veya $n_{\text{neg}} < 5$), `n_boot_valid` ve `ci_unreliable` alanları üretilir.
 
-**Rapor:** `export_report()`, `generate_r_code()`. Literatür paneli: `get_builtin_signatures()` (≥8 ICI imzası + 3 negatif kontrol).
+6. **Sağkalım Hipotez Aileleri (`run_survival_benchmark()`):**
+   - Sürekli Cox PH regresyonu (`cox_p` $\to$ `p_adj_bh`) ve medyan-dikotomize Kaplan-Meier log-rank testi (`logrank_p` $\to$ `logrank_p_adj_bh`) ayrı hipotez aileleri olarak bağımsız BH düzeltmesine tabi tutulur.
+   - Schoenfeld artıkları orantısal tehlike varsayımı kontrolü (`ph_p`, `ph_violated`) bir model tanı testi olduğundan FDR düzeltmesiyle gizlenmemesi için kasıtlı olarak ham bırakılır.
 
-## Veri yapısı
+7. **Raporlama ve Publication Bundle (`export_report()`, `export_publication_bundle()`, `build_reproducibility_manifest()`):**
+   - HTML raporu ve `.zip` Publication Bundle (`fig_auc_heatmap.{png,pdf}`, `fig_auc_forest.{png,pdf}`, `fig_roc_curves.{png,pdf}`, tam hassasiyetli CSV tabloları, `analysis_objects.rds`, `manifest.json`, `figure_legends.txt`) ham ve düzeltilmiş p-değerlerini ayrı başlıklar altında ve tüm Faz 4–7 tanı bayraklarıyla birlikte dışa aktarır.
 
-```r
-list(
-  expr = <gen x örnek matris>,
-  sample_meta = <data.frame: sample_id, response_label, ...>,
-  info = list(normalization = "TPM", scale = "log2")  # veya "linear"
-)
-```
-
-`scale == "linear"` ise skorlamadan önce `log2(x + 1)` uygulanır.
-
-## Yanıt kodlama
-
-- Varsayılan: `CR` / `PR` = 1, `PD` = 0
-- Stabil hastalık (`SD`): varsayılan olarak dışlanır (`sd_handling = "exclude"`)
-- Alternatifler: `"as_0"` (ORR: CR/PR vs SD/PD), `"as_1"` (DCR: CR/PR/SD vs PD)
-
-## ICI kohortları
+## ICI Kohortları ve Kapsam Sınırlılıkları
 
 | Kohort | n | n_pos | n_neg | n_SD | Normalizasyon | Ölçek | Kaynak |
 |--------|--:|------:|------:|----:|---------------|-------|--------|
@@ -118,52 +123,8 @@ list(
 | `riaz_2017` | 49 | 10 | 23 | 16 | FPKM | linear | GEO GSE91061 (`PRCR`→`PR`, `UNK` dışlandı) |
 | `gide_2019` | 41 | 19 | 16 | 6 | normalized counts | linear | GitHub Gide/Quek |
 
-Liu 2019 (cBioPortal) S3/LFS 403 verdiği için dahil edilmedi.
-
-**Klinik etiketler**
-
-- `van_allen_2015` (`treatment = "anti-CTLA4"`): Etiketler IMS `mel_van_cli_data.csv` ikili `response` alanından gelir (`1`→PR/pozitif, `0`→PD/negatif; SD yok). Bu, Van Allen (Science 2015) klinik yarar tanımına dayanır (`n_pos = 19`, `n_neg = 23`, `n = 42`) ve Hugo/Riaz/Gide RECIST CR/PR–PD ekseniyle birebir aynı değildir.
-- `hugo_2016` / `riaz_2017` / `gide_2019`: anti-PD-1; RECIST CR/PR vs PD. `riaz_2017` 16 SD içerir ve önceki anti-CTLA-4 maruziyeti taşır.
-- `gide_2019` (`treatment = "anti-PD1"`): Yalnızca ENA `PD1_*_PRE` (anti-PD1 monoterapi; `n = 41`). `ipiPD1_*_PRE` kombinasyon dahil değildir (`n_pos = 19`, `n_neg = 16`, `n_SD = 6`).
-
-**Ön işleme:** yalnızca pre-treatment; hasta başına tek örnek.
-
-**Paket boyutu:** Her kohortta demo imza genleri + sıfır varyanslı olmayan genlerden `seed = 42` ile ~2.800 gen örneklenir (`compress = "xz"`; `data/` &lt; 5 MB). Kaynak URL’leri ve dışlama kuralları: [`data-raw/PROVENANCE.md`](data-raw/PROVENANCE.md). Yeniden üretim: `data-raw/prepare_ici_datasets.R`, `data-raw/ici_cohort_summary.csv`.
-
-**Sınırlar:** ~2.800 genlik havuzda özel imzalarda kapsama tipik olarak ~%14–15’tir; bu sürüm keşifsel bir prototiptir, tam-genom ICI yeniden analizi değildir. `k ≤ 4` meta-analiz keşifseldir. Kohort normalizasyonları heterojendir; ham ifadeler birleştirilmez. Tam matris için `read_user_dataset()` / `load_cohort_bundle()` kullanın.
-
-**Bağımsızlık:** `Cytokine-5$derived_from` bu kohort adlarını içerir (`independent = FALSE`). `IFNG6` / `Random3` için `derived_from = character(0)` (`independent = TRUE`). Kökeni belirtilmemiş özel imzalar `independent = NA` alır ve varsayılan bağımsız özete girmez.
-
-## Dağıtım (shinyapps.io)
-
-Otomatik deploy yoktur. `rsconnect` ile:
-
-1. Paketi kurun (`devtools::install(".")` veya uzak depodan).
-2. Repo kökündeki `app.R` yalnızca `SigBenchR::run_app()` çağırır (`.Rbuildignore` içinde `^app\.R$`).
-3. Suggests paketlerini (`shiny`, `DT`, `rmarkdown`, `knitr`) hedef ortamda kurun; aksi halde UI özellikleri sessizce düşer veya rapor indirme hata verir.
-4. Örnek:
-
-```r
-# install.packages("rsconnect")
-rsconnect::setAccountInfo(name = "...", token = "...", secret = "...")
-rsconnect::deployApp(
-  appDir = ".",
-  appFiles = c("app.R"),
-  appName = "SigBenchR"
-)
-```
-
-`rsconnect` bağımlılık listesini doğru çıkarsın diye önce Imports/Suggests paketlerinin kurulabilir olduğundan emin olun. Uygulama dahili melanoma ICI kohortları üzerinde çalışır; yalnızca gen sembolleri girin.
-
-## Atıflar
-
-- Kus M, et al. TCGEx: a powerful visual interface for exploring and analyzing cancer gene expression data. *EMBO Reports* (2025). doi:[10.1038/s44319-025-00407-7](https://doi.org/10.1038/s44319-025-00407-7). Kod: [github.com/atakanekiz/TCGEx](https://github.com/atakanekiz/TCGEx).
-- Ayers M, et al. IFN-γ–related mRNA profile predicts clinical response to PD-1 blockade. *J Clin Invest* (2017).
-- Robin X, et al. pROC: an open-source package for R and S+ to analyze and compare ROC curves. *BMC Bioinformatics* (2011).
-- Keilwagen J, et al. PRROC: computing and visualizing precision-recall and receiver operating characteristic curves in R. *Bioinformatics* (2014).
-
-Cytokine-5 imzası TCGEx çalışmasında Pan-ICI verisinden türetilmiştir; yazarlar imzanın üstünlüğünü iddia etmediklerini ve ek doğrulama gerektiğini belirtmiştir. Bu proje bağımsız bir doğrulama aracıdır.
+- **Alt-Örneklenmiş Paket Kohortları vs Tam Transkriptom:** Paket boyutunu <5 MB tutmak için `datasets_ici` kohortları ~2.800 gen içerir (`background_type = "subsampled_panel_cohort"`). Bu nedenle rastgele dış imzalarda gen kapsaması ~%14–15 olabilir. Tam transkriptom ($\ge 5.000$ gen, `background_type = "full_transcriptome"`) analizleri için `read_user_dataset()` veya `load_cohort_bundle()` kullanın.
 
 ## Lisans
 
-GNU GPL (>= 3). Ayrıntılar için `LICENSE.md`. TCGEx ile uyumludur.
+GNU GPL (>= 3). Ayrıntılar için `LICENSE.md`.

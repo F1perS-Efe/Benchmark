@@ -25,10 +25,31 @@
 #' @param compute_null Null permutasyon testi. Varsayilan FALSE.
 #' @param n_perm Null permutasyon sayisi. Varsayilan 1000.
 #' @param seed Rastgelelik tohumu (PR bootstrap ve null); hucre basina turetilir.
-#' @param match_expression Null icin ifade-eslesmeli ornekleme.
+#' @param match_expression Null icin ifade-ve-dispersiyon (2D ortalama x SD)
+#'   eslesmeli ornekleme.
 #'
-#' @return `data.frame` sonuc tablosu (`signed`, `treatment`, `endpoint_type`,
-#'   `cancer_type`, `normalization`, `power_auc70` sutunlari dahil).
+#' @return `data.frame` sonuc tablosu:
+#'   - ROC-AUC: `auc`, `auc_ci_low`, `auc_ci_high`, `auc_var`, `var_zero`, `small_cohort`
+#'   - PR-AUC ve tanilari: `pr_auc`, `pr_baseline`, `pr_ci_low`, `pr_ci_high`,
+#'     `tie_fraction`, `small_positive_class`, `n_boot_valid`, `ci_unreliable`
+#'   - Null permutasyon ve FDR aileleri: `null_p` (ham), `null_p_adj_bh`
+#'     (yontem-ici BH), `null_p_adj_bh_global` (tum yontem x imza x kohort
+#'     ailesinde global BH), `background_type`, `universe_size`
+#'   - Kapsama ve metaveri: `coverage_pct`, `coverage_status`, `low_coverage`,
+#'     `n_alias_rescued`, `signed`, `treatment`, `endpoint_type`,
+#'     `cancer_type`, `normalization`, `power_auc70`, `independent`,
+#'     `skipped`, `skip_reason`.
+#' @examples
+#' data(datasets_demo, package = "SigBenchR")
+#' data(signatures_demo, package = "SigBenchR")
+#' res <- run_benchmark(
+#'   signatures = signatures_demo["IFNG6"],
+#'   datasets = datasets_demo["demo_A"],
+#'   methods = c("mean", "zscore"),
+#'   compute_pr = FALSE,
+#'   compute_null = FALSE
+#' )
+#' head(res[, c("dataset", "signature", "method", "auc", "auc_ci_low", "auc_ci_high")])
 #' @export
 run_benchmark <- function(signatures,
                           datasets,
@@ -36,7 +57,7 @@ run_benchmark <- function(signatures,
                           direction = "<",
                           min_genes = 3L,
                           coverage_threshold = 0.70,
-                          min_coverage = 0.50,
+                          min_coverage = coverage_threshold,
                           invalid_coverage = 0.20,
                           apply_log2 = TRUE,
                           sd_handling = "exclude",
@@ -49,46 +70,124 @@ run_benchmark <- function(signatures,
                           seed = 42L,
                           match_expression = FALSE) {
   if (is.null(names(signatures)) || any(!nzchar(names(signatures)))) {
-    stop("`signatures` isimli bir liste olmalidir.", call. = FALSE)
+    stop("`signatures` must be a named list.", call. = FALSE)
   }
   if (is.null(names(datasets)) || any(!nzchar(names(datasets)))) {
-    stop("`datasets` isimli bir liste olmalidir.", call. = FALSE)
+    stop("`datasets` must be a named list.", call. = FALSE)
   }
   method_choices <- c("mean", "zscore", "median", "rank", "ss_rank")
   methods <- match.arg(methods, choices = method_choices, several.ok = TRUE)
 
-  norms <- vapply(datasets, function(d) as.character(d$info$normalization), character(1))
-  if (length(unique(norms)) > 1L) {
+  norms <- vapply(datasets, function(d) {
+    if (is.list(d) && is.list(d$info) && !is.null(d$info$normalization) &&
+        length(d$info$normalization) > 0L && !is.na(d$info$normalization[1]) &&
+        nzchar(as.character(d$info$normalization)[1])) {
+      as.character(d$info$normalization)[1]
+    } else {
+      "unknown"
+    }
+  }, character(1))
+  valid_norms <- unique(norms[norms != "unknown"])
+  if (length(valid_norms) > 1L) {
     warning(
-      "Veri setleri farkli normalizasyonlara sahip: ",
-      paste(unique(norms), collapse = ", "),
-      ". AUC'ler ayri hesaplanir; ham ifadeler birlestirilmez.",
+      "Datasets have heterogeneous normalizations: ",
+      paste(valid_norms, collapse = ", "),
+      ". AUCs are computed separately; raw expression is never pooled.",
       call. = FALSE
     )
   }
 
   rows <- list()
   row_i <- 0L
-  cell_idx <- 0L
 
   for (ds_name in names(datasets)) {
-    ds <- validate_dataset(datasets[[ds_name]], name = ds_name)
-    expr <- collapse_duplicate_genes(as.matrix(ds$expr))
-    expr <- prepare_expression(
-      expr,
-      scale = ds$info$scale,
-      apply_log2 = apply_log2
+    prep <- tryCatch(
+      .prepare_cohort(
+        datasets[[ds_name]],
+        name = ds_name,
+        apply_log2 = apply_log2,
+        sd_handling = sd_handling,
+        filter_response = TRUE
+      ),
+      error = function(e) e
     )
-
-    enc <- encode_response(
-      ds$sample_meta$response_label,
-      sd_handling = sd_handling
-    )
-
-    # P0-3: SD (veya NA yanit) orneklerini skorlama / null oncesi cikar
-    expr_kept <- expr[, enc$kept, drop = FALSE]
-    y_kept <- enc$response[enc$kept]
-    names(y_kept) <- colnames(expr_kept)
+    if (inherits(prep, "error")) {
+      if (length(datasets) == 1L) {
+        stop(conditionMessage(prep), call. = FALSE)
+      }
+      warning(
+        "Cohort '", ds_name, "' failed validation/preparation and was marked skipped: ",
+        conditionMessage(prep),
+        call. = FALSE
+      )
+      for (sig_name in names(signatures)) {
+        sig <- tryCatch(.as_signature(signatures[[sig_name]], name = sig_name), error = function(e) list())
+        indep_val <- if (is.null(sig$derived_from)) {
+          NA
+        } else {
+          !(tolower(ds_name) %in% tolower(as.character(sig$derived_from)))
+        }
+        for (method in methods) {
+          row_i <- row_i + 1L
+          rows[[row_i]] <- list(
+            dataset = ds_name,
+            signature = sig_name,
+            method = method,
+            n = NA_integer_,
+            n_pos = NA_integer_,
+            n_neg = NA_integer_,
+            coverage_pct = 0,
+            n_found = 0L,
+            n_total = NA_integer_,
+            coverage_label = "0/0 (0%)",
+            found_genes = "",
+            missing_genes = "",
+            low_coverage = TRUE,
+            coverage_status = "invalid",
+            n_alias_rescued = 0L,
+            auc = NA_real_,
+            auc_ci_low = NA_real_,
+            auc_ci_high = NA_real_,
+            auc_var = NA_real_,
+            var_zero = NA,
+            small_cohort = NA,
+            pr_auc = NA_real_,
+            pr_baseline = NA_real_,
+            pr_ci_low = NA_real_,
+            pr_ci_high = NA_real_,
+            tie_fraction = NA_real_,
+            small_positive_class = NA,
+            n_boot_valid = NA_integer_,
+            ci_unreliable = NA,
+            null_p = NA_real_,
+            background_type = NA_character_,
+            universe_size = NA_integer_,
+            power_auc70 = NA_real_,
+            normalization = "unknown",
+            scale = NA_character_,
+            cancer = NA_character_,
+            treatment = NA_character_,
+            endpoint_type = NA_character_,
+            cancer_type = NA_character_,
+            signed = FALSE,
+            n_up_found = 0L,
+            n_down_found = 0L,
+            n_all_na_dropped = 0L,
+            n_excluded_sd = NA_integer_,
+            skipped = TRUE,
+            skip_reason = paste0("Cohort preparation failed: ", conditionMessage(prep)),
+            independent = indep_val
+          )
+        }
+      }
+      next
+    }
+    ds <- prep$ds
+    enc <- prep$enc
+    expr_full <- prep$expr
+    y_kept <- prep$y_kept
+    y_full <- enc$response
+    names(y_full) <- colnames(expr_full)
 
     cancer <- if (!is.null(ds$sample_meta$cancer)) {
       paste(unique(as.character(ds$sample_meta$cancer)), collapse = ";")
@@ -120,45 +219,31 @@ run_benchmark <- function(signatures,
     }
 
     for (sig_name in names(signatures)) {
-      sig <- signatures[[sig_name]]
-      if (is.character(sig) || is.numeric(sig)) {
-        sig <- list(genes = sig)
-      }
-      if (is.null(sig$genes) && is.null(sig$genes_up) && is.null(sig$genes_down)) {
-        stop(
-          "Imza '", sig_name,
-          "' icin `genes` veya `genes_up`/`genes_down` zorunludur.",
-          call. = FALSE
-        )
-      }
+      sig <- .as_signature(signatures[[sig_name]], name = sig_name)
       sig_dir <- .normalize_roc_direction(sig$direction, default = direction)
 
       for (method in methods) {
-        cell_idx <- cell_idx + 1L
-        cell_seed <- if (is.null(seed)) {
-          NULL
-        } else {
-          as.integer(seed) + as.integer(cell_idx)
-        }
+        cell_seed <- .cell_seed(seed, ds_name, sig_name, method)
+        eff_min_genes <- .resolve_min_genes(sig, default = min_genes)
 
         scored <- score_signature(
-          expr_kept,
+          expr_full,
           genes = sig$genes,
           genes_up = sig$genes_up,
           genes_down = sig$genes_down,
+          weights = sig$weights,
           method = method,
-          min_genes = min_genes
+          min_genes = eff_min_genes
         )
 
+        cov_cls <- .classify_coverage(
+          scored$coverage$coverage_pct,
+          ok_threshold = min_coverage,
+          invalid_threshold = invalid_coverage
+        )
         cov_frac <- scored$coverage$coverage_pct / 100
-        low_cov <- cov_frac < coverage_threshold
-        if (cov_frac < invalid_coverage) {
-          cov_status <- "invalid"
-        } else if (cov_frac < min_coverage) {
-          cov_status <- "low_power"
-        } else {
-          cov_status <- "ok"
-        }
+        low_cov <- cov_cls$low_coverage
+        cov_status <- cov_cls$coverage_status
         n_alias <- as.integer(scored$coverage$n_alias_rescued)
         if (length(n_alias) != 1L || is.na(n_alias)) {
           n_alias <- 0L
@@ -211,7 +296,13 @@ run_benchmark <- function(signatures,
           pr_baseline = NA_real_,
           pr_ci_low = NA_real_,
           pr_ci_high = NA_real_,
+          tie_fraction = NA_real_,
+          small_positive_class = NA,
+          n_boot_valid = NA_integer_,
+          ci_unreliable = NA,
           null_p = NA_real_,
+          background_type = NA_character_,
+          universe_size = NA_integer_,
           power_auc70 = NA_real_,
           normalization = if (!is.null(ds$info$normalization) &&
                               length(ds$info$normalization) > 0L &&
@@ -250,16 +341,17 @@ run_benchmark <- function(signatures,
           next
         }
 
-        sample_ids <- names(scored$scores)
+        sample_ids <- intersect(names(scored$scores), names(y_kept))
         resp <- y_kept[sample_ids]
-        keep <- is.finite(scored$scores) & !is.na(resp)
+        sc_kept <- scored$scores[sample_ids]
+        keep <- is.finite(sc_kept) & !is.na(resp)
 
-        scores_use <- scored$scores[keep]
+        scores_use <- sc_kept[keep]
         resp_use <- resp[keep]
 
         if (length(unique(resp_use)) < 2L) {
           base$skipped <- TRUE
-          base$skip_reason <- "Yanitta tek sinif kaldi (ROC hesaplanamaz)."
+          base$skip_reason <- "Single response class remaining (ROC cannot be computed)."
           row_i <- row_i + 1L
           rows[[row_i]] <- base
           next
@@ -316,7 +408,7 @@ run_benchmark <- function(signatures,
           )
           if (inherits(pr_res, "error")) {
             warning(
-              "pr_auc basarisiz (", ds_name, " / ", sig_name, " / ", method, "): ",
+              "pr_auc failed (", ds_name, " / ", sig_name, " / ", method, "): ",
               conditionMessage(pr_res),
               call. = FALSE
             )
@@ -325,6 +417,10 @@ run_benchmark <- function(signatures,
             base$pr_baseline <- pr_res$pr_baseline
             base$pr_ci_low <- pr_res$pr_ci_low
             base$pr_ci_high <- pr_res$pr_ci_high
+            base$tie_fraction <- pr_res$tie_fraction
+            base$small_positive_class <- pr_res$small_positive_class
+            base$n_boot_valid <- pr_res$n_boot_valid
+            base$ci_unreliable <- pr_res$ci_unreliable
           }
         }
 
@@ -344,8 +440,8 @@ run_benchmark <- function(signatures,
           }
           null_res <- tryCatch(
             null_permutation_test(
-              mat = expr_kept,
-              response = y_kept,
+              mat = expr_full,
+              response = y_full,
               n_genes = n_up_f,
               n_genes_down = n_dn_f,
               exclude_genes = found_all,
@@ -357,18 +453,21 @@ run_benchmark <- function(signatures,
               signature_genes = if (length(sig_up) > 0L) sig_up else NULL,
               signature_genes_down = if (length(sig_dn) > 0L) sig_dn else NULL,
               observed_scores = scores_use,
-              min_genes = min_genes
+              min_genes = min_genes,
+              weights = sig$weights
             ),
             error = function(e) e
           )
           if (inherits(null_res, "error")) {
             warning(
-              "null_permutation_test basarisiz (", ds_name, " / ", sig_name,
+              "null_permutation_test failed (", ds_name, " / ", sig_name,
               " / ", method, "): ", conditionMessage(null_res),
               call. = FALSE
             )
           } else {
             base$null_p <- null_res$null_p
+            base$background_type <- null_res$background_type
+            base$universe_size <- null_res$universe_size
           }
         }
 
@@ -385,8 +484,9 @@ run_benchmark <- function(signatures,
   out <- do.call(rbind.data.frame, lapply(rows, as.data.frame, stringsAsFactors = FALSE))
   rownames(out) <- NULL
 
-  # Faz 2C: null_p icin BH (aile = method icinde imza x veri seti)
+  # Faz 2C & Faz 4.7: null_p icin BH (method-ici null_p_adj_bh + global null_p_adj_bh_global)
   out$null_p_adj_bh <- NA_real_
+  out$null_p_adj_bh_global <- NA_real_
   if (isTRUE(compute_null) && "null_p" %in% names(out)) {
     out <- adjust_null_p(out, p_col = "null_p")
   }
@@ -399,8 +499,14 @@ run_benchmark <- function(signatures,
 #' Accepts legacy ROC codes (`"<"`, `">"`) and panel metadata
 #' (`"positive"`, `"negative"`, `"signed"`).
 #'
-#' @noRd
-.normalize_roc_direction <- function(sig_direction, default = "<") {
+#' @param sig_direction Direction metadata from a signature definition (`"<"`,
+#'   `">"`, `"positive"`, `"negative"`, `"signed"`, or `NULL`).
+#' @param default Fallback ROC direction (`"<"` or `">"`).
+#'
+#' @return Normalized ROC direction string (`"<"` or `">"`).
+#' @keywords internal
+#' @export
+normalize_roc_direction <- function(sig_direction, default = "<") {
   if (is.null(sig_direction) || length(sig_direction) == 0L ||
       is.na(sig_direction[1]) || !nzchar(as.character(sig_direction[1]))) {
     return(as.character(default)[1])
@@ -416,4 +522,52 @@ run_benchmark <- function(signatures,
     return("<")
   }
   as.character(default)[1]
+}
+
+.normalize_roc_direction <- normalize_roc_direction
+
+#' Deterministic order-independent per-cell RNG seed
+#'
+#' @noRd
+.cell_seed <- function(seed, ds_name, sig_name, method) {
+  if (is.null(seed) || length(seed) == 0L || is.na(seed[1])) {
+    return(NULL)
+  }
+  key <- paste(
+    as.character(ds_name)[1],
+    as.character(sig_name)[1],
+    as.character(method)[1],
+    sep = "\r"
+  )
+  bytes <- as.integer(charToRaw(enc2utf8(key)))
+  h <- 0
+  mod <- 1073741823 # 2^30 - 1 (31-bit signed int safe)
+  for (b in bytes) {
+    h <- (h * 131 + b) %% mod
+  }
+  base_seed <- abs(as.numeric(seed[1])) %% mod
+  as.integer((base_seed + h) %% mod)
+}
+
+#' Centralized coverage classification
+#'
+#' Classifies coverage percentages (0-100) into `"invalid"`, `"low_power"`,
+#' or `"ok"` using a single `ok_threshold` (0-1) so heatmap, KPI, and
+#' `summarize_auc()` never disagree.
+#'
+#' @noRd
+.classify_coverage <- function(coverage_pct,
+                               ok_threshold = 0.70,
+                               invalid_threshold = 0.20) {
+  cov_frac <- as.numeric(coverage_pct) / 100
+  n <- length(cov_frac)
+  cov_status <- rep("ok", n)
+  bad <- !is.finite(cov_frac) | cov_frac < invalid_threshold
+  low <- !bad & (cov_frac < ok_threshold)
+  cov_status[bad] <- "invalid"
+  cov_status[low] <- "low_power"
+  list(
+    coverage_status = cov_status,
+    low_coverage = cov_status != "ok"
+  )
 }

@@ -20,6 +20,8 @@
 #' skor `up - down` (`ss_rank` icin `s_up + s_down`) olur.
 #' Yalnizca down kolu (`n_genes = 0`, `n_genes_down >= 1`) icin skor `-down`
 #' (`ss_rank` icin azalan sira `s_down`) uretilir.
+#' Surekli agirlikli (`weights`) imzalar icin her rastgele cekilis ayni pozitif ve
+#' negatif katsayi buyukluk dagilimiyla (`w_up`, `w_dn`) agirliklandirilir.
 #'
 #' @param mat Gen x ornek ifade matrisi (hazirlanmis).
 #' @param response 0/1 yanit (ornek sirasi `colnames(mat)` ile hizali veya isimli).
@@ -30,10 +32,11 @@
 #' @param direction Imza yonu.
 #' @param n_perm Permutasyon sayisi B. Varsayilan 1000.
 #' @param seed RNG tohumu.
-#' @param match_expression TRUE ise imza genlerinin ortalama ifadesine yakin
-#'   quantile-bin eslestirilmis ornekleme yapar.
+#' @param match_expression TRUE ise imza genlerinin hem ortalama ifadesine (5 quantile)
+#'   hem de gen dispersiyonuna/SD'sine (3 tertile) yakin 2D-bin eslestirilmis
+#'   ornekleme yapar.
 #' @param signature_genes `match_expression = TRUE` icin up / tek yonlu imza
-#'   genleri (ifade ortalamasi eslestirme referansi). `NULL` ise `exclude_genes`
+#'   genleri (ifade ortalamasi/SD eslestirme referansi). `NULL` ise `exclude_genes`
 #'   (up kolu yoksa eslestirme atlanir).
 #' @param signature_genes_down `match_expression = TRUE` ve `n_genes_down > 0`
 #'   iken down kolu ifade-bin referansi. `NULL` ise down kolu guvenli rastgele
@@ -42,9 +45,12 @@
 #'   Verilmezse `signature_genes` ile skorlanir.
 #' @param min_genes `score_signature` esigi.
 #' @param n_genes_down Isaretli null icin down kolu gen sayisi. Varsayilan 0.
+#' @param weights Opsiyonel isimli sayisal vektor: surekli gen agirliklari
+#'   (orn. Ayers/Cristescu `T_Cell_Inflamed_GEP` regresyon katsayilari).
 #'
 #' @return Liste: `obs_auc`, `null_aucs`, `null_p`, `n_perm`, `n_genes`,
-#'   `pool_size`, `seed`.
+#'   `n_genes_effective`, `pool_size`, `universe_size`, `partial_background`,
+#'   `background_type`, `seed`.
 #' @export
 null_permutation_test <- function(mat,
                                   response,
@@ -59,10 +65,13 @@ null_permutation_test <- function(mat,
                                   observed_scores = NULL,
                                   min_genes = 3L,
                                   n_genes_down = 0L,
-                                  signature_genes_down = NULL) {
+                                  signature_genes_down = NULL,
+                                  weights = NULL) {
   method <- match.arg(method)
   direction <- match.arg(direction)
-  mat <- as.matrix(mat)
+  if (!is.matrix(mat)) {
+    mat <- as.matrix(mat)
+  }
   n_genes <- as.integer(n_genes)
   n_genes_down <- as.integer(n_genes_down)
   if (length(n_genes) != 1L || is.na(n_genes) || n_genes < 0L) {
@@ -75,29 +84,50 @@ null_permutation_test <- function(mat,
     stop("At least one of `n_genes` and `n_genes_down` must be positive.", call. = FALSE)
   }
   if (is.null(rownames(mat)) || is.null(colnames(mat))) {
-    stop("`mat` satir/sutun adlari zorunludur.", call. = FALSE)
+    stop("`mat` rownames and colnames are required.", call. = FALSE)
   }
 
-  # Yaniti orneklerle hizala
+  ostat <- attr(mat, "ortholog_stats")
+  bg_expr <- attr(mat, "transcriptome_bg_expr")
+  partial_background <- FALSE
+  if (is.matrix(bg_expr) && ncol(bg_expr) == ncol(mat)) {
+    mat <- bg_expr
+  } else if (!is.null(ostat) && isTRUE(ostat$is_partial_mapping)) {
+    partial_background <- TRUE
+    warning(
+      sprintf(
+        paste0(
+          "Null permutation on partial ortholog-mapped matrix (mapped=%d of %d ",
+          "input genes, retention=%.1f%%) without preserved background context: ",
+          "null sampling pool is restricted to mapped ortholog subset and does ",
+          "not represent full transcriptome background."
+        ),
+        ostat$n_mapped, ostat$n_input, 100 * ostat$retention_rate
+      ),
+      call. = FALSE
+    )
+  }
+  universe_size <- nrow(mat)
+  background_type <- if (isTRUE(partial_background)) {
+    "partial_ortholog_subset"
+  } else if (universe_size < 5000L) {
+    "subsampled_panel_cohort"
+  } else {
+    "full_transcriptome"
+  }
+
+  # Yaniti orneklerle hizala (zscore/rank tum kohortta hesaplanir, NA yanit AUC adiminda dislanir)
   if (!is.null(names(response))) {
     response <- as.integer(response[colnames(mat)])
   } else {
     response <- as.integer(response)
     if (length(response) != ncol(mat)) {
-      stop("`response` uzunlugu `ncol(mat)` ile eslesmeli.", call. = FALSE)
+      stop("`response` length must match `ncol(mat)`.", call. = FALSE)
     }
-  }
-
-  # P0-3: NA yanitlari (SD vb.) olceklemeden once cikar
-  keep_y <- !is.na(response)
-  if (!all(keep_y)) {
-    mat <- mat[, keep_y, drop = FALSE]
-    response <- response[keep_y]
   }
 
   exclude_up <- unique(toupper(as.character(exclude_genes)))
   rows_up <- toupper(rownames(mat))
-  need_genes <- n_genes + n_genes_down
 
   # P1-1: vektorlestirilmis satir SD (apply yerine)
   row_n <- rowSums(is.finite(mat))
@@ -106,14 +136,38 @@ null_permutation_test <- function(mat,
     rowSums((mat - row_mean)^2, na.rm = TRUE) / pmax(row_n - 1L, 1L)
   )
   gene_ok <- row_n > 1L & is.finite(row_sd) & row_sd > 0
+
+  # R2: zscore/rank sirasinda sifir-SD imza genleri dusuyorsa ayni efektif sayiyi cek
+  n_genes_eff <- n_genes
+  n_genes_down_eff <- n_genes_down
+  if (method %in% c("zscore", "rank")) {
+    if (n_genes > 0L && !is.null(signature_genes) && length(signature_genes) > 0L) {
+      m_up <- tryCatch(match_genes(mat, signature_genes, use_aliases = TRUE)$found, error = function(e) character(0))
+      hit_up_ok <- match(m_up, rownames(mat))
+      hit_up_ok <- hit_up_ok[!is.na(hit_up_ok) & gene_ok[hit_up_ok]]
+      if (length(hit_up_ok) > 0L && length(hit_up_ok) < n_genes_eff) {
+        n_genes_eff <- length(hit_up_ok)
+      }
+    }
+    if (n_genes_down > 0L && !is.null(signature_genes_down) && length(signature_genes_down) > 0L) {
+      m_dn <- tryCatch(match_genes(mat, signature_genes_down, use_aliases = TRUE)$found, error = function(e) character(0))
+      hit_dn_ok <- match(m_dn, rownames(mat))
+      hit_dn_ok <- hit_dn_ok[!is.na(hit_dn_ok) & gene_ok[hit_dn_ok]]
+      if (length(hit_dn_ok) > 0L && length(hit_dn_ok) < n_genes_down_eff) {
+        n_genes_down_eff <- length(hit_dn_ok)
+      }
+    }
+  }
+
+  need_genes <- n_genes_eff + n_genes_down_eff
   pool_idx <- which(gene_ok & !(rows_up %in% exclude_up))
   pool_genes <- rownames(mat)[pool_idx]
   pool_size <- length(pool_genes)
 
   if (pool_size < need_genes) {
     warning(
-      "Null havuz boyutu (", pool_size, ") n_genes+n_genes_down (",
-      need_genes, ") altinda; null testi atlandi.",
+      "Null pool size (", pool_size, ") is below n_genes+n_genes_down (",
+      need_genes, "); null permutation test skipped.",
       call. = FALSE
     )
     return(list(
@@ -122,7 +176,11 @@ null_permutation_test <- function(mat,
       null_p = NA_real_,
       n_perm = as.integer(n_perm),
       n_genes = as.integer(n_genes),
+      n_genes_effective = as.integer(n_genes_eff),
       pool_size = pool_size,
+      universe_size = as.integer(universe_size),
+      partial_background = partial_background,
+      background_type = background_type,
       seed = seed
     ))
   }
@@ -130,11 +188,51 @@ null_permutation_test <- function(mat,
   # Gozlenen AUC
   if (is.null(observed_scores)) {
     sig_use <- if (is.null(signature_genes)) exclude_genes else signature_genes
-    scored <- score_signature(mat, genes = sig_use, method = method, min_genes = min_genes)
+    scored <- score_signature(
+      mat,
+      genes = if (is.null(signature_genes_down) && is.null(weights)) sig_use else NULL,
+      genes_up = if (!is.null(signature_genes_down) && is.null(weights)) sig_use else NULL,
+      genes_down = if (!is.null(signature_genes_down) && is.null(weights)) signature_genes_down else NULL,
+      weights = weights,
+      method = method,
+      min_genes = min_genes
+    )
     if (isTRUE(scored$skipped) || is.null(scored$scores)) {
-      stop("Gozlenen imza skorlanamadi: ", scored$skip_reason, call. = FALSE)
+      stop("Observed signature could not be scored: ", scored$skip_reason, call. = FALSE)
     }
     observed_scores <- scored$scores
+  }
+
+  # Agirlikli imzalar icin up ve down agirlik buyukluklerini cozumle
+  w_up_vec <- NULL
+  w_dn_vec <- NULL
+  if (!is.null(weights) && is.numeric(weights) && length(weights) > 0L && !is.null(names(weights))) {
+    w_clean <- stats::setNames(as.numeric(weights), toupper(trimws(names(weights))))
+    w_clean <- w_clean[nzchar(names(w_clean)) & is.finite(w_clean) & w_clean != 0]
+    if (length(w_clean) > 0L) {
+      pos_q <- names(w_clean)[w_clean > 0]
+      neg_q <- names(w_clean)[w_clean < 0]
+      if (length(pos_q) > 0L && n_genes_eff > 0L) {
+        cov_p <- tryCatch(match_genes(mat, pos_q, use_aliases = TRUE), error = function(e) NULL)
+        if (!is.null(cov_p) && length(cov_p$found) > 0L) {
+          w_p <- abs(as.numeric(.resolve_found_weights(cov_p$found, w_clean, cov_p$alias_rescued)))
+          w_p <- w_p[is.finite(w_p) & w_p > 0]
+          if (length(w_p) > 0L) {
+            w_up_vec <- rep_len(w_p, n_genes_eff)
+          }
+        }
+      }
+      if (length(neg_q) > 0L && n_genes_down_eff > 0L) {
+        cov_n <- tryCatch(match_genes(mat, neg_q, use_aliases = TRUE), error = function(e) NULL)
+        if (!is.null(cov_n) && length(cov_n$found) > 0L) {
+          w_n <- abs(as.numeric(.resolve_found_weights(cov_n$found, w_clean, cov_n$alias_rescued)))
+          w_n <- w_n[is.finite(w_n) & w_n > 0]
+          if (length(w_n) > 0L) {
+            w_dn_vec <- rep_len(w_n, n_genes_down_eff)
+          }
+        }
+      }
+    }
   }
 
   # Skor / yanit ortak ornekleri
@@ -152,76 +250,128 @@ null_permutation_test <- function(mat,
   obs_oriented <- orient_score(obs_scores, direction = direction)
   obs_auc <- auc_mw(obs_oriented, resp_use)
 
-  # Eslestirme: imza gen ortalama ifadeleri -> quantile bin (up ve down ayri)
-  pool_means <- rowMeans(mat[pool_idx, , drop = FALSE], na.rm = TRUE)
-  all_means <- rowMeans(mat, na.rm = TRUE)
-  brks <- unique(stats::quantile(all_means[is.finite(all_means)],
-                                 probs = seq(0, 1, length.out = 6),
-                                 na.rm = TRUE, names = FALSE))
-  pool_bins <- NULL
-  sig_bins <- NULL
-  sig_bins_down <- NULL
+  # Faz 4.6: 2D (5 Ortalama Ifade Quantile x 3 Gen SD/Dispersiyon Tertile) eslestirme
+  pool_means <- row_mean[pool_idx]
+  pool_sds <- row_sd[pool_idx]
+  all_means <- row_mean
+  all_sds <- row_sd
+  brks_mean <- unique(stats::quantile(
+    all_means[is.finite(all_means)],
+    probs = seq(0, 1, length.out = 6),
+    na.rm = TRUE, names = FALSE
+  ))
+  brks_sd <- unique(stats::quantile(
+    all_sds[is.finite(all_sds) & all_sds > 0],
+    probs = seq(0, 1, length.out = 4),
+    na.rm = TRUE, names = FALSE
+  ))
+
+  pool_bins_mean <- NULL
+  pool_bins_2d <- NULL
+  sig_bins_mean <- NULL
+  sig_bins_2d <- NULL
+  sig_bins_down_mean <- NULL
+  sig_bins_down_2d <- NULL
+  has_sd_bins <- length(brks_sd) >= 2L
+
   match_up <- isTRUE(match_expression) && n_genes > 0L
   match_down <- isTRUE(match_expression) &&
     n_genes_down > 0L &&
     !is.null(signature_genes_down) &&
     length(signature_genes_down) > 0L
 
-  if (length(brks) < 2L) {
+  if (length(brks_mean) < 2L) {
     match_up <- FALSE
     match_down <- FALSE
   } else {
-    pool_bins <- as.integer(cut(pool_means, breaks = brks, include.lowest = TRUE, labels = FALSE))
+    pool_bins_mean <- as.integer(cut(pool_means, breaks = brks_mean, include.lowest = TRUE, labels = FALSE))
+    if (has_sd_bins) {
+      pool_bins_sd <- as.integer(cut(pool_sds, breaks = brks_sd, include.lowest = TRUE, labels = FALSE))
+      pool_bins_sd[is.na(pool_bins_sd)] <- 1L
+      pool_bins_2d <- (pool_bins_mean - 1L) * 3L + pool_bins_sd
+    } else {
+      pool_bins_2d <- pool_bins_mean
+    }
   }
 
   if (isTRUE(match_up)) {
     sig_ref <- if (is.null(signature_genes)) exclude_genes else signature_genes
-    sig_ref_up <- unique(toupper(as.character(sig_ref)))
-    hit <- match(sig_ref_up, rows_up)
+    found_ref_up <- if (length(sig_ref) > 0L) {
+      tryCatch(match_genes(mat, sig_ref, use_aliases = TRUE)$found, error = function(e) character(0))
+    } else {
+      character(0)
+    }
+    hit <- match(found_ref_up, rownames(mat))
     hit <- hit[!is.na(hit)]
     if (length(hit) == 0L) {
-      warning("match_expression: up imza geni bulunamadi; up rastgele orneklemeye dusuldu.", call. = FALSE)
+      warning("match_expression: no up signature genes found; falling back to random sampling.", call. = FALSE)
       match_up <- FALSE
     } else {
-      sig_means <- rowMeans(mat[hit, , drop = FALSE], na.rm = TRUE)
-      sig_means <- sig_means[is.finite(sig_means)]
+      sig_means <- row_mean[hit]
+      sig_sds <- row_sd[hit]
+      keep_s <- is.finite(sig_means)
+      sig_means <- sig_means[keep_s]
+      sig_sds <- sig_sds[keep_s]
       if (length(sig_means) == 0L) {
-        warning("match_expression: up ortalama ifadesi NA; up rastgele orneklemeye dusuldu.", call. = FALSE)
+        warning("match_expression: up mean expression is NA; falling back to random sampling.", call. = FALSE)
         match_up <- FALSE
       } else {
-        sig_bins <- as.integer(cut(sig_means, breaks = brks, include.lowest = TRUE, labels = FALSE))
-        sig_bins <- sig_bins[!is.na(sig_bins)]
-        if (length(sig_bins) == 0L) {
-          warning("match_expression: sig_bins NA; up rastgele orneklemeye dusuldu.", call. = FALSE)
+        m_bins <- as.integer(cut(sig_means, breaks = brks_mean, include.lowest = TRUE, labels = FALSE))
+        ok_b <- !is.na(m_bins)
+        m_bins <- m_bins[ok_b]
+        if (length(m_bins) == 0L) {
+          warning("match_expression: sig_bins NA; falling back to random sampling.", call. = FALSE)
           match_up <- FALSE
-          sig_bins <- NULL
+        } else {
+          sig_bins_mean <- m_bins
+          if (has_sd_bins) {
+            s_bins <- as.integer(cut(sig_sds[ok_b], breaks = brks_sd, include.lowest = TRUE, labels = FALSE))
+            s_bins[is.na(s_bins)] <- 1L
+            sig_bins_2d <- (m_bins - 1L) * 3L + s_bins
+          } else {
+            sig_bins_2d <- m_bins
+          }
         }
       }
     }
   }
 
   if (isTRUE(match_down)) {
-    sig_ref_dn <- unique(toupper(as.character(signature_genes_down)))
-    hit_dn <- match(sig_ref_dn, rows_up)
+    found_ref_dn <- if (length(signature_genes_down) > 0L) {
+      tryCatch(match_genes(mat, signature_genes_down, use_aliases = TRUE)$found, error = function(e) character(0))
+    } else {
+      character(0)
+    }
+    hit_dn <- match(found_ref_dn, rownames(mat))
     hit_dn <- hit_dn[!is.na(hit_dn)]
     if (length(hit_dn) == 0L) {
-      warning("match_expression: down imza geni bulunamadi; down rastgele orneklemeye dusuldu.", call. = FALSE)
+      warning("match_expression: no down signature genes found; falling back to random sampling.", call. = FALSE)
       match_down <- FALSE
     } else {
-      sig_means_dn <- rowMeans(mat[hit_dn, , drop = FALSE], na.rm = TRUE)
-      sig_means_dn <- sig_means_dn[is.finite(sig_means_dn)]
+      sig_means_dn <- row_mean[hit_dn]
+      sig_sds_dn <- row_sd[hit_dn]
+      keep_sd <- is.finite(sig_means_dn)
+      sig_means_dn <- sig_means_dn[keep_sd]
+      sig_sds_dn <- sig_sds_dn[keep_sd]
       if (length(sig_means_dn) == 0L) {
-        warning("match_expression: down ortalama ifadesi NA; down rastgele orneklemeye dusuldu.", call. = FALSE)
+        warning("match_expression: down mean expression is NA; falling back to random sampling.", call. = FALSE)
         match_down <- FALSE
       } else {
-        sig_bins_down <- as.integer(
-          cut(sig_means_dn, breaks = brks, include.lowest = TRUE, labels = FALSE)
-        )
-        sig_bins_down <- sig_bins_down[!is.na(sig_bins_down)]
-        if (length(sig_bins_down) == 0L) {
-          warning("match_expression: sig_bins_down NA; down rastgele orneklemeye dusuldu.", call. = FALSE)
+        m_bins_dn <- as.integer(cut(sig_means_dn, breaks = brks_mean, include.lowest = TRUE, labels = FALSE))
+        ok_bd <- !is.na(m_bins_dn)
+        m_bins_dn <- m_bins_dn[ok_bd]
+        if (length(m_bins_dn) == 0L) {
+          warning("match_expression: sig_bins_down NA; falling back to random sampling.", call. = FALSE)
           match_down <- FALSE
-          sig_bins_down <- NULL
+        } else {
+          sig_bins_down_mean <- m_bins_dn
+          if (has_sd_bins) {
+            s_bins_dn <- as.integer(cut(sig_sds_dn[ok_bd], breaks = brks_sd, include.lowest = TRUE, labels = FALSE))
+            s_bins_dn[is.na(s_bins_dn)] <- 1L
+            sig_bins_down_2d <- (m_bins_dn - 1L) * 3L + s_bins_dn
+          } else {
+            sig_bins_down_2d <- m_bins_dn
+          }
         }
       }
     }
@@ -266,7 +416,7 @@ null_permutation_test <- function(mat,
     score_mat <- pool_mat
   }
 
-  .sample_matched_arm <- function(n_need, bins, already_picked) {
+  .sample_matched_arm <- function(n_need, bins_2d, bins_mean, already_picked) {
     if (n_need < 1L) {
       return(character(0))
     }
@@ -275,16 +425,28 @@ null_permutation_test <- function(mat,
       return(NULL)
     }
     picked <- character(0)
-    for (bn in bins) {
+    for (idx_b in seq_along(bins_2d)) {
       if (length(picked) >= n_need) {
         break
       }
+      bn2 <- bins_2d[idx_b]
+      bn1 <- if (!is.null(bins_mean) && length(bins_mean) >= idx_b) bins_mean[idx_b] else NA_integer_
+      # Oncelikle 2D (ortalama + SD) hucresinden aday sec
       cand_idx <- which(
-        !is.na(pool_bins) &
-          pool_bins == bn &
+        !is.na(pool_bins_2d) &
+          pool_bins_2d == bn2 &
           pool_genes %in% avail &
           !(pool_genes %in% picked)
       )
+      # 2D hucrede aday yoksa ayni ortalama ifade quantile (1D) hucresine geri don
+      if (length(cand_idx) == 0L && !is.na(bn1)) {
+        cand_idx <- which(
+          !is.na(pool_bins_mean) &
+            pool_bins_mean == bn1 &
+            pool_genes %in% avail &
+            !(pool_genes %in% picked)
+        )
+      }
       cand <- pool_genes[cand_idx]
       if (length(cand) == 0L) {
         cand <- setdiff(avail, picked)
@@ -306,31 +468,31 @@ null_permutation_test <- function(mat,
   }
 
   .pick_null_genes <- function() {
-    if (n_genes > 0L) {
-      if (isTRUE(match_up) && !is.null(sig_bins)) {
-        picked_up <- .sample_matched_arm(n_genes, sig_bins, character(0))
+    if (n_genes_eff > 0L) {
+      if (isTRUE(match_up) && !is.null(sig_bins_2d)) {
+        picked_up <- .sample_matched_arm(n_genes_eff, sig_bins_2d, sig_bins_mean, character(0))
         if (is.null(picked_up)) {
           return(NULL)
         }
       } else {
-        picked_up <- sample(pool_genes, size = n_genes, replace = FALSE)
+        picked_up <- sample(pool_genes, size = n_genes_eff, replace = FALSE)
       }
     } else {
       picked_up <- character(0)
     }
 
-    if (n_genes_down > 0L) {
-      if (isTRUE(match_down) && !is.null(sig_bins_down)) {
-        picked_down <- .sample_matched_arm(n_genes_down, sig_bins_down, picked_up)
+    if (n_genes_down_eff > 0L) {
+      if (isTRUE(match_down) && !is.null(sig_bins_down_2d)) {
+        picked_down <- .sample_matched_arm(n_genes_down_eff, sig_bins_down_2d, sig_bins_down_mean, picked_up)
         if (is.null(picked_down)) {
           return(NULL)
         }
       } else {
         rem <- setdiff(pool_genes, picked_up)
-        if (length(rem) < n_genes_down) {
+        if (length(rem) < n_genes_down_eff) {
           return(NULL)
         }
-        picked_down <- sample(rem, size = n_genes_down, replace = FALSE)
+        picked_down <- sample(rem, size = n_genes_down_eff, replace = FALSE)
       }
     } else {
       picked_down <- character(0)
@@ -338,7 +500,7 @@ null_permutation_test <- function(mat,
     list(up = picked_up, down = picked_down)
   }
 
-  .arm_scores <- function(gene_names) {
+  .arm_scores <- function(gene_names, arm_weights = NULL) {
     if (length(gene_names) == 0L) {
       return(NULL)
     }
@@ -347,6 +509,13 @@ null_permutation_test <- function(mat,
       return(NULL)
     }
     sub <- score_mat[row_idx, , drop = FALSE]
+    if (!is.null(arm_weights) && length(arm_weights) == nrow(sub) && method != "median") {
+      w_mat <- matrix(arm_weights, nrow = nrow(sub), ncol = ncol(sub))
+      w_mat[!is.finite(sub)] <- NA_real_
+      out <- colSums(sub * w_mat, na.rm = TRUE) / colSums(w_mat, na.rm = TRUE)
+      out[colSums(is.finite(sub)) == 0L] <- NA_real_
+      return(out)
+    }
     if (method == "median") {
       out <- apply(sub, 2L, function(x) {
         if (all(is.na(x))) NA_real_ else stats::median(x, na.rm = TRUE)
@@ -363,12 +532,12 @@ null_permutation_test <- function(mat,
       has_up <- length(picked$up) > 0L
       has_down <- length(picked$down) > 0L
       s_up <- if (has_up) {
-        .ss_rank_arm(rank_mat, picked$up, N_j, reverse = FALSE)
+        .ss_rank_arm(rank_mat, picked$up, N_j, reverse = FALSE, arm_weights = w_up_vec)
       } else {
         rep(0, ncol(mat))
       }
       s_down <- if (has_down) {
-        .ss_rank_arm(rank_mat, picked$down, N_j, reverse = TRUE)
+        .ss_rank_arm(rank_mat, picked$down, N_j, reverse = TRUE, arm_weights = w_dn_vec)
       } else {
         rep(0, ncol(mat))
       }
@@ -385,8 +554,8 @@ null_permutation_test <- function(mat,
       return(scores)
     }
 
-    scores_up <- .arm_scores(picked$up)
-    scores_dn <- .arm_scores(picked$down)
+    scores_up <- .arm_scores(picked$up, arm_weights = w_up_vec)
+    scores_dn <- .arm_scores(picked$down, arm_weights = w_dn_vec)
     if (!is.null(scores_up) && !is.null(scores_dn)) {
       scores <- scores_up - scores_dn
     } else if (!is.null(scores_up)) {
@@ -434,7 +603,11 @@ null_permutation_test <- function(mat,
     null_p = null_p,
     n_perm = as.integer(n_perm),
     n_genes = as.integer(n_genes),
+    n_genes_effective = as.integer(n_genes_eff),
     pool_size = pool_size,
+    universe_size = as.integer(universe_size),
+    partial_background = partial_background,
+    background_type = background_type,
     seed = seed
   )
 }

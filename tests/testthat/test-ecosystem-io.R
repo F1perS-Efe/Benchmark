@@ -36,6 +36,6 @@ test_that("as_sigbenchr_dataset validates lists and rejects bad objects", {
   expect_error(as_sigbenchr_dataset(1:5), "SummarizedExperiment|named dataset lists")
   expect_error(
     as_sigbenchr_dataset(list(expr = ds$expr)),
-    "eksik alanlar"
+    "missing required fields|eksik alanlar"
   )
 })

@@ -17,15 +17,22 @@
     logrank_p = numeric(),
     median_surv_high = numeric(),
     median_surv_low = numeric(),
+    ph_p = numeric(),
+    ph_violated = logical(),
+    surv_note = character(),
     small_sample = logical(),
     stringsAsFactors = FALSE
   )
   if (isTRUE(with_signature)) {
     out$signature <- character()
+    out$method <- character()
+    out$p_adj_bh <- numeric()
+    out$logrank_p_adj_bh <- numeric()
     out <- out[, c(
-      "cohort", "signature", "endpoint", "n_samples", "n_events",
-      "hr", "hr_ci_low", "hr_ci_high", "cox_p", "c_index",
-      "logrank_p", "median_surv_high", "median_surv_low", "small_sample"
+      "cohort", "signature", "method", "endpoint", "n_samples", "n_events",
+      "hr", "hr_ci_low", "hr_ci_high", "cox_p", "p_adj_bh", "c_index",
+      "logrank_p", "logrank_p_adj_bh", "median_surv_high", "median_surv_low",
+      "ph_p", "ph_violated", "surv_note", "small_sample"
     ), drop = FALSE]
   }
   out
@@ -172,7 +179,14 @@ evaluate_survival <- function(dataset,
   time <- as.numeric(ds$sample_meta[[time_col]])
   event <- as.numeric(ds$sample_meta[[event_col]])
 
-  ok <- is.finite(time) & !is.na(event) & is.finite(score_vec)
+  neg_time <- is.finite(time) & time < 0
+  if (any(neg_time)) {
+    warning(
+      sum(neg_time), " sample(s) with negative survival time excluded.",
+      call. = FALSE
+    )
+  }
+  ok <- is.finite(time) & time >= 0 & !is.na(event) & is.finite(score_vec)
   time <- time[ok]
   event <- event[ok]
   score_use <- score_vec[ok]
@@ -194,6 +208,9 @@ evaluate_survival <- function(dataset,
       logrank_p = NA_real_,
       median_surv_high = NA_real_,
       median_surv_low = NA_real_,
+      ph_p = NA_real_,
+      ph_violated = NA,
+      surv_note = "Insufficient sample size or events",
       small_sample = isTRUE(small),
       stringsAsFactors = FALSE
     )
@@ -214,16 +231,25 @@ evaluate_survival <- function(dataset,
   hr_ci_high <- NA_real_
   cox_p <- NA_real_
   c_index <- NA_real_
+  ph_p <- NA_real_
+  ph_violated <- NA
 
   cox_out <- tryCatch(
     {
       fit <- survival::coxph(survival::Surv(time, event) ~ z_score)
       s <- summary(fit)
+      zph <- tryCatch(suppressWarnings(survival::cox.zph(fit)), error = function(e) NULL)
+      ph_val <- if (!is.null(zph) && !is.null(zph$table) && nrow(zph$table) >= 1L) {
+        as.numeric(zph$table[1L, "p"])
+      } else {
+        NA_real_
+      }
       list(
         hr = as.numeric(exp(stats::coef(fit)))[1],
         ci = as.numeric(exp(stats::confint(fit)))[1:2],
         cox_p = as.numeric(s$coefficients[, "Pr(>|z|)"])[1],
-        c_index = as.numeric(s$concordance[1])
+        c_index = as.numeric(s$concordance[1]),
+        ph_p = ph_val
       )
     },
     error = function(e) NULL
@@ -234,18 +260,29 @@ evaluate_survival <- function(dataset,
     hr_ci_high <- cox_out$ci[2]
     cox_p <- cox_out$cox_p
     c_index <- cox_out$c_index
+    ph_p <- cox_out$ph_p
+    ph_violated <- is.finite(ph_p) && ph_p < 0.05
   }
 
   logrank_p <- NA_real_
   median_surv_high <- NA_real_
   median_surv_low <- NA_real_
+  surv_note <- NA_character_
 
-  med_cut <- stats::median(score_use)
-  grp <- ifelse(score_use >= med_cut, "High", "Low")
+  med_cut <- stats::median(z_score)
+  grp <- ifelse(z_score >= med_cut, "High", "Low")
   n_high <- sum(grp == "High", na.rm = TRUE)
   n_low <- sum(grp == "Low", na.rm = TRUE)
+  if (min(n_high, n_low) < 3L) {
+    grp_strict <- ifelse(z_score > med_cut, "High", "Low")
+    if (min(sum(grp_strict == "High"), sum(grp_strict == "Low")) >= 3L) {
+      grp <- grp_strict
+      n_high <- sum(grp == "High", na.rm = TRUE)
+      n_low <- sum(grp == "Low", na.rm = TRUE)
+    }
+  }
 
-  if (n_high >= 1L && n_low >= 1L) {
+  if (n_high >= 3L && n_low >= 3L) {
     lr <- tryCatch(
       {
         sd_fit <- survival::survdiff(survival::Surv(time, event) ~ grp)
@@ -264,6 +301,8 @@ evaluate_survival <- function(dataset,
     )
     median_surv_high <- meds$high
     median_surv_low <- meds$low
+  } else {
+    surv_note <- "Too few samples in one median stratum (< 3) due to ties"
   }
 
   data.frame(
@@ -279,6 +318,9 @@ evaluate_survival <- function(dataset,
     logrank_p = logrank_p,
     median_surv_high = median_surv_high,
     median_surv_low = median_surv_low,
+    ph_p = ph_p,
+    ph_violated = ph_violated,
+    surv_note = surv_note,
     small_sample = FALSE,
     stringsAsFactors = FALSE
   )
@@ -298,7 +340,12 @@ evaluate_survival <- function(dataset,
 #' @param cutoff,orient_direction Passed to `evaluate_survival()`.
 #' @param apply_log2,min_genes Expression prep / scoring thresholds.
 #'
-#' @return `data.frame` with one row per cohort x signature (plus `signature`).
+#' @return `data.frame` with one row per cohort x signature, including separate
+#'   Benjamini-Hochberg FDR columns for the continuous Cox proportional hazards
+#'   family (`cox_p` -> `p_adj_bh`) and the median-dichotomized Kaplan-Meier
+#'   log-rank family (`logrank_p` -> `logrank_p_adj_bh`), while keeping the
+#'   Schoenfeld proportional hazards assumption check (`ph_p`, `ph_violated`)
+#'   intentionally unadjusted as a model diagnostic.
 #' @export
 run_survival_benchmark <- function(datasets,
                                    signatures,
@@ -323,7 +370,27 @@ run_survival_benchmark <- function(datasets,
   row_i <- 0L
 
   for (ds_name in names(datasets)) {
-    ds <- validate_dataset(datasets[[ds_name]], name = ds_name)
+    prep <- tryCatch(
+      .prepare_cohort(
+        datasets[[ds_name]],
+        name = ds_name,
+        apply_log2 = apply_log2,
+        filter_response = FALSE
+      ),
+      error = function(e) e
+    )
+    if (inherits(prep, "error")) {
+      if (length(datasets) == 1L) {
+        stop(conditionMessage(prep), call. = FALSE)
+      }
+      warning(
+        "Skipping cohort '", ds_name, "' in run_survival_benchmark(): ",
+        conditionMessage(prep),
+        call. = FALSE
+      )
+      next
+    }
+    ds <- prep$ds
     has_time <- time_col %in% names(ds$sample_meta)
     has_event <- event_col %in% names(ds$sample_meta)
     if (!has_time || !has_event) {
@@ -333,33 +400,19 @@ run_survival_benchmark <- function(datasets,
       )
       next
     }
-
-    expr <- collapse_duplicate_genes(as.matrix(ds$expr))
-    expr <- prepare_expression(
-      expr,
-      scale = ds$info$scale,
-      apply_log2 = apply_log2
-    )
+    expr <- prep$expr
 
     for (sig_name in names(signatures)) {
-      sig <- signatures[[sig_name]]
-      if (is.character(sig) || is.numeric(sig)) {
-        sig <- list(genes = sig)
-      }
-      if (is.null(sig$genes) && is.null(sig$genes_up) && is.null(sig$genes_down)) {
-        stop(
-          "Signature '", sig_name,
-          "' requires `genes` or `genes_up`/`genes_down`.",
-          call. = FALSE
-        )
-      }
+      sig <- .as_signature(signatures[[sig_name]], name = sig_name)
+      eff_min_genes <- .resolve_min_genes(sig, default = min_genes)
       scored <- score_signature(
         expr,
         genes = sig$genes,
         genes_up = sig$genes_up,
         genes_down = sig$genes_down,
+        weights = sig$weights,
         method = method,
-        min_genes = min_genes
+        min_genes = eff_min_genes
       )
       if (isTRUE(scored$skipped) || is.null(scored$scores)) {
         next
@@ -369,19 +422,29 @@ run_survival_benchmark <- function(datasets,
       ds_eval <- ds
       ds_eval$info$dataset_name <- ds_name
 
+      sig_orient <- if (!is.null(sig$direction) &&
+                        as.character(sig$direction)[1] %in% c("negative", ">")) {
+        "lower_better"
+      } else {
+        orient_direction
+      }
       row <- evaluate_survival(
         dataset = ds_eval,
         score = scored$scores,
         time_col = time_col,
         event_col = event_col,
         cutoff = cutoff,
-        orient_direction = orient_direction
+        orient_direction = sig_orient
       )
       row$signature <- sig_name
+      row$method <- method
+      row$p_adj_bh <- NA_real_
+      row$logrank_p_adj_bh <- NA_real_
       row <- row[, c(
-        "cohort", "signature", "endpoint", "n_samples", "n_events",
-        "hr", "hr_ci_low", "hr_ci_high", "cox_p", "c_index",
-        "logrank_p", "median_surv_high", "median_surv_low", "small_sample"
+        "cohort", "signature", "method", "endpoint", "n_samples", "n_events",
+        "hr", "hr_ci_low", "hr_ci_high", "cox_p", "p_adj_bh", "c_index",
+        "logrank_p", "logrank_p_adj_bh", "median_surv_high", "median_surv_low",
+        "ph_p", "ph_violated", "surv_note", "small_sample"
       ), drop = FALSE]
       row_i <- row_i + 1L
       rows[[row_i]] <- row
@@ -393,6 +456,14 @@ run_survival_benchmark <- function(datasets,
   }
   out <- do.call(rbind, rows)
   rownames(out) <- NULL
+  ok_p <- is.finite(out$cox_p)
+  if (any(ok_p)) {
+    out$p_adj_bh[ok_p] <- stats::p.adjust(out$cox_p[ok_p], method = "BH")
+  }
+  ok_lr <- is.finite(out$logrank_p)
+  if (any(ok_lr)) {
+    out$logrank_p_adj_bh[ok_lr] <- stats::p.adjust(out$logrank_p[ok_lr], method = "BH")
+  }
   out
 }
 
@@ -438,17 +509,67 @@ combine_response_and_survival <- function(auc_res, surv_res) {
       c_index = numeric(),
       stringsAsFactors = FALSE
     )
-  } else {
-    need <- c("cohort", "signature", "hr", "cox_p", "logrank_p", "c_index")
-    miss <- setdiff(need, names(surv_res))
-    if (length(miss) > 0L) {
-      stop(
-        "`surv_res` missing columns: ", paste(miss, collapse = ", "),
-        call. = FALSE
-      )
-    }
-    surv_keep <- surv_res[, need, drop = FALSE]
+    return(merge(auc, surv_keep, by = c("cohort", "signature"), all.x = TRUE))
   }
 
-  merge(auc, surv_keep, by = c("cohort", "signature"), all.x = TRUE)
+  need <- c("cohort", "signature", "hr", "cox_p", "logrank_p", "c_index")
+  miss <- setdiff(need, names(surv_res))
+  if (length(miss) > 0L) {
+    stop(
+      "`surv_res` missing columns: ", paste(miss, collapse = ", "),
+      call. = FALSE
+    )
+  }
+
+  use_method <- "method" %in% names(auc) && "method" %in% names(surv_res)
+  if (!use_method && "method" %in% names(auc) && length(unique(auc$method)) > 1L) {
+    warning(
+      "`surv_res` lacks a `method` column while `auc_res` has multiple methods; ",
+      "survival metrics are joined only by (cohort, signature).",
+      call. = FALSE
+    )
+  }
+
+  surv_cols <- if (use_method) c(need, "method") else need
+  surv_keep <- surv_res[, surv_cols, drop = FALSE]
+
+  auc$.join_cohort <- tolower(trimws(as.character(auc$cohort)))
+  auc$.join_sig <- tolower(trimws(as.character(auc$signature)))
+  surv_keep$.join_cohort <- tolower(trimws(as.character(surv_keep$cohort)))
+  surv_keep$.join_sig <- tolower(trimws(as.character(surv_keep$signature)))
+
+  by_keys <- c(".join_cohort", ".join_sig")
+  if (use_method) {
+    auc$.join_method <- tolower(trimws(as.character(auc$method)))
+    surv_keep$.join_method <- tolower(trimws(as.character(surv_keep$method)))
+    by_keys <- c(by_keys, ".join_method")
+  }
+
+  dup_mask <- duplicated(surv_keep[, by_keys, drop = FALSE])
+  if (any(dup_mask)) {
+    warning(
+      "Duplicate survival rows detected (", sum(dup_mask),
+      "); keeping first row per key to prevent Cartesian expansion.",
+      call. = FALSE
+    )
+    surv_keep <- surv_keep[!dup_mask, , drop = FALSE]
+  }
+
+  # Report unmatched survival keys if any
+  auc_keys <- do.call(paste, c(auc[, by_keys, drop = FALSE], list(sep = "\r")))
+  surv_keys <- do.call(paste, c(surv_keep[, by_keys, drop = FALSE], list(sep = "\r")))
+  unmatched <- setdiff(surv_keys, auc_keys)
+  if (length(unmatched) > 0L) {
+    warning(
+      length(unmatched), " survival row(s) had no matching row in `auc_res`.",
+      call. = FALSE
+    )
+  }
+
+  surv_payload <- surv_keep[, c(by_keys, "hr", "cox_p", "logrank_p", "c_index"), drop = FALSE]
+  out <- merge(auc, surv_payload, by = by_keys, all.x = TRUE, sort = FALSE)
+  for (jk in by_keys) {
+    out[[jk]] <- NULL
+  }
+  out
 }

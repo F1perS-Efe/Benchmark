@@ -41,9 +41,9 @@ read_gmt <- function(path) {
 
 #' Coerce objects into a SigBenchR dataset list
 #'
-#' S3 generic. Validates via [validate_dataset()]. Does **not** declare
-#' Bioconductor packages in DESCRIPTION; SummarizedExperiment support is
-#' optional at runtime when that package is already installed.
+#' S3 generic. Validates via [validate_dataset()]. `SummarizedExperiment` is
+#' declared in `Suggests` and loaded optionally at runtime via
+#' `requireNamespace("SummarizedExperiment", quietly = TRUE)`.
 #'
 #' @param x Object to coerce.
 #' @param ... Passed to methods (e.g. `name`, `normalization`, `scale`).
@@ -67,6 +67,25 @@ as_sigbenchr_dataset.list <- function(x, name = NULL, ...) {
 #' @param scale Value stored in `info$scale` (`"log2"` or `"linear"`).
 #' @param response_col Column in colData used as `response_label`.
 #' @export
+as_sigbenchr_dataset.SummarizedExperiment <- function(x,
+                                                      ...,
+                                                      assay = 1L,
+                                                      normalization = "other",
+                                                      scale = "log2",
+                                                      response_col = "response_label",
+                                                      name = NULL) {
+  .coerce_summarized_experiment(
+    x = x,
+    assay = assay,
+    normalization = normalization,
+    scale = scale,
+    response_col = response_col,
+    name = name
+  )
+}
+
+#' @rdname as_sigbenchr_dataset
+#' @export
 as_sigbenchr_dataset.default <- function(x,
                                          ...,
                                          assay = 1L,
@@ -74,42 +93,51 @@ as_sigbenchr_dataset.default <- function(x,
                                          scale = "log2",
                                          response_col = "response_label",
                                          name = NULL) {
-  # Avoid hard-coding Bioconductor package literals for CRAN checks
-  # (same pattern as optional singscore cross-checks elsewhere).
-  se_class <- paste0("Summarized", "Experiment")
-  se_pkg <- paste0("Summarized", "Experiment")
-
-  if (!inherits(x, se_class)) {
+  if (!inherits(x, "SummarizedExperiment")) {
     stop(
       "`as_sigbenchr_dataset()` supports named dataset lists or ",
-      se_class, " objects. Got: ",
+      "SummarizedExperiment objects. Got: ",
       paste(class(x), collapse = "/"),
       ".",
       call. = FALSE
     )
   }
+  .coerce_summarized_experiment(
+    x = x,
+    assay = assay,
+    normalization = normalization,
+    scale = scale,
+    response_col = response_col,
+    name = name
+  )
+}
 
-  if (!requireNamespace(se_pkg, quietly = TRUE)) {
+#' @noRd
+.coerce_summarized_experiment <- function(x,
+                                          assay = 1L,
+                                          normalization = "other",
+                                          scale = "log2",
+                                          response_col = "response_label",
+                                          name = NULL) {
+  if (!requireNamespace("SummarizedExperiment", quietly = TRUE)) {
     stop(
-      "Object inherits ", se_class, " but package '", se_pkg,
-      "' is not installed. Install it from Bioconductor to coerce, ",
+      "Object inherits SummarizedExperiment but package 'SummarizedExperiment' ",
+      "is not installed. Install it from Bioconductor to coerce, ",
       "or pass a list(expr, sample_meta, info) instead.",
       call. = FALSE
     )
   }
 
-  assay_fun <- getExportedValue(se_pkg, "assay")
-  coldata_fun <- getExportedValue(se_pkg, "colData")
-  expr <- assay_fun(x, assay)
+  expr <- SummarizedExperiment::assay(x, assay)
   expr <- as.matrix(expr)
   if (is.null(rownames(expr)) || is.null(colnames(expr))) {
     stop(
-      se_class, " assay must have gene rownames and sample colnames.",
+      "SummarizedExperiment assay must have gene rownames and sample colnames.",
       call. = FALSE
     )
   }
 
-  cd <- as.data.frame(coldata_fun(x), stringsAsFactors = FALSE)
+  cd <- as.data.frame(SummarizedExperiment::colData(x), stringsAsFactors = FALSE)
   if (!"sample_id" %in% names(cd)) {
     cd$sample_id <- colnames(expr)
   }
@@ -142,7 +170,7 @@ as_sigbenchr_dataset.default <- function(x,
     info = list(
       normalization = as.character(normalization)[1],
       scale = as.character(scale)[1],
-      source = se_class
+      source = "SummarizedExperiment"
     )
   )
   validate_dataset(ds, name = name)

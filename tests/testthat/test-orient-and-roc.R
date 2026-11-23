@@ -44,6 +44,6 @@ test_that("tek sınıflı yanıt hata verir", {
   skip_if_not_installed("pROC")
   expect_error(
     roc_auc(c(1, 2, 3), c(1, 1, 1), direction = "<"),
-    "her iki sinif"
+    "Both response classes|her iki sinif"
   )
 })

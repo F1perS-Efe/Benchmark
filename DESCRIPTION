@@ -11,25 +11,33 @@ Description: Statistically validates whether a gene signature predicts
     via run_app().
 License: GPL (>= 3)
 Encoding: UTF-8
-LazyData: true
+LazyData: false
+biocViews: Software, GeneExpression, Transcriptomics, Classification, Survival
 VignetteBuilder: knitr
 Roxygen: list(markdown = TRUE)
 Depends: 
     R (>= 4.2.0)
 Imports:
     ggplot2,
+    jsonlite,
     pROC,
     PRROC,
+    rlang,
     stats,
     tools,
     utils,
-    withr
+    withr,
+    yaml
 Suggests:
+    babelgene,
     DT,
+    homologene,
     knitr,
     rmarkdown,
     shiny,
+    SummarizedExperiment,
     survival,
-    testthat (>= 3.0.0)
+    testthat (>= 3.0.0),
+    zip
 Config/testthat/edition: 3
 Config/roxygen2/version: 8.1.1

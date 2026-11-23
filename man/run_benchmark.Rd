@@ -11,7 +11,7 @@ run_benchmark(
   direction = "<",
   min_genes = 3L,
   coverage_threshold = 0.7,
-  min_coverage = 0.5,
+  min_coverage = coverage_threshold,
   invalid_coverage = 0.2,
   apply_log2 = TRUE,
   sd_handling = "exclude",
@@ -63,13 +63,37 @@ run_benchmark(
 
 \item{seed}{Rastgelelik tohumu (PR bootstrap ve null); hucre basina turetilir.}
 
-\item{match_expression}{Null icin ifade-eslesmeli ornekleme.}
+\item{match_expression}{Null icin ifade-ve-dispersiyon (2D ortalama x SD)
+eslesmeli ornekleme.}
 }
 \value{
-\code{data.frame} sonuc tablosu (\code{signed}, \code{treatment}, \code{endpoint_type},
-\code{cancer_type}, \code{normalization}, \code{power_auc70} sutunlari dahil).
+\code{data.frame} sonuc tablosu:
+\itemize{
+\item ROC-AUC: \code{auc}, \code{auc_ci_low}, \code{auc_ci_high}, \code{auc_var}, \code{var_zero}, \code{small_cohort}
+\item PR-AUC ve tanilari: \code{pr_auc}, \code{pr_baseline}, \code{pr_ci_low}, \code{pr_ci_high},
+\code{tie_fraction}, \code{small_positive_class}, \code{n_boot_valid}, \code{ci_unreliable}
+\item Null permutasyon ve FDR aileleri: \code{null_p} (ham), \code{null_p_adj_bh}
+(yontem-ici BH), \code{null_p_adj_bh_global} (tum yontem x imza x kohort
+ailesinde global BH), \code{background_type}, \code{universe_size}
+\item Kapsama ve metaveri: \code{coverage_pct}, \code{coverage_status}, \code{low_coverage},
+\code{n_alias_rescued}, \code{signed}, \code{treatment}, \code{endpoint_type},
+\code{cancer_type}, \code{normalization}, \code{power_auc70}, \code{independent},
+\code{skipped}, \code{skip_reason}.
+}
 }
 \description{
 Her veri seti icinde ayri AUC hesaplar; ham ifadeleri birlestirmez.
 Farkli normalizasyonlar yan yana gosterilirken uyari uretir.
+}
+\examples{
+data(datasets_demo, package = "SigBenchR")
+data(signatures_demo, package = "SigBenchR")
+res <- run_benchmark(
+  signatures = signatures_demo["IFNG6"],
+  datasets = datasets_demo["demo_A"],
+  methods = c("mean", "zscore"),
+  compute_pr = FALSE,
+  compute_null = FALSE
+)
+head(res[, c("dataset", "signature", "method", "auc", "auc_ci_low", "auc_ci_high")])
 }

@@ -19,24 +19,27 @@ prepare_expression <- function(expr,
     expr <- as.matrix(expr)
   }
   if (!is.numeric(expr)) {
-    stop("`expr` sayisal olmalidir.", call. = FALSE)
+    stop("`expr` must be numeric.", call. = FALSE)
+  }
+  if (any(is.infinite(expr))) {
+    stop("`expr` cannot contain infinite (Inf / -Inf) values.", call. = FALSE)
   }
 
   # Cok buyuk degerler log olcegi unutulmus olabilir; yalnizca uyari.
-  finite_vals <- expr[is.finite(expr)]
-  if (length(finite_vals) > 0L && max(finite_vals) > large_max_warn &&
-      scale == "log2") {
+  max_val <- suppressWarnings(max(expr, na.rm = TRUE))
+  if (is.finite(max_val) && max_val > large_max_warn && scale == "log2") {
     warning(
-      "Ifade matrisinde cok buyuk degerler var (max > ", large_max_warn,
-      "). Olcek gercekten log2 mi kontrol edin.",
+      "Expression matrix has very large values (max > ", large_max_warn,
+      "). Verify that the scale is truly log2.",
       call. = FALSE
     )
   }
 
   if (scale == "linear" && isTRUE(apply_log2)) {
-    if (any(finite_vals < 0, na.rm = TRUE)) {
+    min_val <- suppressWarnings(min(expr, na.rm = TRUE))
+    if (is.finite(min_val) && min_val < 0) {
       stop(
-        "Negatif deger iceren veriye log2(x + 1) uygulanamaz.",
+        "Cannot apply log2(x + 1) to data containing negative values.",
         call. = FALSE
       )
     }

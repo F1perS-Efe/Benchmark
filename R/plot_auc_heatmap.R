@@ -17,7 +17,7 @@ plot_auc_heatmap <- function(results,
                              coverage_threshold = 0.70,
                              show_normalization = TRUE) {
   if (!is.data.frame(results) || nrow(results) == 0L) {
-    stop("`results` bos olamaz.", call. = FALSE)
+    stop("`results` cannot be empty.", call. = FALSE)
   }
 
   df <- results
@@ -26,12 +26,15 @@ plot_auc_heatmap <- function(results,
   }
   df <- df[df$method == method & !(df$skipped %in% TRUE), , drop = FALSE]
   if (nrow(df) == 0L) {
-    stop("Secilen yontem icin cizilecek satir yok.", call. = FALSE)
+    stop("No non-skipped rows available to plot for the selected method.", call. = FALSE)
   }
 
-  # Dusuk kapsama: esigi dogrudan yeniden hesapla (onceki TRUE kilitlenmesin)
+  # Dusuk kapsama: merkezi siniflandirma ile esigi yeniden hesapla
   if ("coverage_pct" %in% names(df)) {
-    df$low_coverage <- df$coverage_pct < (100 * coverage_threshold)
+    df$low_coverage <- .classify_coverage(
+      df$coverage_pct,
+      ok_threshold = coverage_threshold
+    )$low_coverage
   } else if (!"low_coverage" %in% names(df)) {
     df$low_coverage <- FALSE
   }
@@ -46,23 +49,28 @@ plot_auc_heatmap <- function(results,
   }
   df$cell_label <- ifelse(
     df$low_coverage,
-    paste0("dusuk\n", cov_txt),
+    paste0("low\n", cov_txt),
     sprintf("%.2f", df$auc)
   )
 
   use_norm <- isTRUE(show_normalization) && "normalization" %in% names(df)
+  n_suffix <- if ("n" %in% names(df)) {
+    ifelse(is.finite(df$n), paste0(" (n=", as.integer(df$n), ")"), "")
+  } else {
+    rep("", nrow(df))
+  }
   if (use_norm) {
     norm_lab <- as.character(df$normalization)
     norm_lab[is.na(norm_lab) | !nzchar(norm_lab)] <- "unknown"
-    df$dataset_label <- paste0(as.character(df$dataset), " [", norm_lab, "]")
+    df$dataset_label <- paste0(as.character(df$dataset), n_suffix, " [", norm_lab, "]")
   } else {
-    df$dataset_label <- as.character(df$dataset)
+    df$dataset_label <- paste0(as.character(df$dataset), n_suffix)
   }
 
   caption <- paste0(
-    "Gri hucreler = dusuk gen kapsama (kapsama < %",
+    "Grey cells = low gene coverage (< ",
     round(100 * coverage_threshold),
-    "). Gri, eksik kanit uyarisidir; sessizce yok sayilmamalidir."
+    "%). Grey indicates missing evidence and must not be silently ignored."
   )
   if (use_norm) {
     caption <- paste0(
@@ -93,9 +101,9 @@ plot_auc_heatmap <- function(results,
       name = "AUC"
     ) +
     ggplot2::labs(
-      title = paste0("AUC isi haritasi (", method, ")"),
-      x = "Veri seti",
-      y = "Imza",
+      title = paste0("AUC heatmap (", method, ")"),
+      x = "Cohort",
+      y = "Signature",
       caption = caption
     ) +
     ggplot2::theme_minimal(base_size = 12) +

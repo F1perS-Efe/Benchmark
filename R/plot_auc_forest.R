@@ -22,14 +22,14 @@ plot_auc_forest <- function(results,
                             summary = NULL,
                             show_normalization = TRUE) {
   if (!is.data.frame(results) || nrow(results) == 0L) {
-    stop("`results` bos olamaz.", call. = FALSE)
+    stop("`results` cannot be empty.", call. = FALSE)
   }
   df <- results[!(results$skipped %in% TRUE) & is.finite(results$auc), , drop = FALSE]
   if (is.null(method)) method <- df$method[1]
   if (is.null(signature)) signature <- df$signature[1]
   df <- df[df$method == method & df$signature == signature, , drop = FALSE]
   if (nrow(df) == 0L) {
-    stop("Secilen imza/yontem icin satir yok.", call. = FALSE)
+    stop("No rows available for the selected signature/method.", call. = FALSE)
   }
 
   if (!"auc_ci_low" %in% names(df)) df$auc_ci_low <- NA_real_
@@ -42,6 +42,10 @@ plot_auc_forest <- function(results,
   }
   use_norm <- isTRUE(show_normalization) && "normalization" %in% names(df)
   cohort_base <- as.character(df$dataset)
+  if ("n" %in% names(df)) {
+    n_txt <- ifelse(is.finite(df$n), paste0(" (n=", as.integer(df$n), ")"), "")
+    cohort_base <- paste0(cohort_base, n_txt)
+  }
   if (use_norm) {
     norm_lab <- as.character(df$normalization)
     norm_lab[is.na(norm_lab) | !nzchar(norm_lab)] <- "unknown"
@@ -50,10 +54,10 @@ plot_auc_forest <- function(results,
   df$lab <- ifelse(
     indep_ok,
     cohort_base,
-    paste0(cohort_base, " (bagimsiz degil)")
+    paste0(cohort_base, " (non-independent)")
   )
 
-  caption <- "Kesikli cizgi: sans duzeyi (0.5). var_zero satirlarda GA dar/eksik olabilir."
+  caption <- "Dashed line: chance level (0.5). CIs may be narrow or missing for var_zero rows."
   if (use_norm) {
     caption <- paste0(
       caption,
@@ -85,7 +89,7 @@ plot_auc_forest <- function(results,
       )
       caption <- paste0(
         caption,
-        " Alt satir: logit-AUC REML nokta + kesilmis HKSJ 95 pct GA."
+        " Bottom row: logit-AUC REML estimate + truncated HKSJ 95% CI."
       )
     }
   }
@@ -106,7 +110,7 @@ plot_auc_forest <- function(results,
     ggplot2::geom_point(size = 2.5) +
     ggplot2::labs(
       title = paste0("AUC forest: ", signature, " (", method, ")"),
-      x = "ROC-AUC (DeLong 95 pct GA)",
+      x = "ROC-AUC (DeLong 95% CI)",
       y = NULL,
       caption = caption
     ) +
@@ -121,22 +125,22 @@ plot_auc_forest <- function(results,
     ref_lab <- if ("auc_re" %in% names(sm) && is.finite(sm$auc_re[1])) {
       "auc_re (logit-AUC REML)"
     } else {
-      "auc_ivw (ters-varyans)"
+      "auc_ivw (inverse-variance)"
     }
     if (!is.finite(ref_val)) {
       ref_val <- sm$auc_n_weighted[1]
-      ref_lab <- "auc_n_weighted (n-agirlikli)"
+      ref_lab <- "auc_n_weighted (n-weighted)"
     }
     if (is.finite(ref_val)) {
       cap_extra <- paste0(
-        "Mavi cizgi: ", ref_lab, " = ",
+        "Blue line: ", ref_lab, " = ",
         sprintf("%.3f", ref_val),
-        ". Kesikli: 0.5."
+        ". Dashed: 0.5."
       )
       if (isTRUE(has_hksj)) {
         cap_extra <- paste0(
           cap_extra,
-          " Alt satir: logit-AUC REML + HKSJ 95 pct GA."
+          " Bottom row: logit-AUC REML + HKSJ 95% CI."
         )
       }
       if (use_norm) {

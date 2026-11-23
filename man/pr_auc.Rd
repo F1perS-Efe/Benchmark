@@ -19,15 +19,21 @@ pr_auc(scores, response, direction = c("<", ">"), n_boot = 1000L, seed = 42L)
 }
 \value{
 Liste: \code{pr_auc}, \code{pr_baseline}, \code{pr_ci_low}, \code{pr_ci_high},
-\code{n}, \code{n_pos}, \code{n_neg}.
+\code{n}, \code{n_pos}, \code{n_neg}, \code{tie_fraction}, \code{small_positive_class},
+\code{n_boot_valid}, \code{ci_unreliable}.
 }
 \description{
 Skor once \code{orient_score()} ile "yuksek = yanitli" yapilir, sonra
 \code{PRROC::pr.curve(scores.class0 = ..., weights.class0 = response)}
-ile Davis-Goadrich PR-AUC hesaplanir.
+ile Davis-Goadrich PR-AUC hesaplanir. Yogun tie (bagli deger) nedeniyle
+Davis-Goadrich interpolasyonu sonlu degilse \code{auc.integral} degerine
+geri donulur (\code{tie_fraction} raporlanir).
 }
 \details{
 Taban cizgisi (prevalans): \code{n_pos / n}.
 GA: pozitif ve negatif indeksler ayri ayri iadeli orneklenir
 (\code{n_pos} ve \code{n_neg} sabit); yuzdelik (0.025, 0.975).
+Kucuk pozitif/negatif sinif (\code{n_pos < 5} veya \code{n_neg < 5}) ve
+yetersiz gecerli bootstrap tekrari (\code{n_boot_valid < 0.5 * n_boot})
+durumlarinda \code{small_positive_class} ve \code{ci_unreliable} bayraklari isaretlenir.
 }

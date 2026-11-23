@@ -135,7 +135,7 @@ test_that("edge cases: dup genes, Ensembl warn, unknown label, non-numeric, samp
       f_dup$expr_path, f_dup$meta_path,
       collapse_duplicates = TRUE, scale = "log2"
     ),
-    "yinelenen gen"
+    "duplicate gene"
   )
   expect_equal(nrow(ds_dup$expr), 3L)
 
@@ -163,7 +163,7 @@ test_that("edge cases: dup genes, Ensembl warn, unknown label, non-numeric, samp
   f_bad <- .make_tiny_files(file.path(td, "bad"), bad_numeric = TRUE)
   expect_error(
     read_user_dataset(f_bad$expr_path, f_bad$meta_path, scale = "log2"),
-    "sayisal"
+    "numeric"
   )
 
   # No overlapping sample_id
@@ -179,7 +179,7 @@ test_that("edge cases: dup genes, Ensembl warn, unknown label, non-numeric, samp
   utils::write.csv(meta_bad, meta_bad_path, row.names = FALSE)
   expect_error(
     read_user_dataset(f_ok$expr_path, meta_bad_path, scale = "log2"),
-    "ortak sample_id"
+    "common sample_id"
   )
 })
 

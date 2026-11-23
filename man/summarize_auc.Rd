@@ -2,7 +2,7 @@
 % Please edit documentation in R/summarize_auc.R
 \name{summarize_auc}
 \alias{summarize_auc}
-\title{Veri setleri uzerinde agirlikli AUC ozeti (n, IVW ve logit-AUC REML)}
+\title{Weighted AUC summary across cohorts (n, IVW, and logit-AUC REML)}
 \usage{
 summarize_auc(
   results,
@@ -15,57 +15,55 @@ summarize_auc(
 )
 }
 \arguments{
-\item{results}{\code{run_benchmark()} cikti tablosu.}
+\item{results}{Output \code{data.frame} from \code{\link[=run_benchmark]{run_benchmark()}}.}
 
-\item{method}{Belirli skorlama yontemi; \code{NULL} ise tum yontemler ayri ozetlenir.}
+\item{method}{Optional scoring method filter; \code{NULL} summarizes each method separately.}
 
-\item{include_nonindependent}{\code{TRUE} ise bagimsiz-olmayan / NA satirlar ozete girer.}
+\item{include_nonindependent}{If \code{TRUE}, retain non-independent / \code{NA} rows in summary.}
 
-\item{independent_only}{\code{TRUE} (varsayilan) ise yalniz \code{independent == TRUE}.
-\code{include_nonindependent = TRUE} verilirse bu bayrak gecersiz kilinir.}
+\item{independent_only}{If \code{TRUE} (default), retain only \code{independent == TRUE}.
+Overridden when \code{include_nonindependent = TRUE}.}
 
-\item{exclude_var_zero}{\code{TRUE} (varsayilan) ise varyansi 0/NA olanlar IVW'den cikarilir.}
+\item{exclude_var_zero}{If \code{TRUE} (default), exclude zero/NA variance rows from IVW and REML.}
 
-\item{exclude_low_coverage}{\code{TRUE} (varsayilan) ise dusuk kapsama satirlari ozetten cikarilir.}
+\item{exclude_low_coverage}{If \code{TRUE} (default), exclude low-coverage rows from summary.}
 
-\item{stratify_by}{Opsiyonel karakter vektoru (orn. \code{c("treatment", "endpoint_type")});
-verildiginde ozet her alt grup icinde ayri hesaplanir.}
+\item{stratify_by}{Optional character vector of stratification columns (e.g.
+\code{c("treatment", "endpoint_type")}).}
 }
 \value{
-\code{data.frame} ozet satirlari (\code{auc_re}, \code{auc_re_ci_low}, \code{auc_re_ci_high},
-\code{tau2_reml}, \code{i2_logit} dahil).
+A summary \code{data.frame} (including \code{auc_re}, \code{auc_re_ci_low},
+\code{auc_re_ci_high}, \code{tau2_reml}, \code{i2_logit}).
 }
 \description{
-Her \code{signature} x \code{method} (ve istege bagli \code{stratify_by} alt gruplari) icin:
+Computes cross-cohort summary statistics per \code{signature} x \code{method} (and
+optional \code{stratify_by} subgroups):
 \itemize{
-\item \strong{n-agirlikli} ortalama: \code{sum(n * auc) / sum(n)}
-\item \strong{ters-varyans (IVW)} ortalama: \code{sum(w * auc) / sum(w)}, \code{w = 1 / auc_var}
-\item Heterojenlik: Cochran \code{Q} ve \code{I^2} (IVW agirliklariyla)
-\item \strong{Logit-AUC REML + kesilmis HKSJ 95 pct GA}: AUC acik aralikta (0, 1) ve
-pozitif varyansli kohortlarda \code{stats::qlogis} olceginde REML \code{tau2},
-Hartung-Knapp-Sidik-Jonkman \code{max(1, q_hk)} kesmeli standart hata ve
-\code{stats::qt} kritik degeri; nokta/GA \code{stats::plogis} ile geri donusur.
-Ayrica logit olcekli \code{i2_logit} raporlanir.
+\item \strong{n-weighted mean}: \code{sum(n * auc) / sum(n)}
+\item \strong{inverse-variance weighted (IVW) mean}: \code{sum(w * auc) / sum(w)}, \code{w = 1 / auc_var}
+\item Heterogeneity: Cochran \code{Q} and \code{I^2} (IVW weights)
+\item \strong{Logit-AUC REML + truncated HKSJ 95\% CI}: on cohorts with open-interval
+AUC in \verb{(0, 1)} and positive variance, estimates REML \code{tau2} on the
+\code{stats::qlogis} scale, Hartung-Knapp-Sidik-Jonkman standard error truncated
+at \code{max(1, q_hk)} with \code{stats::qt} critical values, and back-transforms
+estimates via \code{stats::plogis}; also reports logit-scale \code{i2_logit}.
 }
 }
 \details{
-Varsayilan kurallar:
+Default inclusion rules:
 \itemize{
-\item \code{independent_only = TRUE}: yalniz \code{independent == TRUE} (NA / FALSE dislanir)
-\item \code{exclude_low_coverage = TRUE}: \code{coverage_status != "ok"} (varsa) veya
-\code{low_coverage == TRUE} satirlar dislanir; \code{n_excluded_coverage} raporlanir
-\item \code{var_zero} / \code{auc_var <= 0} yalnizca IVW / REML'den cikarilir; n-agirlikli ortalamaya girer
-\item \code{skipped} veya sonlu olmayan AUC satirlar yok sayilir
+\item \code{independent_only = TRUE}: includes only \code{independent == TRUE} (\code{NA} / \code{FALSE} excluded)
+\item \code{exclude_low_coverage = TRUE}: excludes rows with \code{coverage_status != "ok"}
+(if present) or \code{low_coverage == TRUE}; reports \code{n_excluded_coverage}
+\item \code{var_zero} / \code{auc_var <= 0}: excluded from IVW and REML only (retained in n-weighted mean)
+\item \code{skipped} or non-finite AUC rows are ignored
 }
 
-\code{stratify_by = NULL} (varsayilan) iken cikti geriye donuk uyumludur. Ayni ozet
-grubunda birden fazla farkli non-NA \code{endpoint_type} veya \code{treatment} degeri
-birlestiriliyorsa ASCII \code{warning()} uretilir ve \code{stratify_by} onerilir.
-Varsayilan HTML rapor, tabakasiz ozetten hemen sonra
-\code{stratify_by = "treatment"} ve \code{stratify_by = "endpoint_type"} tablolarini
-ayri ayri render eder; forest grafigi tabakasiz ozeti korur.
+With \code{stratify_by = NULL} (default), output preserves the unstratified schema.
+Mixing distinct non-NA \code{endpoint_type} or \code{treatment} values within a summary
+group emits a \code{warning()} and recommends \code{stratify_by}.
 
-Logit-AUC REML + HKSJ ozeti kucuk kohort sayisinda (\code{k <= 4}) \strong{kesifseldir}.
-Farkli klinik sonlanimli kohortlarda \code{stratify_by} kullanin; havuzlama
-klinik olarak anlamsiz ortalamalar uretebilir.
+Logit-AUC REML + HKSJ summaries are exploratory when cohort count is small
+(\code{k <= 4}). Use \code{stratify_by} when cohorts differ in clinical endpoint or
+treatment regimen.
 }

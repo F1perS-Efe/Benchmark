@@ -2,20 +2,31 @@
 % Please edit documentation in R/adjust_null_p.R
 \name{adjust_null_p}
 \alias{adjust_null_p}
-\title{Null p-degerlerine BH duzeltmesi (imza x veri seti ailesi)}
+\title{Null p-degerlerine BH duzeltmesi (imza x veri seti ve yontemler arasi aile)}
 \usage{
-adjust_null_p(results, p_col = "null_p")
+adjust_null_p(results, p_col = "null_p", scope = c("within_method", "global"))
 }
 \arguments{
 \item{results}{\code{run_benchmark()} cikti (veya \code{null_p} iceren tablo).}
 
 \item{p_col}{Ham p sutunu. Varsayilan \code{"null_p"}.}
+
+\item{scope}{Coklu test ailesi kapsami: \code{"within_method"} veya \code{"global"}.}
 }
 \value{
-Ayni tablo + \code{null_p_adj_bh} sutunu.
+Ayni tablo + \code{null_p_adj_bh} ve \code{null_p_adj_bh_global} sutunlari.
 }
 \description{
-Coklu karsilastirma ailesi = ayni \code{method} icindeki tum
-\code{signature} x \code{dataset} satirlarinin \code{null_p} degerleri.
-Ham \code{null_p} korunur; \code{null_p_adj_bh} eklenir.
+Coklu karsilastirma ailesi:
+\itemize{
+\item \code{"within_method"} (varsayilan): Ayni \code{method} icindeki tum \code{signature} x \code{dataset}
+satirlarinin \code{null_p} degerleri (\code{null_p_adj_bh}).
+\item \code{"global"}: Tablodaki tum \code{method} x \code{signature} x \code{dataset} kombinasyonlarinin
+ortak ailesi uzerinden BH duzeltmesi.
+}
+}
+\details{
+Her iki modda da yontemler-arasi global duzeltilmis p-degeri \code{null_p_adj_bh_global}
+sutununda her zaman raporlanir; \code{scope = "global"} secildiginde \code{null_p_adj_bh}
+de global duzeltilmis degere esitlenir.
 }

@@ -10,7 +10,8 @@ score_signature(
   method = c("mean", "zscore", "median", "rank", "ss_rank"),
   min_genes = 3L,
   genes_up = NULL,
-  genes_down = NULL
+  genes_down = NULL,
+  weights = NULL
 )
 }
 \arguments{
@@ -26,10 +27,16 @@ score_signature(
 \item{genes_up}{Yukari yonlu (pozitif) imza genleri.}
 
 \item{genes_down}{Asagi yonlu (negatif) imza genleri.}
+
+\item{weights}{Optional named numeric vector of continuous gene weights
+(e.g. published regression coefficients such as Ayers/Cristescu 18-gene
+T cell-inflamed GEP where \code{CD276 = -0.023900} and \code{STAT1 = 0.250229}).
+When provided, scores are computed as the weighted linear combination of
+matched gene values (\code{method} transformation applied per gene first).}
 }
 \value{
 Liste: \code{scores}, \code{coverage}, \code{n_all_na_dropped}, \code{skipped},
-\code{skip_reason}, \code{signed}, \code{n_up_found}, \code{n_down_found}.
+\code{skip_reason}, \code{signed}, \code{weighted}, \code{n_up_found}, \code{n_down_found}.
 }
 \description{
 Skorlama yanit etiketini (\code{response}) asla kullanmaz; tum ornekler
@@ -61,4 +68,19 @@ Isaretli (\code{+}/\code{-}) imzalar:
 
 \code{mean} / \code{median} / \code{zscore} / \code{rank} icin \code{genes_down} doluysa
 \code{score = score_up - score_down}. \code{ss_rank} icin \code{score = s_up + s_down}.
+}
+\examples{
+mat <- matrix(
+  c(2.1, 3.5, 1.2, 4.0, 2.8, 3.9, 1.5, 4.2, 0.5, 0.2, 1.8, 0.3),
+  nrow = 3, byrow = TRUE,
+  dimnames = list(c("STAT1", "CXCL9", "CD276"), c("S1", "S2", "S3", "S4"))
+)
+# Unidirectional or continuously weighted signature scoring
+s_unidir <- score_signature(mat, genes = c("STAT1", "CXCL9"), method = "zscore", min_genes = 2L)
+s_weighted <- score_signature(
+  mat,
+  weights = c(STAT1 = 0.250229, CXCL9 = 0.074135, CD276 = -0.023900),
+  method = "zscore",
+  min_genes = 2L
+)
 }

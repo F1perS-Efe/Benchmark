@@ -42,10 +42,10 @@ read_user_dataset <- function(expr_path,
   scale <- match.arg(scale)
 
   if (!file.exists(expr_path)) {
-    stop("`expr_path` bulunamadi: ", expr_path, call. = FALSE)
+    stop("`expr_path` not found: ", expr_path, call. = FALSE)
   }
   if (!file.exists(meta_path)) {
-    stop("`meta_path` bulunamadi: ", meta_path, call. = FALSE)
+    stop("`meta_path` not found: ", meta_path, call. = FALSE)
   }
 
   sep_expr <- .detect_sep(expr_path, sep)
@@ -74,11 +74,11 @@ read_user_dataset <- function(expr_path,
   )
 
   if (ncol(expr_raw) < 2L) {
-    stop("Ifade dosyasi en az bir ID sutunu ve bir deger sutunu icermelidir.", call. = FALSE)
+    stop("Expression file must contain at least one ID column and one value column.", call. = FALSE)
   }
   id_col <- as.character(expr_raw[[1L]])
   if (any(is.na(id_col) | !nzchar(id_col))) {
-    stop("Ifade matrisinde gen (veya ornek) ID satirlari zorunludur.", call. = FALSE)
+    stop("Expression matrix requires non-empty gene (or sample) ID rows.", call. = FALSE)
   }
   expr_df <- expr_raw[, -1L, drop = FALSE]
 
@@ -97,8 +97,8 @@ read_user_dataset <- function(expr_path,
       coerced <- suppressWarnings(as.numeric(as.character(expr_df[[j]])))
       if (any(is.na(coerced) & !is.na(expr_df[[j]]) & nzchar(as.character(expr_df[[j]])))) {
         stop(
-          "Ifade matrisi sayisal olmalidir; sayisal olmayan deger(ler) bulundu ",
-          "(sutun: ", names(expr_df)[j], ").",
+          "Expression matrix must be numeric; non-numeric value(s) found ",
+          "(column: ", names(expr_df)[j], ").",
           call. = FALSE
         )
       }
@@ -110,16 +110,16 @@ read_user_dataset <- function(expr_path,
   storage.mode(expr) <- "double"
   rownames(expr) <- id_col
   if (!is.numeric(expr)) {
-    stop("Ifade matrisi sayisal olmalidir.", call. = FALSE)
+    stop("Expression matrix must be numeric.", call. = FALSE)
   }
   if (is.null(colnames(expr)) || any(!nzchar(colnames(expr)))) {
-    stop("Ifade matrisinde ornek (veya gen) ID sutunlari zorunludur.", call. = FALSE)
+    stop("Expression matrix requires non-empty sample (or gene) ID columns.", call. = FALSE)
   }
 
   if (identical(gene_id_type, "Ensembl")) {
     warning(
-      "gene_id_type = 'Ensembl': v0.2 HGNC sembolleriyle tam eslesme yapar; ",
-      "Ensembl ID'ler imza genleriyle eslesmeyebilir.",
+      "gene_id_type = 'Ensembl': signature matching expects HGNC gene symbols; ",
+      "Ensembl IDs may not match signature genes.",
       call. = FALSE
     )
   }
@@ -129,20 +129,20 @@ read_user_dataset <- function(expr_path,
     n_unique_dup <- length(unique(toupper(rownames(expr))[duplicated(toupper(rownames(expr)))]))
     expr <- collapse_duplicate_genes(expr)
     warning(
-      n_unique_dup, " yinelenen gen birlestirildi (collapse_duplicate_genes).",
+      n_unique_dup, " duplicate gene(s) collapsed via collapse_duplicate_genes().",
       call. = FALSE
     )
   }
 
   if (!sample_id_col %in% names(meta_df)) {
     stop(
-      "`meta_path` icinde `", sample_id_col, "` sutunu bulunamadi.",
+      "Column `", sample_id_col, "` not found in `meta_path`.",
       call. = FALSE
     )
   }
   if (!response_col %in% names(meta_df)) {
     stop(
-      "`meta_path` icinde `", response_col, "` sutunu bulunamadi.",
+      "Column `", response_col, "` not found in `meta_path`.",
       call. = FALSE
     )
   }
@@ -150,12 +150,22 @@ read_user_dataset <- function(expr_path,
   meta_df$sample_id <- as.character(meta_df[[sample_id_col]])
   meta_df$response_label <- as.character(meta_df[[response_col]])
 
+  if (any(is.na(meta_df$sample_id) | !nzchar(trimws(meta_df$sample_id)))) {
+    stop("Metadata column `", sample_id_col, "` cannot contain empty or NA sample IDs.", call. = FALSE)
+  }
+  if (anyDuplicated(meta_df$sample_id)) {
+    stop("Metadata column `", sample_id_col, "` contains duplicate sample_id values.", call. = FALSE)
+  }
+  if (anyDuplicated(as.character(colnames(expr)))) {
+    stop("Expression matrix contains duplicate sample IDs in column headers.", call. = FALSE)
+  }
+
   expr_ids <- as.character(colnames(expr))
   meta_ids <- as.character(meta_df$sample_id)
   common <- intersect(expr_ids, meta_ids)
   if (length(common) == 0L) {
     stop(
-      "Ifade matrisi ile metadata arasinda ortak sample_id yok.",
+      "No common sample_id values between expression matrix and metadata.",
       call. = FALSE
     )
   }
@@ -163,7 +173,7 @@ read_user_dataset <- function(expr_path,
   dropped_meta <- setdiff(meta_ids, common)
   if (length(dropped_expr) > 0L || length(dropped_meta) > 0L) {
     warning(
-      "Eslesmeyen ornekler dislandi: expr=", length(dropped_expr),
+      "Excluded unmatched samples: expr=", length(dropped_expr),
       ", meta=", length(dropped_meta), ".",
       call. = FALSE
     )

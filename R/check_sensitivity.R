@@ -15,16 +15,16 @@
 #' @export
 check_sensitivity <- function(results, threshold = 0.10) {
   if (!is.data.frame(results) || nrow(results) == 0L) {
-    stop("`results` bos olamaz.", call. = FALSE)
+    stop("`results` cannot be empty.", call. = FALSE)
   }
   req <- c("dataset", "signature", "method", "auc", "skipped")
   miss <- setdiff(req, names(results))
   if (length(miss) > 0L) {
-    stop("`results` eksik sutunlar: ", paste(miss, collapse = ", "), call. = FALSE)
+    stop("`results` is missing required columns: ", paste(miss, collapse = ", "), call. = FALSE)
   }
   if (!is.numeric(threshold) || length(threshold) != 1L || is.na(threshold) ||
       threshold < 0) {
-    stop("`threshold` negatif olmayan tek bir sayi olmalidir.", call. = FALSE)
+    stop("`threshold` must be a single non-negative number.", call. = FALSE)
   }
 
   df <- results[!(results$skipped %in% TRUE) & is.finite(results$auc), , drop = FALSE]

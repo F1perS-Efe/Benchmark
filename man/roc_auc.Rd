@@ -2,7 +2,7 @@
 % Please edit documentation in R/roc_auc.R
 \name{roc_auc}
 \alias{roc_auc}
-\title{ROC-AUC hesapla (sabit yon, cift ters cevirme yok)}
+\title{Compute ROC-AUC with fixed direction (no silent sign flipping)}
 \usage{
 roc_auc(
   scores,
@@ -13,25 +13,26 @@ roc_auc(
 )
 }
 \arguments{
-\item{scores}{Ornek skorlari (isimli vektor olabilir).}
+\item{scores}{Numeric sample score vector (optionally named).}
 
-\item{response}{0/1 yanit vektoru (ayni uzunluk / hizali isimler).}
+\item{response}{Integer/numeric 0/1 response vector (aligned to \code{scores}).}
 
-\item{direction}{Imza yonu: \code{"<"} veya \code{">"}. Yalnizca \code{orient_score}'a gider.}
+\item{direction}{Signature direction: \code{"<"} or \code{">"}. Passed to \code{\link[=orient_score]{orient_score()}}.}
 
-\item{min_n}{Kucuk kohort icin toplam n esigi. Varsayilan 20.}
+\item{min_n}{Minimum total sample size for \code{small_cohort} flag. Default \code{20L}.}
 
-\item{min_per_class}{Kucuk kohort icin sinif basi minimum. Varsayilan 5.}
+\item{min_per_class}{Minimum per-class sample size for \code{small_cohort} flag. Default \code{5L}.}
 }
 \value{
-Liste: \code{auc}, \code{auc_ci_low}, \code{auc_ci_high}, \code{auc_var}, \code{var_zero},
-\code{small_cohort}, \code{n}, \code{n_pos}, \code{n_neg}, \code{roc}, \code{scores_oriented}.
+A list with \code{auc}, \code{auc_ci_low}, \code{auc_ci_high}, \code{auc_var},
+\code{var_zero}, \code{small_cohort}, \code{n}, \code{n_pos}, \code{n_neg}, \code{roc},
+\code{scores_oriented}, and \code{response}.
 }
 \description{
-Akis: \code{orient_score()} ile skorlari "yuksek = yanitli" yap, ardindan
-\code{pROC::roc()} cagrisini her zaman \code{direction = "<"} ile yap.
-AUC < 0.5 ise ters cevirmeden durustce raporlanir.
+Aligns scores via \code{\link[=orient_score]{orient_score()}} so higher values represent responders,
+then invokes \code{pROC::roc()} with \code{direction = "<"}. When AUC < 0.5, values
+are reported directly without flipping.
 }
 \details{
-DeLong yontemiyle \%95 GA (\code{ci.auc}) ve AUC varyansi (\code{var}) eklenir.
+Computes DeLong 95\% confidence intervals (\code{ci.auc}) and AUC variance (\code{var}).
 }

@@ -13,14 +13,23 @@
 run_app <- function(allow_upload = FALSE, ...) {
   if (!requireNamespace("shiny", quietly = TRUE)) {
     stop(
-      "Shiny arayuzu icin 'shiny' paketini kurun: install.packages(\"shiny\")",
+      "Install 'shiny' to launch the UI: install.packages(\"shiny\")",
       call. = FALSE
     )
   }
   app_dir <- system.file("shiny", package = "SigBenchR")
   if (!nzchar(app_dir) || !dir.exists(app_dir)) {
-    stop("Shiny uygulama dizini bulunamadi (inst/shiny).", call. = FALSE)
+    stop("Shiny app directory not found (inst/shiny).", call. = FALSE)
   }
+  old_allow <- shiny::getShinyOption("sigbenchr_allow_upload")
+  old_opts <- options(shiny.maxRequestSize = 100 * 1024^2)
+  on.exit(
+    {
+      options(old_opts)
+      shiny::shinyOptions(sigbenchr_allow_upload = old_allow)
+    },
+    add = TRUE
+  )
   shiny::shinyOptions(sigbenchr_allow_upload = isTRUE(allow_upload))
   shiny::runApp(app_dir, ...)
 }

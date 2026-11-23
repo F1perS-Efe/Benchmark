@@ -150,3 +150,98 @@ code, pre {
   border-radius: 6px;
   background: var(--tint);
 }
+
+/* Tier-1 cards, priority badges, and deterministic alerts */
+.sb-tier1-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+  margin: 0.9rem 0 1.2rem;
+}
+
+.sb-card {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  padding: 0.75rem 0.9rem;
+}
+
+.sb-card-label {
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin: 0 0 0.25rem;
+}
+
+.sb-card-value {
+  font-size: 1.05rem;
+  font-weight: 650;
+  color: var(--accent);
+  margin: 0;
+}
+
+.sb-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--tint);
+  color: var(--ink);
+}
+
+.sb-badge-high { background: #ECFDF5; border-color: #10B981; color: #065F46; }
+.sb-badge-med  { background: #EFF6FF; border-color: #3B82F6; color: #1E40AF; }
+.sb-badge-low  { background: #F8FAFC; border-color: #94A3B8; color: #334155; }
+
+.sb-alert {
+  border-left: 4px solid #F59E0B;
+  background: #FFFBEB;
+  border-top: 1px solid #FDE68A;
+  border-right: 1px solid #FDE68A;
+  border-bottom: 1px solid #FDE68A;
+  border-radius: 4px;
+  padding: 0.6rem 0.85rem;
+  margin: 0.5rem 0;
+  font-size: 0.9rem;
+}
+
+.sb-alert-info {
+  border-left-color: #3B82F6;
+  background: #EFF6FF;
+  border-color: #BFDBFE;
+}
+
+.sb-takeaway {
+  border-left: 3px solid var(--accent);
+  background: var(--tint);
+  padding: 0.55rem 0.85rem;
+  margin: 0.6rem 0 1.2rem;
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+
+details.sb-appendix {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.6rem 0.9rem;
+  margin: 0.75rem 0;
+  background: var(--bg);
+}
+
+details.sb-appendix > summary {
+  cursor: pointer;
+  font-weight: 650;
+  color: var(--accent);
+}
+
+@media print {
+  body { font-size: 11pt; }
+  .main-container { max-width: 100%; padding: 0.4in; }
+  h1.sb-tier-break { page-break-before: always; }
+  .table-wrap { overflow-x: visible; page-break-inside: avoid; }
+  .sb-card, .sb-alert, .sb-notice { page-break-inside: avoid; }
+  details.sb-appendix { border: none; padding: 0; }
+}

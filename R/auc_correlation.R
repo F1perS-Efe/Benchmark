@@ -13,12 +13,12 @@
 #' @export
 auc_correlation <- function(results, method = NULL) {
   if (!is.data.frame(results) || nrow(results) == 0L) {
-    stop("`results` bos olamaz.", call. = FALSE)
+    stop("`results` cannot be empty.", call. = FALSE)
   }
   req <- c("dataset", "signature", "method", "auc", "skipped")
   miss <- setdiff(req, names(results))
   if (length(miss) > 0L) {
-    stop("`results` eksik sutunlar: ", paste(miss, collapse = ", "), call. = FALSE)
+    stop("`results` is missing required columns: ", paste(miss, collapse = ", "), call. = FALSE)
   }
 
   df <- results[!(results$skipped %in% TRUE) & is.finite(results$auc), , drop = FALSE]
@@ -27,12 +27,12 @@ auc_correlation <- function(results, method = NULL) {
   }
   df <- df[df$method == method, , drop = FALSE]
   if (nrow(df) == 0L) {
-    stop("Secilen yontem icin AUC satiri yok.", call. = FALSE)
+    stop("No AUC rows available for the selected method.", call. = FALSE)
   }
 
   sigs <- unique(as.character(df$signature))
   if (length(sigs) < 2L) {
-    stop("Korelasyon icin en az iki imza gerekir.", call. = FALSE)
+    stop("At least two signatures are required for correlation.", call. = FALSE)
   }
 
   # Genis matris: satir = veri seti, sutun = imza

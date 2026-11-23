@@ -219,7 +219,7 @@ test_that("shiny app parses and guards input$run before results()", {
   expect_error(parse(file = app_path), NA)
 
   src <- paste(readLines(app_path, warn = FALSE), collapse = "\n")
-  expect_true(grepl("v0\\.4\\.5", src))
+  expect_true(grepl('packageVersion\\("SigBenchR"\\)', src))
   # kpi_strip: run==0 check appears before results() in that block
   kpi_block <- sub(".*output\\$kpi_strip\\s*<-\\s*shiny::renderUI\\(\\{", "", src)
   kpi_block <- sub("\\}\\)\\s*\\n\\s*sens\\s*<-.*", "", kpi_block)

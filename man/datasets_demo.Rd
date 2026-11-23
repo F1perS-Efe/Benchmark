@@ -8,7 +8,7 @@
 Isimli liste (\code{demo_A}, \code{demo_B}).
 }
 \usage{
-datasets_demo
+data(datasets_demo)
 }
 \description{
 Iki kucuk sentetik ICI-benzeri kohort. Her biri sade bir listedir:

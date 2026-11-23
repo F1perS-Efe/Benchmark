@@ -3,12 +3,23 @@
 \name{as_sigbenchr_dataset}
 \alias{as_sigbenchr_dataset}
 \alias{as_sigbenchr_dataset.list}
+\alias{as_sigbenchr_dataset.SummarizedExperiment}
 \alias{as_sigbenchr_dataset.default}
 \title{Coerce objects into a SigBenchR dataset list}
 \usage{
 as_sigbenchr_dataset(x, ...)
 
 \method{as_sigbenchr_dataset}{list}(x, name = NULL, ...)
+
+\method{as_sigbenchr_dataset}{SummarizedExperiment}(
+  x,
+  ...,
+  assay = 1L,
+  normalization = "other",
+  scale = "log2",
+  response_col = "response_label",
+  name = NULL
+)
 
 \method{as_sigbenchr_dataset}{default}(
   x,
@@ -39,7 +50,7 @@ as_sigbenchr_dataset(x, ...)
 A validated \code{list(expr, sample_meta, info)}.
 }
 \description{
-S3 generic. Validates via \code{\link[=validate_dataset]{validate_dataset()}}. Does \strong{not} declare
-Bioconductor packages in DESCRIPTION; SummarizedExperiment support is
-optional at runtime when that package is already installed.
+S3 generic. Validates via \code{\link[=validate_dataset]{validate_dataset()}}. \code{SummarizedExperiment} is
+declared in \code{Suggests} and loaded optionally at runtime via
+\code{requireNamespace("SummarizedExperiment", quietly = TRUE)}.
 }

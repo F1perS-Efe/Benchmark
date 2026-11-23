@@ -50,7 +50,7 @@ test_that("low_coverage isi haritasinda auc_plot NA (gri) olur", {
 
   p <- plot_auc_heatmap(results, method = "mean", coverage_threshold = 0.70)
   expect_s3_class(p, "ggplot")
-  expect_match(p$labels$caption, "dusuk gen kapsama|Gri hucreler")
+  expect_match(p$labels$caption, "low gene coverage|Grey cells")
 })
 
 test_that("run_benchmark coverage_label ve median/rank uretir", {

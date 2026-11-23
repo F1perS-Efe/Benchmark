@@ -115,7 +115,7 @@ test_that("validate_dataset rejects bad survival columns; datasets_ici still ok"
 
   ds_neg <- ds
   ds_neg$sample_meta$os_time[1] <- -1
-  expect_error(validate_dataset(ds_neg, name = "bad_time"), "negatif|os_time")
+  expect_error(validate_dataset(ds_neg, name = "bad_time"), "negative|os_time")
 
   ds_ev <- ds
   ds_ev$sample_meta$os_event[1] <- 2

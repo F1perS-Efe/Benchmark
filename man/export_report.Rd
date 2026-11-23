@@ -10,7 +10,10 @@ export_report(
   sensitivity_tbl,
   params_list,
   output_file,
-  surv_res = NULL
+  surv_res = NULL,
+  report_model = NULL,
+  manifest = NULL,
+  beyond_inf = NULL
 )
 }
 \arguments{
@@ -28,7 +31,15 @@ export_report(
 \item{output_file}{Cikti HTML dosya yolu.}
 
 \item{surv_res}{Opsiyonel \code{run_survival_benchmark()} tablosu. \code{NULL}
-(varsayilan) iken sagkalim bolumu render edilmez (geriye donuk uyum).}
+(varsayilan) iken eger \code{params_list$datasets} ve \code{params_list$signatures}
+verilmisse ve kohortlarda sagkalim sutunlari varsa otomatik hesaplanir.}
+
+\item{report_model}{Optional pre-built \code{\link[=build_report_model]{build_report_model()}} object.}
+
+\item{manifest}{Optional pre-built \code{\link[=build_reproducibility_manifest]{build_reproducibility_manifest()}} object.}
+
+\item{beyond_inf}{Opsiyonel \code{test_beyond_infiltration()} ciktisi (veya imza
+bazli liste).}
 }
 \value{
 \code{output_file} yolu (gorunmez).

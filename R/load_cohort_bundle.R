@@ -14,11 +14,11 @@
 #' @importFrom tools md5sum
 load_cohort_bundle <- function(path, expected_md5 = NULL) {
   if (missing(path) || !nzchar(as.character(path)[1])) {
-    stop("`path` zorunludur.", call. = FALSE)
+    stop("`path` is required.", call. = FALSE)
   }
   path <- as.character(path)[1]
   if (!file.exists(path)) {
-    stop("Kohort paketi bulunamadi: ", path, call. = FALSE)
+    stop("Cohort bundle not found: ", path, call. = FALSE)
   }
 
   if (!is.null(expected_md5)) {
@@ -26,7 +26,7 @@ load_cohort_bundle <- function(path, expected_md5 = NULL) {
     got <- tolower(unname(tools::md5sum(path)))
     if (!identical(got, expected_md5)) {
       stop(
-        "MD5 uyusmazligi: beklenen=", expected_md5, ", bulunan=", got, ".",
+        "MD5 mismatch: expected=", expected_md5, ", got=", got, ".",
         call. = FALSE
       )
     }
@@ -35,7 +35,7 @@ load_cohort_bundle <- function(path, expected_md5 = NULL) {
   bundle <- readRDS(path)
   if (!is.list(bundle) || is.null(names(bundle)) || any(!nzchar(names(bundle)))) {
     stop(
-      "Kohort paketi isimli bir liste olmalidir (her eleman bir veri seti).",
+      "Cohort bundle must be a named list of dataset objects.",
       call. = FALSE
     )
   }

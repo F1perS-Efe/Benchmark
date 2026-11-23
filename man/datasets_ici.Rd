@@ -8,7 +8,7 @@
 Isimli liste: \code{van_allen_2015}, \code{hugo_2016}, \code{riaz_2017}, \code{gide_2019}.
 }
 \usage{
-datasets_ici
+data(datasets_ici)
 }
 \description{
 Pre-treatment, hasta basina tek ornek. Genler: demo imza genleri +
