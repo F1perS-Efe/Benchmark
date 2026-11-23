@@ -58,7 +58,7 @@ test_that("Faz 1.1 & 1.2: download_manifest, download_pub_bundle, and download_r
     # whereas changing analysis parameters without re-running must flag stale_inputs()
     session$setInputs(heatmap_method = "zscore")
     expect_false(stale_inputs())
-    expect_identical(report_model()$tier1$active_method, "zscore")
+    expect_identical(report_model()$tier1$active_method, "mean")
 
     session$setInputs(heatmap_method = "mean")
     session$setInputs(

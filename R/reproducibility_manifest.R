@@ -91,9 +91,10 @@ build_reproducibility_manifest <- function(results,
   cohorts_fp <- .fingerprint_cohorts(results, datasets = datasets)
   sigs_fp <- .fingerprint_signatures(results, signatures = signatures)
 
+  hash_params <- run_params[setdiff(names(run_params), c("heatmap_method", "forest_signature"))]
   core_payload <- list(
     sigbench_version = .pkg_ver("SigBenchR"),
-    run_params = run_params,
+    run_params = hash_params,
     rules_meta = rules_meta,
     cohorts_fingerprint = cohorts_fp,
     signatures_fingerprint = sigs_fp
