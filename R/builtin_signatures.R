@@ -180,7 +180,7 @@ get_builtin_signatures <- function(include_controls = TRUE) {
       min_genes = 3L,
       biological_interpretation = "5-gene Th1/Tfh cytokine and chemokine ICI response signature",
       original_reference = "Kus et al., EMBO Reports 2025 (TCGEx melanoma ICI cytokine panel).",
-      doi = "10.1038/s44319-025-00380-x",
+      doi = "10.1038/s44319-025-00407-7",
       known_limitations = "Derived across bundled melanoma ICI cohorts (van_allen_2015, hugo_2016, riaz_2017, gide_2019); flagged as non-independent (independent = FALSE) on those cohorts."
     )
   )
