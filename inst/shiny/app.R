@@ -1224,7 +1224,7 @@ server <- function(input, output, session) {
   report_model <- shiny::reactive({
     shiny::req(results())
     snap <- results()
-    hm_snap <- .validated_hm_method(snap)
+    hm_snap <- .snap_method(snap)
     fsig_snap <- .snap_forest_sig(snap)
     snap_params <- utils::modifyList(
       snap$params,
@@ -1546,7 +1546,7 @@ server <- function(input, output, session) {
         stop("Install 'rmarkdown' to download the HTML report.", call. = FALSE)
       }
       snap <- results()
-      hm_snap <- .validated_hm_method(snap)
+      hm_snap <- .snap_method(snap)
       fsig_snap <- .snap_forest_sig(snap)
       m <- report_model()
       man <- reproducibility_manifest()
@@ -1583,7 +1583,7 @@ server <- function(input, output, session) {
     shiny::req(results())
     snap <- results()
     m <- report_model()
-    hm_snap <- .validated_hm_method(snap)
+    hm_snap <- .snap_method(snap)
     fsig_snap <- .snap_forest_sig(snap)
     snap_params <- utils::modifyList(
       snap$params,
@@ -1616,7 +1616,7 @@ server <- function(input, output, session) {
     content = function(file) {
       shiny::req(results())
       snap <- results()
-      hm_snap <- .validated_hm_method(snap)
+      hm_snap <- .snap_method(snap)
       fsig_snap <- .snap_forest_sig(snap)
       m <- report_model()
       man <- reproducibility_manifest()

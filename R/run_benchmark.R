@@ -225,15 +225,62 @@ run_benchmark <- function(signatures,
         cell_seed <- .cell_seed(seed, ds_name, sig_name, method)
         eff_min_genes <- .resolve_min_genes(sig, default = min_genes)
 
-        scored <- score_signature(
-          expr_full,
-          genes = sig$genes,
-          genes_up = sig$genes_up,
-          genes_down = sig$genes_down,
-          weights = sig$weights,
-          method = method,
-          min_genes = eff_min_genes
-        )
+        compat <- sig$scoring_compatibility
+        if (!is.null(compat) && !(method %in% as.character(compat))) {
+          scored <- list(
+            scores = NULL,
+            coverage = list(
+              found = character(0),
+              missing = as.character(sig$genes),
+              n_found = 0L,
+              n_total = length(sig$genes),
+              coverage_pct = 0,
+              n_alias_rescued = 0L
+            ),
+            n_all_na_dropped = 0L,
+            skipped = TRUE,
+            skip_reason = sprintf(
+              "Method '%s' is incompatible with signature '%s' (compatible: %s).",
+              method, sig_name, paste(compat, collapse = ", ")
+            ),
+            signed = isTRUE(!is.null(sig$genes_up) || !is.null(sig$genes_down) || !is.null(sig$weights)),
+            n_up_found = 0L,
+            n_down_found = 0L,
+            method_incompatible = TRUE
+          )
+        } else {
+          scored <- tryCatch(
+            score_signature(
+              expr_full,
+              genes = sig$genes,
+              genes_up = sig$genes_up,
+              genes_down = sig$genes_down,
+              weights = sig$weights,
+              method = method,
+              min_genes = eff_min_genes
+            ),
+            error = function(e) {
+              list(
+                scores = NULL,
+                coverage = list(
+                  found = character(0),
+                  missing = as.character(sig$genes),
+                  n_found = 0L,
+                  n_total = length(sig$genes),
+                  coverage_pct = 0,
+                  n_alias_rescued = 0L
+                ),
+                n_all_na_dropped = 0L,
+                skipped = TRUE,
+                skip_reason = conditionMessage(e),
+                signed = isTRUE(!is.null(sig$genes_up) || !is.null(sig$genes_down) || !is.null(sig$weights)),
+                n_up_found = 0L,
+                n_down_found = 0L,
+                method_incompatible = TRUE
+              )
+            }
+          )
+        }
 
         cov_cls <- .classify_coverage(
           scored$coverage$coverage_pct,
@@ -248,7 +295,7 @@ run_benchmark <- function(signatures,
           n_alias <- 0L
         }
 
-        if (identical(cov_status, "invalid")) {
+        if (!isTRUE(scored$method_incompatible) && identical(cov_status, "invalid")) {
           warning(
             "Invalid gene coverage for cohort '", ds_name, "' / signature '",
             sig_name, "': coverage=",

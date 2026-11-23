@@ -46,6 +46,32 @@ test_that("BUG-13: Weighted continuous signatures disallow method = 'median' and
     score_signature(mat, genes = gep$genes, weights = gep$weights, method = "median"),
     "Weighted continuous signatures do not support method = 'median'"
   )
+
+  # In run_benchmark(), T_Cell_Inflamed_GEP + median marks only that cell skipped = TRUE
+  ds <- list(
+    cohort1 = list(
+      expr = mat,
+      sample_meta = data.frame(
+        sample_id = colnames(mat),
+        response_label = rep(c("CR", "PD"), each = 6),
+        stringsAsFactors = FALSE
+      ),
+      info = list(normalization = "TPM", scale = "log2")
+    )
+  )
+  rb <- run_benchmark(
+    signatures = list(T_Cell_Inflamed_GEP = gep),
+    datasets = ds,
+    methods = c("mean", "median"),
+    compute_pr = FALSE,
+    compute_null = FALSE
+  )
+  med_row <- rb[rb$method == "median", , drop = FALSE]
+  mean_row <- rb[rb$method == "mean", , drop = FALSE]
+  expect_true(isTRUE(med_row$skipped[1]))
+  expect_true(grepl("incompatible|median", med_row$skip_reason[1], ignore.case = TRUE))
+  expect_false(isTRUE(mean_row$skipped[1]))
+  expect_true(is.finite(mean_row$auc[1]))
 })
 
 test_that("BUG-14 & BUG-04 UI/Rmd: generate_r_code does not override demo signature directions and UI/Rmd use Repeat SD / Range (min-max)", {
